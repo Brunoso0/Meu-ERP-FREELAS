@@ -1,0 +1,380 @@
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import { useForm, type UseFormRegisterReturn } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { toast } from 'sonner'
+import { Download, Lock, Save, ScrollText } from 'lucide-react'
+import { Pager, usePagination } from '@/components/ui/Pagination'
+import { Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from '@/components/ui/primitives'
+import { useInsert, useRemove, useTable, useUpdate } from '@/hooks/useData'
+import { buildContractMarkdown, contractClauses, defaultClauses, serviceKinds } from '@/lib/contract'
+import { contractStatus, proposalStatus, toOptions } from '@/lib/labels'
+import { downloadContractPdf } from '@/lib/pdf'
+import { cn, formatCurrency, formatDate, formatProposalNumber } from '@/lib/utils'
+import type { ContractStatus } from '@/types/database.types'
+
+const days = (min: number, message: string) => z.coerce.number().int('Use um número inteiro').min(min, message)
+const pct = z.coerce.number().min(0, 'Não pode ser negativa').max(100, 'Máximo de 100%')
+
+const schema = z.object({
+  proposal_id: z.string(),
+  client_id: z.string().min(1, 'Selecione o cliente'),
+  title: z.string().min(3, 'Informe um título'),
+  objectDetails: z.string(),
+  executionDays: days(1, 'Mínimo de 1 dia'),
+  termMonths: days(1, 'Mínimo de 1 mês'),
+  revisionLimit: days(0, 'Não pode ser negativo'),
+  paymentDays: days(0, 'Não pode ser negativo'),
+  latePenaltyPct: pct,
+  terminationPenaltyPct: pct,
+  noticeDays: days(0, 'Não pode ser negativo'),
+  warrantyDays: days(0, 'Não pode ser negativo'),
+  responseHours: days(1, 'Mínimo de 1 hora'),
+  forum: z.string().min(2, 'Informe a comarca'),
+})
+type Values = z.infer<typeof schema>
+type NumericField = Exclude<keyof Values, 'proposal_id' | 'client_id' | 'title' | 'objectDetails' | 'forum'>
+
+/** Parâmetros que cada cláusula expõe quando está ligada. */
+const clauseParams: Record<string, Array<{ name: NumericField; label: string; step?: string }>> = {
+  term: [{ name: 'executionDays', label: 'Prazo (dias corridos)' }],
+  recurring: [
+    { name: 'termMonths', label: 'Vigência (meses)' },
+    { name: 'noticeDays', label: 'Aviso prévio (dias)' },
+  ],
+  payment: [
+    { name: 'paymentDays', label: 'Vencimento (dias após a cobrança)' },
+    { name: 'latePenaltyPct', label: 'Multa por atraso (%)', step: '0.5' },
+  ],
+  revisions: [{ name: 'revisionLimit', label: 'Rodadas de ajuste incluídas' }],
+  warranty: [{ name: 'warrantyDays', label: 'Garantia (dias)' }],
+  sla: [{ name: 'responseHours', label: 'Primeira resposta (horas úteis)' }],
+  termination: [
+    { name: 'noticeDays', label: 'Aviso prévio (dias)' },
+    { name: 'terminationPenaltyPct', label: 'Multa rescisória (%)' },
+  ],
+}
+
+// prazo único e vigência mensal descrevem modelos de contrato diferentes
+const exclusive: Record<string, string> = { term: 'recurring', recurring: 'term' }
+
+/** Renderiza o markdown simples do contrato (#, ##, parágrafos, **negrito**). */
+function Markdown({ source }: { source: string }) {
+  const bold = (text: string) =>
+    text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : <Fragment key={i}>{part}</Fragment>))
+  return (
+    <>
+      {source.split('\n').map((raw, i) => {
+        const line = raw.trim()
+        if (!line) return null
+        if (line.startsWith('# ')) return <h2 key={i} className="mb-6 text-center text-xl font-semibold tracking-tight">{line.slice(2)}</h2>
+        if (line.startsWith('## ')) return <h3 key={i} className="mb-1.5 mt-6 text-sm font-semibold">{line.slice(3)}</h3>
+        return <p key={i} className="mb-2.5 text-justify">{bold(line)}</p>
+      })}
+    </>
+  )
+}
+
+function Check({ checked, disabled, onChange, label }: { checked: boolean; disabled?: boolean; onChange: () => void; label: string }) {
+  return (
+    <input
+      type="checkbox"
+      aria-label={label}
+      checked={checked}
+      disabled={disabled}
+      onChange={onChange}
+      className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-brand-600 disabled:opacity-60"
+    />
+  )
+}
+
+export default function ContractGenerator() {
+  const preselected = (useLocation().state as { proposalId?: string } | null)?.proposalId
+  const proposals = useTable('proposals')
+  const clients = useTable('clients')
+  const contracts = useTable('contracts')
+  const profile = useTable('profiles').data?.[0]
+  const insert = useInsert('contracts')
+  const update = useUpdate('contracts')
+  const remove = useRemove('contracts')
+  const [clauses, setClauses] = useState<string[]>(defaultClauses)
+  const [services, setServices] = useState<string[]>(['maintenance', 'data'])
+  const saved = usePagination(contracts.data)
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      proposal_id: preselected ?? '',
+      client_id: '',
+      title: '',
+      objectDetails: '',
+      executionDays: 30,
+      termMonths: 12,
+      revisionLimit: 2,
+      paymentDays: 5,
+      latePenaltyPct: 2,
+      terminationPenaltyPct: 20,
+      noticeDays: 15,
+      warrantyDays: 30,
+      responseHours: 24,
+      forum: '',
+    },
+  })
+
+  const values = watch()
+  const proposal = proposals.data?.find((p) => p.id === values.proposal_id)
+  const client = clients.data?.find((c) => c.id === values.client_id)
+
+  // escolher a proposta puxa cliente, título e escopo dela
+  useEffect(() => {
+    if (!proposal) return
+    if (proposal.client_id) setValue('client_id', proposal.client_id)
+    setValue('title', `Contrato — ${proposal.title}`)
+    setValue('objectDetails', proposal.scope_text ?? '')
+  }, [proposal?.id, setValue]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // aprovadas primeiro: são as que normalmente viram contrato
+  const proposalOptions = useMemo(
+    () => [...(proposals.data ?? [])].sort((a, b) => Number(b.status === 'approved') - Number(a.status === 'approved')),
+    [proposals.data],
+  )
+
+  const toggleClause = (id: string) =>
+    setClauses((current) => (current.includes(id) ? current.filter((c) => c !== id) : [...current.filter((c) => c !== exclusive[id]), id]))
+  const toggleService = (id: string) => setServices((current) => (current.includes(id) ? current.filter((s) => s !== id) : [...current, id]))
+
+  const num = (name: NumericField) => Number(values[name]) || 0
+  const markdown = buildContractMarkdown(
+    {
+      title: values.title,
+      services,
+      objectDetails: values.objectDetails ?? '',
+      executionDays: num('executionDays'),
+      termMonths: num('termMonths'),
+      revisionLimit: num('revisionLimit'),
+      paymentDays: num('paymentDays'),
+      latePenaltyPct: num('latePenaltyPct'),
+      terminationPenaltyPct: num('terminationPenaltyPct'),
+      noticeDays: num('noticeDays'),
+      warrantyDays: num('warrantyDays'),
+      responseHours: num('responseHours'),
+      forum: values.forum,
+      clauses,
+    },
+    proposal,
+    client,
+    profile,
+  )
+
+  const issuer = profile?.company_name || profile?.full_name || 'Contrato'
+  const activeCount = contractClauses.filter((c) => c.required || clauses.includes(c.id)).length
+
+  const guard = (run: (v: Values) => void | Promise<void>) =>
+    handleSubmit(run, () => toast.error('Revise os campos destacados antes de continuar'))
+
+  const save = guard(async (v) => {
+    try {
+      await insert.mutateAsync({
+        proposal_id: v.proposal_id || null,
+        client_id: v.client_id,
+        title: v.title,
+        content_markdown: markdown,
+        status: 'draft',
+      })
+      toast.success('Contrato salvo')
+    } catch {
+      // toast de erro já exibido pelo hook
+    }
+  })
+
+  const download = guard((v) => downloadContractPdf(v.title, markdown, issuer))
+
+  const paramInput = (reg: UseFormRegisterReturn, label: string, error: string | undefined, step?: string) => (
+    <Field key={reg.name} label={label} error={error} className="w-full sm:w-44">
+      <Input type="number" min={0} step={step ?? '1'} {...reg} />
+    </Field>
+  )
+
+  return (
+    <>
+      <PageHeader
+        title="Gerador de contratos"
+        description="Parta de uma proposta, escolha as cláusulas e exporte."
+        actions={
+          <>
+            <Button variant="secondary" onClick={download}>
+              <Download className="h-4 w-4" /> Baixar PDF
+            </Button>
+            <Button loading={isSubmitting} onClick={save}>
+              <Save className="h-4 w-4" /> Salvar contrato
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,460px)_1fr]">
+        <div className="space-y-4">
+          <Card className="space-y-4 p-5">
+            <h2 className="text-sm font-semibold">Origem</h2>
+            <Field label="Proposta">
+              <Select {...register('proposal_id')}>
+                <option value="">Sem proposta (contrato avulso)</option>
+                {proposalOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {formatProposalNumber(p.proposal_number)} · {p.title} ({proposalStatus[p.status].label.toLowerCase()})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            {proposal && proposal.status !== 'approved' && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                Esta proposta ainda não foi aprovada pelo cliente.
+              </p>
+            )}
+            <Field label="Cliente" error={errors.client_id?.message}>
+              <Select {...register('client_id')}>
+                <option value="">Selecione…</option>
+                {clients.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.company_name ? `${c.name} — ${c.company_name}` : c.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Título do contrato" error={errors.title?.message}>
+              <Input {...register('title')} />
+            </Field>
+            {proposal && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Valor da proposta: <span className="tabular font-medium text-slate-900 dark:text-slate-100">{formatCurrency(proposal.total_amount)}</span>
+              </p>
+            )}
+          </Card>
+
+          <Card className="space-y-4 p-5">
+            <div>
+              <h2 className="text-sm font-semibold">Serviços do objeto</h2>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Marque o que descreve o trabalho. O texto precisa bater com o que você entrega e com a nota fiscal.</p>
+            </div>
+            <div className="space-y-2">
+              {serviceKinds.map((k) => (
+                <label key={k.id} className="flex cursor-pointer items-start gap-2.5 text-sm">
+                  <Check checked={services.includes(k.id)} onChange={() => toggleService(k.id)} label={k.label} />
+                  {k.label}
+                </label>
+              ))}
+            </div>
+            <Field label="Detalhamento (opcional)">
+              <Textarea rows={3} placeholder="Ex.: atualização mensal da lista de clientes e correção de cadastros duplicados no sistema de vendas." {...register('objectDetails')} />
+            </Field>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between gap-3 border-b px-5 py-3.5">
+              <div>
+                <h2 className="text-sm font-semibold">Cláusulas</h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{activeCount} no contrato · a numeração se ajusta sozinha</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setClauses(defaultClauses)}>
+                Restaurar recomendadas
+              </Button>
+            </div>
+            <ul>
+              {contractClauses.map((clause) => {
+                const active = clause.required || clauses.includes(clause.id)
+                // o aviso prévio é um campo só: com a rescisão ligada, ele é editado lá
+                const params = (active ? clauseParams[clause.id] ?? [] : []).filter(
+                  (p) => !(clause.id === 'recurring' && p.name === 'noticeDays' && clauses.includes('termination')),
+                )
+                return (
+                  <li key={clause.id} className={cn('border-b px-5 py-3 last:border-0', !active && 'opacity-70')}>
+                    <label className={cn('flex items-start gap-2.5', !clause.required && 'cursor-pointer')}>
+                      <Check checked={active} disabled={clause.required} onChange={() => toggleClause(clause.id)} label={clause.title} />
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-1.5 text-sm font-medium">
+                          {clause.title}
+                          {clause.required && <Lock className="h-3 w-3 text-slate-400" aria-label="Obrigatória" />}
+                        </span>
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">{clause.hint}</span>
+                      </span>
+                    </label>
+                    {(params.length > 0 || (active && clause.id === 'forum')) && (
+                      <div className="mt-3 flex flex-wrap gap-3 pl-6">
+                        {params.map((p) => paramInput(register(p.name), p.label, errors[p.name]?.message, p.step))}
+                        {clause.id === 'forum' && (
+                          <Field label="Comarca" error={errors.forum?.message} className="w-full sm:w-64">
+                            <Input placeholder="Ex.: São Paulo/SP" {...register('forum')} />
+                          </Field>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </Card>
+
+          <Card>
+            <h2 className="border-b px-5 py-3.5 text-sm font-semibold">Contratos salvos</h2>
+            {saved.total === 0 ? (
+              <EmptyState icon={ScrollText} title="Nenhum contrato salvo" description="Os contratos que você salvar aparecem aqui." className="py-8" />
+            ) : (
+              <>
+                <ul>
+                  {saved.visible.map((c) => (
+                    <li key={c.id} className="flex items-center gap-3 border-b px-5 py-3 last:border-0">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{c.title}</p>
+                        <p className="tabular text-xs text-slate-500 dark:text-slate-400">{formatDate(c.created_at)}</p>
+                      </div>
+                      <Select
+                        aria-label="Alterar status"
+                        value={c.status}
+                        onChange={(e) => update.mutate({ id: c.id, patch: { status: e.target.value as ContractStatus } })}
+                        className="h-8 w-28 text-xs"
+                      >
+                        {toOptions(contractStatus).map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button variant="ghost" size="icon" aria-label="Baixar PDF" className="h-8 w-8" onClick={() => downloadContractPdf(c.title, c.content_markdown, issuer)}>
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => window.confirm(`Excluir "${c.title}"?`) && remove.mutate(c.id, { onSuccess: () => toast.success('Contrato excluído') })}
+                      >
+                        Excluir
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+                <Pager {...saved} />
+              </>
+            )}
+          </Card>
+        </div>
+
+        <div className="xl:sticky xl:top-20">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Pré-visualização A4</p>
+          <div className="max-h-[calc(100vh-8rem)] overflow-auto rounded-xl border bg-slate-100 p-4 dark:bg-slate-950">
+            {/* folha sempre clara: é o documento que vai para impressão */}
+            <article className="mx-auto aspect-[210/297] w-full max-w-[794px] bg-white px-[8%] py-[7%] text-[13px] leading-relaxed text-slate-900 shadow-sm">
+              <Markdown source={markdown} />
+            </article>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}

@@ -1,0 +1,160 @@
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { format, parseISO } from 'date-fns'
+import { toast } from 'sonner'
+import type { ZodTypeAny } from 'zod'
+import { Trash2 } from 'lucide-react'
+import { Sheet } from '@/components/ui/overlays'
+import { Button, Field, Input, Select, Textarea } from '@/components/ui/primitives'
+import { useInsert, useRemove, useUpdate } from '@/hooks/useData'
+import type { TableName } from '@/types/database.types'
+
+export interface FieldDef {
+  name: string
+  label: string
+  type?: 'text' | 'email' | 'number' | 'date' | 'datetime' | 'select' | 'textarea'
+  options?: Array<{ value: string; label: string }>
+  /** Opção vazia do select (ex.: "Sem projeto"). */
+  emptyOption?: string
+  mask?: (value: string) => string
+  placeholder?: string
+  step?: string
+  /** Ocupa a linha inteira no grid de 2 colunas. */
+  full?: boolean
+}
+
+interface EntityFormProps {
+  open: boolean
+  onClose: () => void
+  /** Nome da entidade no singular, com artigo: "o cliente", "a demanda". */
+  noun: string
+  title: string
+  table: TableName
+  fields: FieldDef[]
+  schema: ZodTypeAny
+  record?: Record<string, any>
+  defaults?: Record<string, any>
+  variant?: 'drawer' | 'modal'
+  /** Falso para registros que não podem ser excluídos (ex.: o próprio perfil). */
+  allowDelete?: boolean
+}
+
+function initialValues(fields: FieldDef[], source: Record<string, any> | undefined) {
+  const values: Record<string, any> = {}
+  for (const f of fields) {
+    const raw = source?.[f.name]
+    if (raw === null || raw === undefined) values[f.name] = f.type === 'select' && !f.emptyOption ? f.options?.[0]?.value ?? '' : ''
+    else if (f.type === 'datetime') values[f.name] = format(parseISO(raw), "yyyy-MM-dd'T'HH:mm")
+    else values[f.name] = raw
+  }
+  return values
+}
+
+/**
+ * Formulário de criação/edição dirigido por configuração: cada entidade
+ * declara campos + schema Zod em GlobalModals e este componente cuida de
+ * validação, máscaras, salvar, excluir e feedback.
+ */
+export function EntityForm({ open, onClose, noun, title, table, fields, schema, record, defaults, variant = 'drawer', allowDelete = true }: EntityFormProps) {
+  const insert = useInsert(table)
+  const update = useUpdate(table)
+  const remove = useRemove(table)
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<Record<string, any>>({ resolver: zodResolver(schema), defaultValues: initialValues(fields, record ?? defaults) })
+
+  // `fields` é recriado a cada render do pai; reiniciar só quando abre ou troca o registro
+  useEffect(() => {
+    if (open) reset(initialValues(fields, record ?? defaults))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, record?.id])
+
+  const submit = handleSubmit(async (values) => {
+    const payload: Record<string, any> = {}
+    for (const f of fields) {
+      let v = values[f.name]
+      if (v === '' || v === undefined) v = null
+      else if (f.type === 'datetime') v = new Date(v).toISOString()
+      payload[f.name] = v
+    }
+    try {
+      if (record) await update.mutateAsync({ id: record.id, patch: payload })
+      else await insert.mutateAsync(payload)
+      toast.success(record ? 'Alterações salvas' : 'Registro criado')
+      onClose()
+    } catch {
+      // o hook já mostrou o toast de erro; mantém o formulário aberto
+    }
+  })
+
+  const handleDelete = async () => {
+    if (!record || !window.confirm(`Excluir ${noun}? Esta ação não pode ser desfeita.`)) return
+    try {
+      await remove.mutateAsync(record.id)
+      toast.success('Registro excluído')
+      onClose()
+    } catch {
+      // toast de erro já exibido pelo hook
+    }
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title={title} variant={variant}>
+      <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+        <div className="grid flex-1 grid-cols-2 content-start gap-4 overflow-y-auto px-5 py-5">
+          {fields.map((f) => {
+            const error = errors[f.name]?.message as string | undefined
+            const reg = register(f.name, f.mask ? { onChange: (e) => setValue(f.name, f.mask!(e.target.value)) } : undefined)
+            const wide = f.full || f.type === 'textarea'
+            return (
+              <Field key={f.name} label={f.label} error={error} className={wide ? 'col-span-2' : 'col-span-2 sm:col-span-1'}>
+                {f.type === 'select' ? (
+                  <Select {...reg}>
+                    {f.emptyOption && <option value="">{f.emptyOption}</option>}
+                    {f.options?.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                ) : f.type === 'textarea' ? (
+                  <Textarea placeholder={f.placeholder} {...reg} />
+                ) : (
+                  <Input
+                    type={f.type === 'datetime' ? 'datetime-local' : f.type ?? 'text'}
+                    step={f.type === 'number' ? f.step ?? '0.01' : undefined}
+                    placeholder={f.placeholder}
+                    {...reg}
+                  />
+                )}
+              </Field>
+            )
+          })}
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t px-5 py-3.5">
+          {record && allowDelete ? (
+            <Button variant="danger" size="sm" onClick={handleDelete} loading={remove.isPending}>
+              <Trash2 className="h-4 w-4" /> Excluir
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" loading={isSubmitting}>
+              {record ? 'Salvar' : 'Criar'}
+            </Button>
+          </div>
+        </div>
+      </form>
+    </Sheet>
+  )
+}
