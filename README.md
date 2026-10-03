@@ -16,7 +16,7 @@ Sem configuração nenhuma o app abre em **modo demo**: dados de exemplo salvos 
 ## Conectar ao Supabase
 
 1. Crie um projeto em supabase.com.
-2. No SQL Editor, rode em ordem os arquivos de `supabase/migrations/` (`001_initial_schema.sql`: tabelas, RLS, numeração de propostas, profile automático e bucket `proofs`; `002_quotes.sql`: orçamentos com Pix).
+2. No SQL Editor, rode em ordem os arquivos de `supabase/migrations/` (`001_initial_schema.sql`: tabelas, RLS, numeração de propostas, profile automático e bucket `proofs`; `002_quotes.sql`: orçamentos com Pix; `003_hardening.sql`: bloqueio de acesso anônimo e demais travas de segurança). Para uso individual, desligue também "Allow new users to sign up" em Authentication.
 3. Copie `.env.example` para `.env.local` e preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
 4. Reinicie `npm run dev`. O app passa a exigir login (e-mail e senha) e o indicador da barra superior mostra o status da conexão.
 

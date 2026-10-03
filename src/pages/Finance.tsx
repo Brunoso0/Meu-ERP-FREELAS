@@ -105,6 +105,11 @@ export default function Finance() {
     const id = uploadTarget.current
     e.target.value = ''
     if (!file || !id) return
+    // o `accept` do input é só sugestão do navegador; a checagem de verdade é esta
+    if (!/^image\/(png|jpe?g|webp)$|^application\/pdf$/.test(file.type)) {
+      toast.error('Formato não aceito', { description: 'Envie o comprovante em PNG, JPG, WEBP ou PDF.' })
+      return
+    }
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Arquivo muito grande', { description: 'O comprovante pode ter até 5 MB.' })
       return
@@ -249,7 +254,7 @@ export default function Finance() {
         <Summary label={isCurrent ? 'Lucro líquido projetado' : 'Resultado do período'} value={summary.profit} hint="Entradas menos saídas com vencimento no período" tone={summary.profit >= 0 ? 'good' : 'bad'} loading={loading} />
       </div>
 
-      <input ref={fileInput} type="file" accept="image/*,application/pdf" className="hidden" onChange={onFile} />
+      <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={onFile} />
 
       <Tabs.Root value={tab} onValueChange={(v) => setTab(v as Tab)} className="mt-4">
         <Card>

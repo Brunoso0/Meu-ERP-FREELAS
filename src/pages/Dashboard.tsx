@@ -9,7 +9,7 @@ import { Pager, usePagination } from '@/components/ui/Pagination'
 import { Avatar, Badge, Card, EmptyState, PageHeader, Skeleton } from '@/components/ui/primitives'
 import { useTable } from '@/hooks/useData'
 import { eventType, taskPriority } from '@/lib/labels'
-import { cn, formatCompact, formatCurrency, formatDate, sum, toDate } from '@/lib/utils'
+import { cn, formatCompact, formatCurrency, formatDate, safeHttpUrl, sum, toDate } from '@/lib/utils'
 import { useUI } from '@/store/ui'
 
 function Kpi({
@@ -273,11 +273,11 @@ export default function Dashboard() {
                       {eventType[e.event_type].label}
                     </Badge>
                   </span>
-                  {e.meeting_link && (
+                  {safeHttpUrl(e.meeting_link) && (
                     <a
-                      href={e.meeting_link}
+                      href={safeHttpUrl(e.meeting_link)!}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       <Video className="h-3.5 w-3.5" /> Entrar

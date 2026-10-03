@@ -68,7 +68,12 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
       event_type: z.enum(['meeting', 'deadline', 'review']),
       start_time: text.min(1, 'Informe o início'),
       end_time: text,
-      meeting_link: z.string().url('Link inválido (inclua https://)').or(z.literal('')),
+      // só http(s): z.url() sozinho aceita esquemas como javascript:, que virariam um link executável
+      meeting_link: z
+        .string()
+        .url('Link inválido (inclua https://)')
+        .refine((v) => /^https?:\/\//i.test(v), 'O link precisa começar com https://')
+        .or(z.literal('')),
       client_id: text,
       freelancer_id: text,
     })

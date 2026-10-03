@@ -64,5 +64,8 @@ export function initials(name: string | null | undefined) {
   return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
 }
 
+/** Devolve o link só se for http(s); qualquer outro esquema é descartado. */
+export const safeHttpUrl = (url: string | null | undefined) => (url && /^https?:\/\//i.test(url) ? url : null)
+
 export const sum = (values: Array<number | null | undefined>) =>
   values.reduce<number>((acc, v) => acc + Number(v ?? 0), 0)
