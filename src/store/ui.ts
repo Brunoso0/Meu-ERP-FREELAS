@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type ModalType = 'client' | 'freelancer' | 'project' | 'task' | 'event' | 'transaction' | 'goal' | 'profile'
+export type ModalType = 'client' | 'project' | 'task' | 'event' | 'transaction' | 'goal' | 'profile'
 
 export interface ModalState {
   type: ModalType

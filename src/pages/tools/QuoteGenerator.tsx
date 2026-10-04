@@ -1,19 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { addDays } from 'date-fns'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { Check, Download, MoreHorizontal, Pencil, Plus, QrCode, Save, Trash2, Undo2 } from 'lucide-react'
+import { PrintPortal } from '@/components/proposals/PrintPortal'
 import { QuoteDocument } from '@/components/quotes/QuoteDocument'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dropdown, DropdownContent, DropdownItem, DropdownSeparator, DropdownTrigger } from '@/components/ui/overlays'
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from '@/components/ui/primitives'
 import { useInsert, useRemove, useTable, useUpdate } from '@/hooks/useData'
-import { downloadQuotePdf, type QuoteDoc } from '@/lib/pdf'
 import { itemsTotal } from '@/lib/proposal'
+import { buildQuoteDoc, type QuoteDoc, type QuoteDraft } from '@/lib/quote'
 import { formatCurrency, formatDate, formatQuoteNumber } from '@/lib/utils'
-import type { Client, Profile, Quote } from '@/types/database.types'
+import { useUI } from '@/store/ui'
+import type { Quote } from '@/types/database.types'
 
 const schema = z
   .object({
@@ -48,36 +49,6 @@ const blank: Values = {
   notes: '',
 }
 
-type QuoteDraft = Pick<Quote, 'quote_number' | 'client_id' | 'customer_name' | 'title' | 'items' | 'notes' | 'total_amount' | 'validity_days'> & { created_at?: string }
-
-function buildQuoteDoc(quote: QuoteDraft, client: Client | undefined, profile: Profile | undefined): QuoteDoc {
-  const date = quote.created_at ? new Date(quote.created_at) : new Date()
-  const validityDays = Number(quote.validity_days) || 0
-  return {
-    number: formatQuoteNumber(quote.quote_number),
-    title: quote.title || 'Orçamento sem título',
-    date,
-    validUntil: addDays(date, validityDays),
-    validityDays,
-    issuer: {
-      name: profile?.company_name || profile?.full_name || 'Sua empresa',
-      document: profile?.document ?? '',
-      email: profile?.email ?? '',
-      phone: profile?.phone ?? '',
-    },
-    customer: client
-      ? {
-          name: [client.name, client.company_name].filter(Boolean).join(' — '),
-          document: client.document ?? '',
-          contact: [client.email, client.phone].filter(Boolean).join(' · '),
-        }
-      : { name: quote.customer_name ?? '', document: '', contact: '' },
-    items: (quote.items ?? []).filter((i) => i.description),
-    notes: quote.notes ?? '',
-    total: Number(quote.total_amount) || 0,
-  }
-}
-
 const quoteStatus = { pending: { label: 'Aguardando Pix', tone: 'amber' }, paid: { label: 'Pago', tone: 'green' } } as const
 
 export default function QuoteGenerator() {
@@ -87,7 +58,22 @@ export default function QuoteGenerator() {
   const insert = useInsert('quotes')
   const update = useUpdate('quotes')
   const remove = useRemove('quotes')
+  const openModal = useUI((s) => s.openModal)
   const [editing, setEditing] = useState<Quote | null>(null)
+  // orçamento que está sendo mandado para a impressão (PDF)
+  const [printing, setPrinting] = useState<QuoteDoc | null>(null)
+
+  useEffect(() => {
+    if (!printing) return
+    const done = () => setPrinting(null)
+    window.addEventListener('afterprint', done)
+    // espera as fontes do documento, senão o PDF sai com fonte errada
+    const timer = setTimeout(() => document.fonts.ready.then(() => window.print()), 300)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('afterprint', done)
+    }
+  }, [printing])
 
   const {
     register,
@@ -149,7 +135,7 @@ export default function QuoteGenerator() {
           ? await update.mutateAsync({ id: editing.id, patch: payload })
           : await insert.mutateAsync({ ...payload, status: 'pending' })
         toast.success(`Orçamento ${formatQuoteNumber(saved.quote_number)} salvo`)
-        if (thenDownload) await downloadQuotePdf(buildQuoteDoc(saved, clientOf(saved.client_id), profile))
+        if (thenDownload) setPrinting(buildQuoteDoc(saved, clientOf(saved.client_id), profile))
         startNew()
       } catch {
         // toast de erro já exibido pelo hook
@@ -190,7 +176,7 @@ export default function QuoteGenerator() {
             </Button>
           </DropdownTrigger>
           <DropdownContent>
-            <DropdownItem icon={Download} onSelect={() => downloadQuotePdf(buildQuoteDoc(q, clientOf(q.client_id), profile))}>Baixar PDF</DropdownItem>
+            <DropdownItem icon={Download} onSelect={() => setPrinting(buildQuoteDoc(q, clientOf(q.client_id), profile))}>Salvar em PDF / Imprimir</DropdownItem>
             <DropdownItem icon={Pencil} onSelect={() => edit(q)}>Editar</DropdownItem>
             {q.status === 'pending' ? (
               <DropdownItem icon={Check} onSelect={() => update.mutate({ id: q.id, patch: { status: 'paid' } }, { onSuccess: () => toast.success('Orçamento marcado como pago') })}>
@@ -220,7 +206,7 @@ export default function QuoteGenerator() {
               </Button>
             )}
             <Button variant="secondary" loading={isSubmitting} onClick={() => save(true)}>
-              <Download className="h-4 w-4" /> Salvar e baixar PDF
+              <Download className="h-4 w-4" /> Salvar e gerar PDF
             </Button>
             <Button loading={isSubmitting} onClick={() => save(false)}>
               <Save className="h-4 w-4" /> Salvar orçamento
@@ -228,6 +214,15 @@ export default function QuoteGenerator() {
           </>
         }
       />
+
+      {profile && !profile.pix_key && !profile.pix_qr_image && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+          <span>Você ainda não cadastrou sua chave Pix nem o QR Code. Sem eles, o orçamento sai sem o bloco de pagamento.</span>
+          <Button variant="secondary" size="sm" onClick={() => openModal({ type: 'profile', record: profile })}>
+            Cadastrar Pix
+          </Button>
+        </div>
+      )}
 
       <div className="grid items-start gap-4 xl:grid-cols-2">
         <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
@@ -299,6 +294,12 @@ export default function QuoteGenerator() {
           </div>
         </div>
       </div>
+
+      {printing && (
+        <PrintPortal>
+          <QuoteDocument doc={printing} />
+        </PrintPortal>
+      )}
 
       <Card className="mt-6">
         <h2 className="border-b px-5 py-3.5 text-sm font-semibold">Orçamentos salvos</h2>

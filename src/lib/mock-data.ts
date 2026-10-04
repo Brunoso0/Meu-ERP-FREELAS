@@ -26,12 +26,8 @@ export function buildSeed(): MockDB {
     { id: 'c5', user_id: u, name: 'Helena Duarte', company_name: null, email: 'helena.duarte@mail.example', phone: '(51) 94444-5050', document: '123.456.789-09', status: 'inactive', hourly_rate: 140, notes: null, created_at: created(300) },
   ]
 
-  const freelancers: MockDB['freelancers'] = [
-    { id: 'f1', user_id: u, name: 'Caio Nogueira', specialty: 'Front-end React', email: 'caio@mail.example', phone: '(11) 93333-1111', pix_key: 'caio@mail.example', cost_per_hour: 75, rating: 4.8, status: 'active', created_at: created(200) },
-    { id: 'f2', user_id: u, name: 'Bianca Farias', specialty: 'UI/UX Design', email: 'bianca@mail.example', phone: '(21) 93333-2222', pix_key: '(21) 93333-2222', cost_per_hour: 85, rating: 4.9, status: 'active', created_at: created(180) },
-    { id: 'f3', user_id: u, name: 'Diego Santana', specialty: 'Back-end Node', email: 'diego@mail.example', phone: '(31) 93333-3333', pix_key: '321.654.987-00', cost_per_hour: 90, rating: 4.6, status: 'active', created_at: created(140) },
-    { id: 'f4', user_id: u, name: 'Yasmin Leal', specialty: 'Redação & SEO', email: 'yasmin@mail.example', phone: '(41) 93333-4444', pix_key: 'yasmin@mail.example', cost_per_hour: 55, rating: 4.7, status: 'inactive', created_at: created(90) },
-  ]
+  // a tabela continua existindo no banco, mas o app não usa mais cadastro de terceiros
+  const freelancers: MockDB['freelancers'] = []
 
   const proposals: MockDB['proposals'] = [
     {
@@ -84,23 +80,23 @@ export function buildSeed(): MockDB {
   ]
 
   const tasks: MockDB['tasks'] = [
-    { id: 't1', user_id: u, project_id: 'pr1', freelancer_id: 'f2', title: 'Ajustar layout da home', description: null, status: 'done', priority: 'medium', scheduled_date: weekday(0), due_date: weekday(0), cost_amount: 680, charged_amount: 1400, created_at: created(9) },
-    { id: 't2', user_id: u, project_id: 'pr1', freelancer_id: 'f1', title: 'Componentes do portfólio', description: 'Grade e página de detalhe.', status: 'in_progress', priority: 'high', scheduled_date: weekday(1), due_date: weekday(2), cost_amount: 1200, charged_amount: 2600, created_at: created(8) },
-    { id: 't3', user_id: u, project_id: 'pr2', freelancer_id: 'f3', title: 'API de pontos', description: 'Endpoints de saldo e resgate.', status: 'in_progress', priority: 'urgent', scheduled_date: weekday(1), due_date: isoDay(addDays(now, 1)), cost_amount: 1800, charged_amount: 3800, created_at: created(7) },
-    { id: 't4', user_id: u, project_id: 'pr2', freelancer_id: 'f2', title: 'Telas de resgate', description: null, status: 'review', priority: 'medium', scheduled_date: weekday(2), due_date: weekday(3), cost_amount: 850, charged_amount: 1900, created_at: created(7) },
-    { id: 't5', user_id: u, project_id: 'pr3', freelancer_id: 'f1', title: 'Formulário de captação', description: null, status: 'in_progress', priority: 'high', scheduled_date: weekday(2), due_date: isoDay(addDays(now, 1)), cost_amount: 450, charged_amount: 1100, created_at: created(5) },
-    { id: 't6', user_id: u, project_id: 'pr3', freelancer_id: 'f4', title: 'Revisão dos textos', description: null, status: 'in_progress', priority: 'low', scheduled_date: weekday(3), due_date: weekday(4), cost_amount: 220, charged_amount: 600, created_at: created(5) },
-    { id: 't7', user_id: u, project_id: 'pr1', freelancer_id: 'f1', title: 'Integração com CMS', description: null, status: 'in_progress', priority: 'medium', scheduled_date: weekday(3), due_date: isoDay(addDays(monday, 8)), cost_amount: 900, charged_amount: 2500, created_at: created(4) },
-    { id: 't8', user_id: u, project_id: 'pr2', freelancer_id: 'f3', title: 'Autenticação por telefone', description: null, status: 'in_progress', priority: 'high', scheduled_date: weekday(4), due_date: isoDay(addDays(monday, 9)), cost_amount: 1350, charged_amount: 2900, created_at: created(4) },
-    { id: 't9', user_id: u, project_id: 'pr2', freelancer_id: null, title: 'Notificações push', description: 'Definir provedor antes de alocar.', status: 'backlog', priority: 'medium', scheduled_date: null, due_date: null, cost_amount: 0, charged_amount: 2200, created_at: created(3) },
+    { id: 't1', user_id: u, project_id: 'pr1', freelancer_id: null, title: 'Ajustar layout da home', description: null, status: 'done', priority: 'medium', scheduled_date: weekday(0), due_date: weekday(0), cost_amount: 0, charged_amount: 1400, created_at: created(9) },
+    { id: 't2', user_id: u, project_id: 'pr1', freelancer_id: null, title: 'Componentes do portfólio', description: 'Grade e página de detalhe.', status: 'in_progress', priority: 'high', scheduled_date: weekday(1), due_date: weekday(2), cost_amount: 0, charged_amount: 2600, created_at: created(8) },
+    { id: 't3', user_id: u, project_id: 'pr2', freelancer_id: null, title: 'API de pontos', description: 'Endpoints de saldo e resgate.', status: 'in_progress', priority: 'urgent', scheduled_date: weekday(1), due_date: isoDay(addDays(now, 1)), cost_amount: 0, charged_amount: 3800, created_at: created(7) },
+    { id: 't4', user_id: u, project_id: 'pr2', freelancer_id: null, title: 'Telas de resgate', description: null, status: 'review', priority: 'medium', scheduled_date: weekday(2), due_date: weekday(3), cost_amount: 0, charged_amount: 1900, created_at: created(7) },
+    { id: 't5', user_id: u, project_id: 'pr3', freelancer_id: null, title: 'Formulário de captação', description: null, status: 'in_progress', priority: 'high', scheduled_date: weekday(2), due_date: isoDay(addDays(now, 1)), cost_amount: 0, charged_amount: 1100, created_at: created(5) },
+    { id: 't6', user_id: u, project_id: 'pr3', freelancer_id: null, title: 'Revisão dos textos', description: null, status: 'in_progress', priority: 'low', scheduled_date: weekday(3), due_date: weekday(4), cost_amount: 0, charged_amount: 600, created_at: created(5) },
+    { id: 't7', user_id: u, project_id: 'pr1', freelancer_id: null, title: 'Integração com CMS', description: null, status: 'in_progress', priority: 'medium', scheduled_date: weekday(3), due_date: isoDay(addDays(monday, 8)), cost_amount: 0, charged_amount: 2500, created_at: created(4) },
+    { id: 't8', user_id: u, project_id: 'pr2', freelancer_id: null, title: 'Autenticação por telefone', description: null, status: 'in_progress', priority: 'high', scheduled_date: weekday(4), due_date: isoDay(addDays(monday, 9)), cost_amount: 0, charged_amount: 2900, created_at: created(4) },
+    { id: 't9', user_id: u, project_id: 'pr2', freelancer_id: null, title: 'Notificações push', description: 'Definir provedor antes de começar.', status: 'backlog', priority: 'medium', scheduled_date: null, due_date: null, cost_amount: 0, charged_amount: 2200, created_at: created(3) },
     { id: 't10', user_id: u, project_id: 'pr1', freelancer_id: null, title: 'Página de contato', description: null, status: 'backlog', priority: 'low', scheduled_date: null, due_date: null, cost_amount: 0, charged_amount: 900, created_at: created(3) },
-    { id: 't11', user_id: u, project_id: 'pr3', freelancer_id: 'f2', title: 'Variação de banner para anúncios', description: null, status: 'backlog', priority: 'high', scheduled_date: null, due_date: isoDay(addDays(now, 6)), cost_amount: 300, charged_amount: 800, created_at: created(2) },
-    { id: 't12', user_id: u, project_id: 'pr4', freelancer_id: 'f2', title: 'Manual da marca', description: null, status: 'done', priority: 'medium', scheduled_date: isoDay(subDays(now, 45)), due_date: isoDay(subDays(now, 42)), cost_amount: 2400, charged_amount: 7800, created_at: created(100) },
+    { id: 't11', user_id: u, project_id: 'pr3', freelancer_id: null, title: 'Variação de banner para anúncios', description: null, status: 'backlog', priority: 'high', scheduled_date: null, due_date: isoDay(addDays(now, 6)), cost_amount: 0, charged_amount: 800, created_at: created(2) },
+    { id: 't12', user_id: u, project_id: 'pr4', freelancer_id: null, title: 'Manual da marca', description: null, status: 'done', priority: 'medium', scheduled_date: isoDay(subDays(now, 45)), due_date: isoDay(subDays(now, 42)), cost_amount: 0, charged_amount: 7800, created_at: created(100) },
   ]
 
   const calendar_events: MockDB['calendar_events'] = [
     { id: 'e1', user_id: u, title: 'Alinhamento semanal — Bento Café', event_type: 'meeting', start_time: at(now, 10), end_time: at(now, 10, 45), meeting_link: 'https://meet.google.com/', client_id: 'c2', freelancer_id: null, created_at: created(3) },
-    { id: 'e2', user_id: u, title: 'Revisão de layout com Bianca', event_type: 'review', start_time: at(now, 15, 30), end_time: at(now, 16), meeting_link: 'https://meet.google.com/', client_id: null, freelancer_id: 'f2', created_at: created(2) },
+    { id: 'e2', user_id: u, title: 'Revisão do layout antes da entrega', event_type: 'review', start_time: at(now, 15, 30), end_time: at(now, 16), meeting_link: 'https://meet.google.com/', client_id: null, freelancer_id: null, created_at: created(2) },
     { id: 'e3', user_id: u, title: 'Apresentação da proposta — Clínica Vértice', event_type: 'meeting', start_time: at(addDays(now, 1), 11), end_time: at(addDays(now, 1), 12), meeting_link: 'https://meet.google.com/', client_id: 'c3', freelancer_id: null, created_at: created(2) },
     { id: 'e4', user_id: u, title: 'Entrega da landing page', event_type: 'deadline', start_time: at(addDays(now, 4), 18), end_time: null, meeting_link: null, client_id: 'c3', freelancer_id: null, created_at: created(10) },
     { id: 'e5', user_id: u, title: 'Primeira conversa — Rota Logística', event_type: 'meeting', start_time: at(addDays(now, 3), 9, 30), end_time: at(addDays(now, 3), 10, 15), meeting_link: 'https://meet.google.com/', client_id: 'c4', freelancer_id: null, created_at: created(1) },
@@ -112,17 +108,17 @@ export function buildSeed(): MockDB {
   const tx = (t: Omit<FinancialTransaction, 'id' | 'user_id' | 'created_at' | 'proof_url'>) =>
     financial_transactions.push({ ...t, id: `x${++txId}`, user_id: u, proof_url: null, created_at: toDateTime(t.due_date) })
 
-  const history: Array<[income: number, payout: number, extra: number]> = [
-    [9800, 3900, 420], [12400, 5200, 380], [8600, 3100, 510], [14900, 6400, 460], [13200, 5600, 390],
+  const history: Array<[income: number, taxes: number, tools: number]> = [
+    [9800, 590, 420], [12400, 745, 380], [8600, 515, 510], [14900, 895, 460], [13200, 790, 390],
   ]
-  history.forEach(([income, payout, extra], i) => {
+  history.forEach(([income, taxes, tools], i) => {
     const month = startOfMonth(subMonths(now, 5 - i))
     const day = (d: number) => isoDay(addDays(month, d))
     const client = ['c1', 'c2', 'c5', 'c2', 'c1'][i]
     const project = ['pr1', 'pr2', 'pr4', 'pr2', 'pr1'][i]
     tx({ type: 'income', category: 'Projeto', description: 'Parcela de projeto', amount: income, due_date: day(9), payment_date: day(10), status: 'paid', client_id: client, freelancer_id: null, project_id: project })
-    tx({ type: 'expense', category: 'Repasse', description: 'Repasse de demandas', amount: payout, due_date: day(14), payment_date: day(14), status: 'paid', client_id: null, freelancer_id: ['f1', 'f3', 'f2', 'f3', 'f1'][i], project_id: project })
-    tx({ type: 'expense', category: 'Ferramentas', description: 'Licenças e hospedagem', amount: extra, due_date: day(4), payment_date: day(4), status: 'paid', client_id: null, freelancer_id: null, project_id: null })
+    tx({ type: 'expense', category: 'Impostos', description: 'Impostos e taxas do mês', amount: taxes, due_date: day(20), payment_date: day(20), status: 'paid', client_id: null, freelancer_id: null, project_id: null })
+    tx({ type: 'expense', category: 'Ferramentas', description: 'Licenças e hospedagem', amount: tools, due_date: day(4), payment_date: day(4), status: 'paid', client_id: null, freelancer_id: null, project_id: null })
   })
 
   const thisMonth = startOfMonth(now)
@@ -131,9 +127,9 @@ export function buildSeed(): MockDB {
   tx({ type: 'income', category: 'Projeto', description: 'App Bento — 2ª parcela', amount: 7333, due_date: isoDay(addDays(now, 5)), payment_date: null, status: 'pending', client_id: 'c2', freelancer_id: null, project_id: 'pr2' })
   tx({ type: 'income', category: 'Projeto', description: 'Landing page — saldo', amount: 3200, due_date: isoDay(subDays(now, 3)), payment_date: null, status: 'pending', client_id: 'c3', freelancer_id: null, project_id: 'pr3' })
   tx({ type: 'income', category: 'Projeto', description: 'Site Aurora — 2ª parcela', amount: 9250, due_date: isoDay(addDays(now, 20)), payment_date: null, status: 'pending', client_id: 'c1', freelancer_id: null, project_id: 'pr1' })
-  tx({ type: 'expense', category: 'Repasse', description: 'Caio — componentes do portfólio', amount: 1200, due_date: isoDay(addDays(now, 3)), payment_date: null, status: 'pending', client_id: null, freelancer_id: 'f1', project_id: 'pr1' })
-  tx({ type: 'expense', category: 'Repasse', description: 'Diego — API de pontos', amount: 1800, due_date: isoDay(addDays(now, 7)), payment_date: null, status: 'pending', client_id: null, freelancer_id: 'f3', project_id: 'pr2' })
-  tx({ type: 'expense', category: 'Repasse', description: 'Bianca — layout da home', amount: 680, due_date: today, payment_date: today, status: 'paid', client_id: null, freelancer_id: 'f2', project_id: 'pr1' })
+  tx({ type: 'expense', category: 'Impostos', description: 'Impostos e taxas do mês', amount: 555, due_date: isoDay(addDays(now, 3)), payment_date: null, status: 'pending', client_id: null, freelancer_id: null, project_id: null })
+  tx({ type: 'expense', category: 'Ferramentas', description: 'Assinatura da ferramenta de design', amount: 120, due_date: isoDay(addDays(now, 7)), payment_date: null, status: 'pending', client_id: null, freelancer_id: null, project_id: null })
+  tx({ type: 'expense', category: 'Equipamento', description: 'Teclado e mouse', amount: 380, due_date: today, payment_date: today, status: 'paid', client_id: null, freelancer_id: null, project_id: null })
   tx({ type: 'expense', category: 'Ferramentas', description: 'Licenças e hospedagem', amount: 440, due_date: isoDay(addDays(thisMonth, 4)), payment_date: isoDay(addDays(thisMonth, 4)), status: 'paid', client_id: null, freelancer_id: null, project_id: null })
   tx({ type: 'expense', category: 'Infraestrutura', description: 'Servidor do App Bento', amount: 260, due_date: isoDay(addDays(now, 9)), payment_date: null, status: 'pending', client_id: null, freelancer_id: null, project_id: 'pr2' })
 
@@ -148,7 +144,7 @@ export function buildSeed(): MockDB {
   ]
 
   const profiles: MockDB['profiles'] = [
-    { id: u, full_name: 'Usuário Demo', company_name: 'Minha Agência', document: '00.000.000/0001-00', email: 'demo@meuerp.example', phone: '(11) 90000-0000', avatar_url: null, created_at: created(365) },
+    { id: u, full_name: 'Usuário Demo', company_name: 'Demo Serviços Digitais', document: '00.000.000/0001-00', email: 'demo@meuerp.example', phone: '(11) 90000-0000', avatar_url: null, pix_key: 'demo@meuerp.example', pix_qr_image: null, created_at: created(365) },
   ]
 
   const quotes: MockDB['quotes'] = [

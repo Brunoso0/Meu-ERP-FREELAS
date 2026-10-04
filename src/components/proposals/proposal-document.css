@@ -1,0 +1,911 @@
+/*
+ * Visual da proposta comercial (capa com ondas, cartões em degradê, páginas A4).
+ * Tudo fica sob .pdoc para não vazar para o resto do app. O documento tem
+ * cores próprias e ignora o tema claro/escuro: é uma peça para o cliente.
+ */
+
+.pdoc {
+  --pd-magenta: #e6007a;
+  --pd-purple: #7928ca;
+  --pd-ink: #18092b;
+  --pd-body: #4b5563;
+  --pd-gradient-main: linear-gradient(135deg, #ec008c 0%, #8916b5 60%, #4b0082 100%);
+  --pd-gradient-card: linear-gradient(145deg, #d90082 0%, #6e12a1 100%);
+  --pd-gradient-chart: linear-gradient(180deg, #ec008c 0%, #6e12a1 100%);
+  --pd-shadow-sm: 0 4px 12px rgba(110, 18, 161, 0.08);
+  --pd-shadow-card: 0 12px 30px rgba(75, 0, 130, 0.18);
+
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 210mm;
+  font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+  color: var(--pd-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.pdoc *,
+.pdoc *::before,
+.pdoc *::after {
+  box-sizing: border-box;
+  border-color: #e2e8f0;
+}
+
+.pdoc h1,
+.pdoc h2,
+.pdoc h3,
+.pdoc h4,
+.pdoc h5,
+.pdoc h6,
+.pdoc p,
+.pdoc ul {
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- página ---------- */
+
+.pdoc .pd-page {
+  width: 210mm;
+  min-height: 297mm;
+  background: #fff;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+}
+
+/* capa e contracapa têm arte posicionada: altura fixa de A4 */
+.pdoc .pd-cover,
+.pdoc .pd-back {
+  height: 297mm;
+}
+
+.pdoc .pd-content {
+  padding: 48px 54px 30px;
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdoc .pd-footer-bar {
+  margin-top: auto;
+  padding: 14px 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #f1f5f9;
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.pdoc .pd-page-pill {
+  background: var(--pd-gradient-main);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.pdoc .pd-section-title {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--pd-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: relative;
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+}
+
+.pdoc .pd-section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--pd-gradient-main);
+}
+
+.pdoc .pd-lead {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--pd-body);
+  margin-bottom: 24px;
+  white-space: pre-line;
+}
+
+.pdoc .pd-wave-header,
+.pdoc .pd-wave-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pdoc .pd-wave-header {
+  top: 0;
+}
+
+.pdoc .pd-wave-footer {
+  bottom: 0;
+}
+
+.pdoc .pd-wave-header svg,
+.pdoc .pd-wave-footer svg {
+  width: 100%;
+  display: block;
+}
+
+/* ---------- capa ---------- */
+
+.pdoc .pd-cover-tag {
+  position: absolute;
+  top: 42px;
+  left: 54px;
+  right: 54px;
+  z-index: 20;
+  color: #fff;
+}
+
+.pdoc .pd-cover-tag h4 {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.pdoc .pd-cover-tag p {
+  font-size: 9px;
+  opacity: 0.85;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.pdoc .pd-cover-body {
+  margin-top: 290px;
+  padding: 0 54px;
+  position: relative;
+  z-index: 20;
+}
+
+.pdoc .pd-cover-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--pd-magenta);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.pdoc .pd-cover-title {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--pd-ink);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* títulos longos encolhem para não invadir a onda do rodapé */
+.pdoc .pd-cover-title.pd-long {
+  font-size: 34px;
+}
+
+.pdoc .pd-cover-title.pd-xlong {
+  font-size: 26px;
+}
+
+.pdoc .pd-cover-number {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 28px;
+  background: var(--pd-gradient-main);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.pdoc .pd-cover-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 20px;
+  max-width: 480px;
+}
+
+.pdoc .pd-meta-item h6 {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.pdoc .pd-meta-item p {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pd-ink);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- cartões em degradê ---------- */
+
+.pdoc .pd-dual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin-top: 8px;
+}
+
+.pdoc .pd-hero-card {
+  background: var(--pd-gradient-card);
+  border-radius: 16px;
+  padding: 30px 26px;
+  color: #fff;
+  box-shadow: var(--pd-shadow-card);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.pdoc .pd-hero-card::after {
+  content: '';
+  position: absolute;
+  right: -30px;
+  bottom: -30px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.pdoc .pd-hero-title {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+.pdoc .pd-bullets {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  opacity: 0.95;
+}
+
+.pdoc .pd-bullets li {
+  position: relative;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+}
+
+.pdoc .pd-bullets li::before {
+  content: '■';
+  position: absolute;
+  left: 0;
+  font-size: 8px;
+  top: 3px;
+  color: #ffc0e5;
+}
+
+.pdoc .pd-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pdoc .pd-facts dt {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #ffc0e5;
+  font-weight: 700;
+}
+
+.pdoc .pd-facts dd {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.pdoc .pd-strip {
+  background: #f8fafc;
+  border-left: 4px solid var(--pd-magenta);
+  padding: 16px 20px;
+  border-radius: 0 10px 10px 0;
+  margin-top: 24px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #475569;
+  white-space: pre-line;
+}
+
+.pdoc .pd-strip strong {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--pd-magenta);
+  margin-bottom: 4px;
+}
+
+/* ---------- cronograma ---------- */
+
+.pdoc .pd-chart-box {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 28px;
+  box-shadow: var(--pd-shadow-sm);
+}
+
+.pdoc .pd-chart-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pd-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.pdoc .pd-chart-title small {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.pdoc .pd-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 150px;
+  padding: 0 16px 8px;
+  border-bottom: 1.5px solid #cbd5e1;
+  gap: 14px;
+}
+
+.pdoc .pd-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.pdoc .pd-bar-value {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pd-magenta);
+  white-space: nowrap;
+}
+
+.pdoc .pd-bar-fill {
+  width: 100%;
+  max-width: 32px;
+  border-radius: 6px 6px 0 0;
+  background: var(--pd-gradient-chart);
+}
+
+.pdoc .pd-bar-fill.pd-total {
+  background: #e6007a;
+}
+
+.pdoc .pd-bar-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.pdoc .pd-steps-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.pdoc .pd-steps-grid.pd-single {
+  grid-template-columns: 1fr;
+}
+
+.pdoc .pd-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pdoc .pd-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.pdoc .pd-step-circle {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border: 2px solid var(--pd-magenta);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pd-magenta);
+  font-weight: 800;
+  font-size: 13px;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(230, 0, 122, 0.15);
+}
+
+.pdoc .pd-step h5 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pd-ink);
+  margin-bottom: 3px;
+  overflow-wrap: anywhere;
+}
+
+.pdoc .pd-step p {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.pdoc .pd-side-card {
+  background: var(--pd-gradient-card);
+  border-radius: 14px;
+  padding: 24px 20px;
+  color: #fff;
+  box-shadow: var(--pd-shadow-card);
+}
+
+.pdoc .pd-side-card h4 {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+}
+
+.pdoc .pd-side-card .pd-side-big {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+
+.pdoc .pd-side-card p {
+  font-size: 11.5px;
+  line-height: 1.6;
+  opacity: 0.95;
+}
+
+/* ---------- investimento ---------- */
+
+.pdoc .pd-pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.pdoc .pd-pricing-card {
+  background: var(--pd-gradient-card);
+  border-radius: 14px;
+  padding: 22px 20px;
+  color: #fff;
+  box-shadow: var(--pd-shadow-card);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.pdoc .pd-pricing-card small {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.45;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.pdoc .pd-pricing-card h4 {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.pdoc .pd-pricing-card p {
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.92;
+  margin-top: 6px;
+}
+
+.pdoc .pd-price-tag {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 8px;
+  display: inline-block;
+  align-self: flex-start;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdoc .pd-table-box {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.pdoc .pd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.pdoc .pd-table th {
+  background: #f1f5f9;
+  padding: 10px 16px;
+  text-align: left;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+.pdoc .pd-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  color: var(--pd-ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.pdoc .pd-table .pd-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pdoc .pd-table tr:last-child td {
+  border-bottom: none;
+}
+
+.pdoc .pd-total-row td {
+  background: #faf5ff;
+  font-weight: 700;
+  color: var(--pd-purple);
+  font-size: 14px;
+}
+
+.pdoc .pd-signatures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-top: auto;
+  padding-top: 56px;
+}
+
+.pdoc .pd-sign-line {
+  border-top: 1.5px solid #cbd5e1;
+  padding-top: 8px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.pdoc .pd-sign-line strong {
+  display: block;
+  color: var(--pd-ink);
+  font-size: 12px;
+}
+
+/* ---------- contracapa ---------- */
+
+.pdoc .pd-back {
+  background: var(--pd-gradient-card);
+  color: #fff;
+  justify-content: space-between;
+}
+
+.pdoc .pd-back-top {
+  padding: 60px 54px 0;
+  position: relative;
+  z-index: 20;
+}
+
+.pdoc .pd-back-box {
+  max-width: 480px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 36px 32px;
+}
+
+.pdoc .pd-back-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #ffc0e5;
+  margin-bottom: 12px;
+}
+
+.pdoc .pd-back-title {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}
+
+.pdoc .pd-back-text {
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0.95;
+}
+
+.pdoc .pd-contact {
+  padding: 0 54px 50px;
+  position: relative;
+  z-index: 20;
+}
+
+.pdoc .pd-contact-inner {
+  background: #fff;
+  color: var(--pd-ink);
+  border-radius: 14px;
+  padding: 24px 30px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pdoc .pd-contact-col h6 {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.pdoc .pd-contact-col p {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pd-ink);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- impressão ----------
+ * A cópia de impressão (PrintPortal) fica fora do app, direto no <body>:
+ * invisível na tela e, ao imprimir, a única coisa na folha. */
+
+.pdoc-print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body:has(> .pdoc-print-root) {
+    background: #fff !important;
+  }
+
+  body:has(> .pdoc-print-root) > :not(.pdoc-print-root) {
+    display: none !important;
+  }
+
+  .pdoc-print-root {
+    display: block;
+  }
+
+  .pdoc-print-root .pdoc {
+    zoom: 1 !important;
+    gap: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .pdoc-print-root .pd-page {
+    box-shadow: none;
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+  }
+
+  .pdoc-print-root .pd-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}
+
+/* ---------- orçamento (folha única, mesmo visual da proposta) ---------- */
+
+.pdoc .pd-quote-wave svg {
+  height: 230px;
+}
+
+.pdoc .pd-quote-tag {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  top: 36px;
+}
+
+.pdoc .pd-quote-number {
+  text-align: right;
+}
+
+.pdoc .pd-quote-number h4 {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.pdoc .pd-quote-content {
+  padding-top: 200px;
+}
+
+.pdoc .pd-cover-title.pd-quote-title {
+  font-size: 32px;
+  margin-bottom: 20px;
+}
+
+.pdoc .pd-cover-title.pd-quote-title.pd-long {
+  font-size: 25px;
+}
+
+.pdoc .pd-cover-title.pd-quote-title.pd-xlong {
+  font-size: 20px;
+}
+
+.pdoc .pd-quote-meta {
+  grid-template-columns: 1.6fr 1fr 1.2fr;
+  max-width: none;
+  margin-bottom: 24px;
+}
+
+.pdoc .pd-meta-item span {
+  display: block;
+  margin-top: 3px;
+  font-size: 10.5px;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+
+.pdoc .pd-pix-card {
+  background: var(--pd-gradient-card);
+  border-radius: 16px;
+  padding: 22px 24px;
+  color: #fff;
+  box-shadow: var(--pd-shadow-card);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  position: relative;
+  overflow: hidden;
+  break-inside: avoid;
+}
+
+.pdoc .pd-pix-card::after {
+  content: '';
+  position: absolute;
+  right: -30px;
+  bottom: -30px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.pdoc .pd-pix-qr {
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px;
+  flex: 0 0 auto;
+}
+
+.pdoc .pd-pix-qr img {
+  display: block;
+  width: 150px;
+  height: 150px;
+}
+
+.pdoc .pd-pix-info {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.pdoc .pd-pix-info h3 {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.pdoc .pd-pix-total {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 4px 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdoc .pd-pix-key {
+  font-size: 12px;
+  margin-bottom: 10px;
+  overflow-wrap: anywhere;
+}
+
+.pdoc .pd-pix-key strong {
+  font-weight: 700;
+}
+
+.pdoc .pd-pix-info ol {
+  margin: 0;
+  padding-left: 16px;
+  list-style: decimal;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  opacity: 0.95;
+}

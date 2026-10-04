@@ -5,7 +5,6 @@ import { useUI, type ModalType } from '@/store/ui'
 import {
   clientStatus,
   eventType,
-  freelancerStatus,
   goalCategory,
   projectStatus,
   taskPriority,
@@ -32,16 +31,6 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
     hourly_rate: money,
     notes: text,
   }),
-  freelancer: z.object({
-    name: text.min(2, 'Informe o nome'),
-    specialty: text,
-    email,
-    phone,
-    pix_key: text,
-    cost_per_hour: money,
-    rating: z.coerce.number().min(0, 'De 0 a 5').max(5, 'De 0 a 5'),
-    status: z.enum(['active', 'inactive']),
-  }),
   project: z.object({
     title: text.min(2, 'Informe o título'),
     client_id: text,
@@ -53,13 +42,11 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
   task: z.object({
     title: text.min(2, 'Informe o título'),
     project_id: text,
-    freelancer_id: text,
     status: z.enum(['backlog', 'in_progress', 'review', 'done']),
     priority: z.enum(['low', 'medium', 'high', 'urgent']),
     scheduled_date: text,
     due_date: text,
     charged_amount: money,
-    cost_amount: money,
     description: text,
   }),
   event: z
@@ -75,8 +62,7 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
         .refine((v) => /^https?:\/\//i.test(v), 'O link precisa começar com https://')
         .or(z.literal('')),
       client_id: text,
-      freelancer_id: text,
-    })
+      })
     .refine((v) => !v.end_time || v.end_time >= v.start_time, { path: ['end_time'], message: 'Termina antes de começar' }),
   transaction: z
     .object({
@@ -88,8 +74,7 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
       status: z.enum(['pending', 'paid', 'overdue']),
       payment_date: text,
       client_id: text,
-      freelancer_id: text,
-      project_id: text,
+        project_id: text,
     })
     .refine((v) => v.status !== 'paid' || v.payment_date, { path: ['payment_date'], message: 'Informe a data do pagamento' }),
   goal: z
@@ -108,12 +93,13 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
     document,
     email,
     phone,
+    pix_key: text.max(140, 'Chave muito longa'),
+    pix_qr_image: text.refine((v) => v === '' || v.startsWith('data:image/'), 'Imagem inválida'),
   }),
 }
 
 const meta: Record<ModalType, { table: TableName; noun: string; create: string; edit: string; variant?: 'drawer' | 'modal'; allowDelete?: boolean }> = {
   client: { table: 'clients', noun: 'o cliente', create: 'Novo cliente', edit: 'Editar cliente' },
-  freelancer: { table: 'freelancers', noun: 'o freelancer', create: 'Novo freelancer', edit: 'Editar freelancer' },
   project: { table: 'projects', noun: 'o projeto', create: 'Novo projeto', edit: 'Editar projeto' },
   task: { table: 'tasks', noun: 'a demanda', create: 'Nova demanda', edit: 'Editar demanda' },
   event: { table: 'calendar_events', noun: 'o compromisso', create: 'Novo compromisso', edit: 'Editar compromisso', variant: 'modal' },
@@ -126,11 +112,9 @@ const meta: Record<ModalType, { table: TableName; noun: string; create: string; 
 export function GlobalModals() {
   const { modal, closeModal } = useUI()
   const clients = useTable('clients').data ?? []
-  const freelancers = useTable('freelancers').data ?? []
   const projects = useTable('projects').data ?? []
 
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.company_name ? `${c.name} — ${c.company_name}` : c.name }))
-  const freelancerOptions = freelancers.map((f) => ({ value: f.id, label: f.name }))
   const projectOptions = projects.map((p) => ({ value: p.id, label: p.title }))
 
   const fields: Record<ModalType, FieldDef[]> = {
@@ -144,16 +128,6 @@ export function GlobalModals() {
       { name: 'hourly_rate', label: 'Valor/hora (R$)', type: 'number' },
       { name: 'notes', label: 'Observações', type: 'textarea' },
     ],
-    freelancer: [
-      { name: 'name', label: 'Nome', full: true },
-      { name: 'specialty', label: 'Especialidade', placeholder: 'Ex.: Front-end React' },
-      { name: 'status', label: 'Status', type: 'select', options: toOptions(freelancerStatus) },
-      { name: 'email', label: 'E-mail', type: 'email' },
-      { name: 'phone', label: 'WhatsApp', mask: maskPhone, placeholder: '(00) 00000-0000' },
-      { name: 'pix_key', label: 'Chave PIX', full: true },
-      { name: 'cost_per_hour', label: 'Custo/hora (R$)', type: 'number' },
-      { name: 'rating', label: 'Avaliação (0 a 5)', type: 'number', step: '0.1' },
-    ],
     project: [
       { name: 'title', label: 'Título', full: true },
       { name: 'client_id', label: 'Cliente', type: 'select', options: clientOptions, emptyOption: 'Sem cliente' },
@@ -165,13 +139,11 @@ export function GlobalModals() {
     task: [
       { name: 'title', label: 'Título', full: true },
       { name: 'project_id', label: 'Projeto', type: 'select', options: projectOptions, emptyOption: 'Sem projeto' },
-      { name: 'freelancer_id', label: 'Freelancer', type: 'select', options: freelancerOptions, emptyOption: 'Não alocado' },
       { name: 'status', label: 'Status', type: 'select', options: toOptions(taskStatus) },
       { name: 'priority', label: 'Prioridade', type: 'select', options: toOptions(taskPriority) },
       { name: 'scheduled_date', label: 'Dia no kanban', type: 'date' },
       { name: 'due_date', label: 'Prazo', type: 'date' },
-      { name: 'charged_amount', label: 'Cobrado do cliente (R$)', type: 'number' },
-      { name: 'cost_amount', label: 'Repasse ao freelancer (R$)', type: 'number' },
+      { name: 'charged_amount', label: 'Valor da demanda (R$)', type: 'number' },
       { name: 'description', label: 'Descrição', type: 'textarea' },
     ],
     event: [
@@ -181,18 +153,16 @@ export function GlobalModals() {
       { name: 'end_time', label: 'Fim', type: 'datetime' },
       { name: 'meeting_link', label: 'Link da videoconferência', placeholder: 'https://meet.google.com/…', full: true },
       { name: 'client_id', label: 'Cliente', type: 'select', options: clientOptions, emptyOption: 'Nenhum' },
-      { name: 'freelancer_id', label: 'Freelancer', type: 'select', options: freelancerOptions, emptyOption: 'Nenhum' },
     ],
     transaction: [
-      { name: 'type', label: 'Tipo', type: 'select', options: [{ value: 'income', label: 'Entrada (a receber)' }, { value: 'expense', label: 'Saída (a pagar)' }] },
+      { name: 'type', label: 'Tipo', type: 'select', options: [{ value: 'income', label: 'Entrada (a receber)' }, { value: 'expense', label: 'Despesa (a pagar)' }] },
       { name: 'amount', label: 'Valor (R$)', type: 'number' },
       { name: 'description', label: 'Descrição', full: true },
-      { name: 'category', label: 'Categoria', placeholder: 'Projeto, Repasse, Ferramentas…' },
+      { name: 'category', label: 'Categoria', placeholder: 'Projeto, Ferramentas, Impostos…' },
       { name: 'due_date', label: 'Vencimento', type: 'date' },
       { name: 'status', label: 'Situação', type: 'select', options: [{ value: 'pending', label: 'Pendente' }, { value: 'paid', label: 'Pago' }] },
       { name: 'payment_date', label: 'Data do pagamento', type: 'date' },
       { name: 'client_id', label: 'Cliente', type: 'select', options: clientOptions, emptyOption: 'Nenhum' },
-      { name: 'freelancer_id', label: 'Freelancer (repasse)', type: 'select', options: freelancerOptions, emptyOption: 'Nenhum' },
       { name: 'project_id', label: 'Projeto', type: 'select', options: projectOptions, emptyOption: 'Nenhum', full: true },
     ],
     goal: [
@@ -210,6 +180,8 @@ export function GlobalModals() {
       { name: 'document', label: 'CPF / CNPJ', mask: maskCpfCnpj, placeholder: '00.000.000/0000-00' },
       { name: 'phone', label: 'WhatsApp', mask: maskPhone, placeholder: '(00) 00000-0000' },
       { name: 'email', label: 'E-mail de contato', type: 'email', full: true },
+      { name: 'pix_key', label: 'Chave Pix (para receber)', placeholder: 'CPF/CNPJ, e-mail, telefone ou chave aleatória', full: true },
+      { name: 'pix_qr_image', label: 'QR Code Pix', type: 'image', hint: 'Imagem do QR Code gerado no app do seu banco. Aparece nos orçamentos.' },
     ],
   }
 

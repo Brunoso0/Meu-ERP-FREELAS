@@ -1,4 +1,4 @@
-import { lazy, useEffect } from 'react'
+import { lazy, useEffect, useRef } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
@@ -10,7 +10,6 @@ import { useUI } from '@/store/ui'
 import Login from '@/pages/Login'
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Clients = lazy(() => import('@/pages/Clients'))
-const Freelancers = lazy(() => import('@/pages/Freelancers'))
 const Projects = lazy(() => import('@/pages/Projects'))
 const Proposals = lazy(() => import('@/pages/Proposals'))
 const ProposalView = lazy(() => import('@/pages/ProposalView'))
@@ -34,8 +33,12 @@ export default function App() {
   // dados em cache pertencem a quem estava logado: troca de usuário começa do zero
   const queryClient = useQueryClient()
   const userId = session?.user.id
+  const lastUserId = useRef(userId)
   useEffect(() => {
-    queryClient.clear()
+    // só limpa quando alguém que estava logado sai ou é trocado. Limpar na entrada
+    // derrubaria as consultas que o layout acabou de abrir (menu ficaria sem perfil).
+    if (lastUserId.current && lastUserId.current !== userId) queryClient.clear()
+    lastUserId.current = userId
   }, [userId, queryClient])
 
   const needsLogin = isSupabaseConfigured && !session
@@ -54,7 +57,6 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="clientes" element={<Clients />} />
-            <Route path="freelancers" element={<Freelancers />} />
             <Route path="projetos" element={<Projects />} />
             <Route path="propostas" element={<Proposals />} />
             <Route path="propostas/:id" element={<ProposalView />} />

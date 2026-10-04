@@ -1,8 +1,8 @@
 # Meu ERP Freelas
 
-Um ERP para quem toca projetos com freelancers: clientes, propostas, demandas num kanban semanal, agenda, financeiro, metas e geradores de orçamento, proposta e contrato em PDF.
+Um ERP para o freelancer que trabalha sozinho: clientes, propostas, demandas num kanban semanal, agenda, financeiro, metas e geradores de orçamento, proposta e contrato em PDF.
 
-Foi feito para **uso individual**: uma pessoa, uma conta, os próprios dados. Você pode testar em dois minutos sem configurar nada, e depois ligar ao seu próprio banco para usar de verdade.
+Foi feito para **uso individual**: você é quem atende os clientes e faz o trabalho. Uma pessoa, uma conta, os próprios dados. Você pode testar em dois minutos sem configurar nada, e depois ligar ao seu próprio banco para usar de verdade.
 
 ## Sumário
 
@@ -37,15 +37,14 @@ Para zerar os dados de exemplo, apague a chave `meu-erp-freelas:demo-db:v1` no a
 |---|---|
 | **Dashboard** | Faturamento do mês, demandas ativas, propostas em aberto, fluxo de caixa e o que vence em 48 horas. |
 | **Clientes** | Cadastro com busca e filtro. O LTV (quanto cada cliente já pagou) é calculado sozinho. |
-| **Propostas** | Lista com status, visualização pronta para impressão e PDF. |
-| **Projetos** | Agrupa demandas, repasses e recebimentos de um cliente. |
+| **Propostas** | Lista com status e a proposta em páginas A4 (capa, escopo, cronograma, investimento), pronta para "Salvar em PDF / Imprimir". |
+| **Projetos** | Agrupa as demandas, os recebimentos e as despesas de um trabalho para um cliente. |
 | **Demandas** | Tabela ou kanban semanal (Backlog, Segunda a Sexta). Arraste os cards entre os dias. |
 | **Agenda** | Mês ou semana, com reuniões, prazos e as demandas agendadas. |
-| **Freelancers** | Sua rede de parceiros, custo por hora e chave Pix para repasse. |
-| **Financeiro** | A receber, repasses e outros custos, por mês, trimestre, ano ou tudo. Comprovante de Pix anexado ao repasse. |
+| **Financeiro** | O que você tem a receber e as suas despesas, por mês, trimestre, ano ou tudo, com gráficos de entradas e saídas por mês e de recebido por cliente. Dá para anexar comprovante a cada lançamento. |
 | **Metas & Relatórios** | Metas com progresso automático e a margem líquida de cada projeto. |
-| **Calculadora de Preço** | Soma custos, impostos e margem e diz quanto cobrar. Vira proposta com um clique. |
-| **Gerador de Orçamentos** | Orçamento rápido em PDF com QR Code Pix para pagamento. |
+| **Calculadora de Preço** | Soma as suas horas, ferramentas, impostos e margem e diz quanto cobrar. Vira proposta com um clique. |
+| **Gerador de Orçamentos** | Orçamento rápido em folha A4, no mesmo visual da proposta, com QR Code Pix para pagamento. Sai em PDF por "Salvar em PDF / Imprimir". |
 | **Gerador de Propostas** | Escopo, entregáveis, cronograma, preços e condições, com numeração automática. |
 | **Gerador de Contratos** | Biblioteca de cláusulas que você liga e desliga, a partir de uma proposta. |
 
@@ -61,11 +60,12 @@ Em supabase.com, crie uma conta e um projeto novo. Guarde a senha do banco que e
 
 ### 2. Crie as tabelas
 
-No painel do projeto, abra **SQL Editor** e rode os três arquivos da pasta [`supabase/migrations/`](supabase/migrations/), **nesta ordem**, colando o conteúdo de cada um e clicando em Run:
+No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase/migrations/`](supabase/migrations/), **nesta ordem**, colando o conteúdo de cada um e clicando em Run:
 
 1. `001_initial_schema.sql` cria as tabelas, as regras de acesso e o espaço para comprovantes.
 2. `002_quotes.sql` cria a tabela de orçamentos.
 3. `003_hardening.sql` fecha o acesso para quem não está logado.
+4. `004_profile_pix.sql` adiciona a chave e o QR Code Pix ao perfil.
 
 O editor vai avisar que a consulta tem "operações destrutivas". Num projeto novo pode confirmar: os scripts só removem versões anteriores dos próprios objetos que criam.
 
@@ -93,14 +93,13 @@ VITE_SUPABASE_ANON_KEY=sua-chave-publishable
 
 ### 5. Entre
 
-Reinicie o `npm run dev`. Agora o app abre na tela de login. Entre com o usuário que você criou e, antes de tudo, clique no seu nome no rodapé do menu para preencher os dados de **Minha empresa**: eles aparecem como emitente nos orçamentos, propostas e contratos.
+Reinicie o `npm run dev`. Agora o app abre na tela de login. Entre com o usuário que você criou e, antes de tudo, clique no seu nome no rodapé do menu para preencher os dados de **Minha empresa**: eles aparecem como emitente nos orçamentos, propostas e contratos, e é ali que você cadastra a chave e o QR Code Pix.
 
 O indicador no topo da tela mostra **Supabase** em verde quando a conexão está funcionando.
 
 ## Deixar com a sua cara
 
-- **QR Code Pix.** Substitua `public/qrcodepix.jpeg` pela imagem do seu QR (mesmo nome de arquivo). Ele é uma imagem fixa: o app mostra o valor ao lado e pede que o cliente o informe ao pagar.
-- **Dados da empresa.** Menu → seu nome no rodapé → Minha empresa.
+- **Dados da empresa e Pix.** Menu → seu nome no rodapé → Minha empresa. Ali ficam nome, CNPJ, contatos, a **chave Pix** e a **imagem do QR Code Pix** (a que o app do seu banco gera). Os orçamentos mostram o que estiver cadastrado: QR, chave, ou os dois. O QR é uma imagem fixa: o app mostra o valor ao lado e pede que o cliente o informe ao pagar.
 - **Cláusulas e serviços do contrato.** Ficam em [`src/lib/contract.ts`](src/lib/contract.ts). As que vêm no projeto foram escritas para serviços de manutenção de sistemas e edição de listas de dados; ajuste a lista `serviceKinds` e os textos para a sua atividade. São um modelo-base, não uma revisão jurídica.
 - **Nome e cor.** O nome aparece em `index.html` e em `src/components/layout/Sidebar.tsx`; a cor de destaque é a paleta `brand` em `tailwind.config.js`.
 
@@ -125,18 +124,19 @@ No Supabase, em **Authentication → URL Configuration**, coloque o endereço pu
 Um caminho típico, do primeiro contato ao dinheiro na conta:
 
 1. **Cadastre o cliente** em Clientes (ou pelo botão + Novo).
-2. **Calcule o preço** na Calculadora: custo dos freelancers, suas horas, infraestrutura, impostos e a margem desejada.
+2. **Calcule o preço** na Calculadora: suas horas por atividade, ferramentas, impostos e a margem desejada.
 3. **Converta em proposta.** O botão leva os valores para o Gerador de Propostas; complete escopo, entregáveis e cronograma e salve. Para trabalhos pequenos, use o **Gerador de Orçamentos** e mande o PDF com o QR do Pix.
 4. **Marque a proposta como aprovada** quando o cliente fechar e, se quiser, **gere o contrato** a partir dela, escolhendo as cláusulas.
-5. **Crie o projeto** e as **demandas**, alocando freelancers. No kanban, arraste cada card para o dia em que será feito.
-6. **Lance o financeiro:** parcelas a receber do cliente e repasses aos freelancers. Ao pagar, marque como pago e anexe o comprovante.
+5. **Crie o projeto** e as **demandas**. No kanban, arraste cada card para o dia em que você vai fazê-lo.
+6. **Lance o financeiro:** parcelas a receber do cliente e as suas despesas (ferramentas, impostos, equipamento). Ao receber ou pagar, marque como pago e, se quiser, anexe o comprovante.
 7. **Acompanhe** no Dashboard e em Metas & Relatórios quanto entrou, o que vence e qual a margem real de cada projeto.
 
 Algumas regras que ajudam a entender os números:
 
+- Ao marcar um projeto como **Concluído**, o recebimento do orçamento é lançado sozinho no Financeiro, já como pago. Se parte do valor já tinha sido lançada para o projeto, entra só o que falta; reabrir e concluir de novo não duplica.
 - Uma transação pendente com vencimento no passado aparece como **Atrasado** automaticamente.
-- No Financeiro, o **saldo** é acumulado até o fim do período escolhido; os demais cartões consideram só o que vence dentro dele.
-- A **margem do projeto** é o valor cobrado nas demandas, menos o repasse aos freelancers, menos despesas do projeto que não são repasse.
+- No Financeiro, o **saldo** é o que foi recebido menos o que foi pago dentro do período escolhido (pela data do pagamento); os demais cartões consideram o que vence dentro dele. Em "Tudo", o saldo é o acumulado geral.
+- A **margem do projeto** é o valor cobrado nas demandas menos as despesas que você lançou no financeiro ligadas àquele projeto.
 - O progresso das **metas** é medido pelo sistema (recebimentos pagos, clientes ou projetos criados no período) somado ao valor manual que você informar.
 - Todas as listas mostram **10 itens por página**.
 
@@ -200,7 +200,7 @@ Está em modo demo: o `.env.local` não existe, está vazio ou o servidor não f
 E-mail ou senha errados, ou o usuário não foi criado/confirmado em Authentication → Users.
 
 **Entrei, mas nada salva ("permission denied" ou "row-level security").**
-Alguma migração não foi executada, ou foi fora de ordem. Rode as três novamente, na ordem.
+Alguma migração não foi executada, ou foi fora de ordem. Rode todas novamente, na ordem.
 
 **Funciona no meu computador, mas no site publicado o login não responde.**
 O endereço do Supabase em `public/_headers` ainda é o de outro projeto. Corrija, gere o build e publique de novo.
@@ -208,8 +208,8 @@ O endereço do Supabase em `public/_headers` ainda é o de outro projeto. Corrij
 **Ao salvar um orçamento: "relation quotes does not exist".**
 Faltou rodar `002_quotes.sql`.
 
-**O QR Code não aparece no orçamento.**
-O arquivo precisa se chamar exatamente `public/qrcodepix.jpeg`.
+**O bloco do Pix não aparece no orçamento.**
+Falta cadastrar a chave Pix ou a imagem do QR Code em Minha empresa (clique no seu nome, no rodapé do menu).
 
 **O indicador no topo mostra "Offline".**
 O app não conseguiu falar com o Supabase: confira a URL e a chave no `.env.local` e se o projeto não foi pausado por inatividade (acontece no plano gratuito).

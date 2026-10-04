@@ -1,19 +1,23 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import type { ZodTypeAny } from 'zod'
-import { Trash2 } from 'lucide-react'
+import { ImagePlus, Trash2 } from 'lucide-react'
 import { Sheet } from '@/components/ui/overlays'
 import { Button, Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import { useInsert, useRemove, useUpdate } from '@/hooks/useData'
+import { imageToDataUrl } from '@/lib/image'
 import type { TableName } from '@/types/database.types'
 
 export interface FieldDef {
   name: string
   label: string
-  type?: 'text' | 'email' | 'number' | 'date' | 'datetime' | 'select' | 'textarea'
+  /** `image` guarda a imagem como data URL no próprio registro. */
+  type?: 'text' | 'email' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'image'
+  /** Texto de ajuda abaixo do campo (hoje usado pelo campo de imagem). */
+  hint?: string
   options?: Array<{ value: string; label: string }>
   /** Opção vazia do select (ex.: "Sem projeto"). */
   emptyOption?: string
@@ -51,6 +55,51 @@ function initialValues(fields: FieldDef[], source: Record<string, any> | undefin
   return values
 }
 
+function ImageField({ field, value, error, onChange }: { field: FieldDef; value: string; error?: string; onChange: (value: string) => void }) {
+  const input = useRef<HTMLInputElement>(null)
+
+  const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      onChange(await imageToDataUrl(file))
+    } catch (err) {
+      toast.error('Imagem não aceita', { description: err instanceof Error ? err.message : undefined })
+    }
+  }
+
+  return (
+    <div className="col-span-2">
+      <span className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">{field.label}</span>
+      <div className="flex items-center gap-4 rounded-lg border p-3">
+        {value ? (
+          <img src={value} alt={field.label} className="h-24 w-24 shrink-0 rounded-md border bg-white object-contain p-1" />
+        ) : (
+          <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-md border border-dashed text-slate-400">
+            <ImagePlus className="h-6 w-6" />
+          </div>
+        )}
+        <div className="min-w-0 space-y-2">
+          {field.hint && <p className="text-xs text-slate-500 dark:text-slate-400">{field.hint}</p>}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => input.current?.click()}>
+              {value ? 'Trocar imagem' : 'Enviar imagem'}
+            </Button>
+            {value && (
+              <Button variant="danger" size="sm" onClick={() => onChange('')}>
+                Remover
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={pick} aria-label={field.label} />
+      {error && <span className="mt-1 block text-xs text-red-600 dark:text-red-400">{error}</span>}
+    </div>
+  )
+}
+
 /**
  * Formulário de criação/edição dirigido por configuração: cada entidade
  * declara campos + schema Zod em GlobalModals e este componente cuida de
@@ -66,6 +115,7 @@ export function EntityForm({ open, onClose, noun, title, table, fields, schema, 
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<Record<string, any>>({ resolver: zodResolver(schema), defaultValues: initialValues(fields, record ?? defaults) })
 
@@ -110,6 +160,9 @@ export function EntityForm({ open, onClose, noun, title, table, fields, schema, 
         <div className="grid flex-1 grid-cols-2 content-start gap-4 overflow-y-auto px-5 py-5">
           {fields.map((f) => {
             const error = errors[f.name]?.message as string | undefined
+            if (f.type === 'image') {
+              return <ImageField key={f.name} field={f} value={watch(f.name) ?? ''} error={error} onChange={(v) => setValue(f.name, v, { shouldDirty: true })} />
+            }
             const reg = register(f.name, f.mask ? { onChange: (e) => setValue(f.name, f.mask!(e.target.value)) } : undefined)
             const wide = f.full || f.type === 'textarea'
             return (

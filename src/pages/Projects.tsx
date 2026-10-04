@@ -62,7 +62,7 @@ export default function Projects() {
 
   return (
     <>
-      <PageHeader title="Projetos" description="Cada projeto agrupa demandas, repasses e recebimentos de um cliente." actions={action} />
+      <PageHeader title="Projetos" description="Cada projeto é um trabalho para um cliente. Ao marcá-lo como concluído, o recebimento é lançado sozinho no financeiro." actions={action} />
       <Card>
         <DataTable
           columns={columns}

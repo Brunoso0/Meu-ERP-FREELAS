@@ -4,6 +4,7 @@ import { addMonths, addQuarters, addYears, endOfMonth, endOfQuarter, endOfYear, 
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { Check, ChevronLeft, ChevronRight, Eye, MoreHorizontal, Paperclip, Pencil, Plus, Wallet } from 'lucide-react'
+import { FinanceCharts } from '@/components/finance/FinanceCharts'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dropdown, DropdownContent, DropdownItem, DropdownTrigger } from '@/components/ui/overlays'
 import { Badge, Button, Card, EmptyState, PageHeader, Segmented, Skeleton } from '@/components/ui/primitives'
@@ -14,7 +15,7 @@ import { cn, formatCurrency, formatDate, isoDay, sum, toDate } from '@/lib/utils
 import { useUI } from '@/store/ui'
 import type { FinancialTransaction, TransactionStatus } from '@/types/database.types'
 
-type Tab = 'income' | 'payouts' | 'other'
+type Tab = 'income' | 'expenses'
 type Period = 'month' | 'quarter' | 'year' | 'all'
 
 const periods: Record<Exclude<Period, 'all'>, { start: (d: Date) => Date; end: (d: Date) => Date; move: (d: Date, step: number) => Date; label: (d: Date) => string }> = {
@@ -47,7 +48,6 @@ export default function Finance() {
   const openModal = useUI((s) => s.openModal)
   const transactions = useTable('financial_transactions')
   const clients = useTable('clients')
-  const freelancers = useTable('freelancers')
   const projects = useTable('projects')
   const update = useUpdate('financial_transactions')
   const [tab, setTab] = useState<Tab>('income')
@@ -65,12 +65,12 @@ export default function Finance() {
   const summary = useMemo(() => {
     const inPeriod = (day: string) => !range || (toDate(day) >= range.start && toDate(day) <= range.end)
     const due = all.filter((t) => inPeriod(t.due_date))
-    // saldo é acumulado: tudo que foi pago até o fim do período escolhido
-    const paid = all.filter((t) => t.status === 'paid' && (!range || toDate(t.payment_date ?? t.due_date) <= range.end))
+    // saldo do período: o que foi efetivamente pago dentro dele (pela data do pagamento)
+    const paid = all.filter((t) => t.status === 'paid' && inPeriod(t.payment_date ?? t.due_date))
     return {
       balance: sum(paid.filter((t) => t.type === 'income').map((t) => t.amount)) - sum(paid.filter((t) => t.type === 'expense').map((t) => t.amount)),
       receivable: sum(due.filter((t) => t.type === 'income' && t.status !== 'paid').map((t) => t.amount)),
-      payable: sum(due.filter((t) => t.type === 'expense' && t.freelancer_id && t.status !== 'paid').map((t) => t.amount)),
+      payable: sum(due.filter((t) => t.type === 'expense' && t.status !== 'paid').map((t) => t.amount)),
       profit: sum(due.filter((t) => t.type === 'income').map((t) => t.amount)) - sum(due.filter((t) => t.type === 'expense').map((t) => t.amount)),
     }
   }, [all, range])
@@ -80,13 +80,11 @@ export default function Finance() {
     const due = all.filter((t) => !range || (toDate(t.due_date) >= range.start && toDate(t.due_date) <= range.end))
     return {
       income: due.filter((t) => t.type === 'income').sort(byDue),
-      payouts: due.filter((t) => t.type === 'expense' && t.freelancer_id).sort(byDue),
-      other: due.filter((t) => t.type === 'expense' && !t.freelancer_id).sort(byDue),
+      expenses: due.filter((t) => t.type === 'expense').sort(byDue),
     }
   }, [all, range])
 
   const counterpart = (t: FinancialTransaction) => {
-    if (t.freelancer_id) return freelancers.data?.find((f) => f.id === t.freelancer_id)?.name
     const c = clients.data?.find((x) => x.id === t.client_id)
     return c ? c.company_name ?? c.name : undefined
   }
@@ -137,7 +135,7 @@ export default function Finance() {
     }
   }
 
-  const columns = (current: Tab): Column<FinancialTransaction>[] => [
+  const columns: Column<FinancialTransaction>[] = [
     {
       header: 'Descrição',
       cell: (t) => (
@@ -158,23 +156,19 @@ export default function Finance() {
         return <Badge tone={transactionStatus[s].tone}>{transactionStatus[s].label}</Badge>
       },
     },
-    ...(current === 'payouts'
-      ? [
-          {
-            header: 'Comprovante',
-            cell: (t: FinancialTransaction) =>
-              t.proof_url ? (
-                <button type="button" onClick={() => viewProof(t)} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
-                  <Eye className="h-3.5 w-3.5" /> Ver PIX
-                </button>
-              ) : (
-                <button type="button" onClick={() => pickProof(t.id)} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
-                  <Paperclip className="h-3.5 w-3.5" /> Anexar
-                </button>
-              ),
-          },
-        ]
-      : []),
+    {
+      header: 'Comprovante',
+      cell: (t) =>
+        t.proof_url ? (
+          <button type="button" onClick={() => viewProof(t)} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
+            <Eye className="h-3.5 w-3.5" /> Ver
+          </button>
+        ) : (
+          <button type="button" onClick={() => pickProof(t.id)} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
+            <Paperclip className="h-3.5 w-3.5" /> Anexar
+          </button>
+        ),
+    },
     { header: 'Valor', className: 'text-right', cell: (t) => <span className="tabular font-medium">{formatCurrency(t.amount)}</span> },
     {
       header: '',
@@ -199,8 +193,7 @@ export default function Finance() {
 
   const tabs: Array<{ value: Tab; label: string; defaults: Record<string, unknown>; emptyTitle: string; emptyText: string }> = [
     { value: 'income', label: 'A receber', defaults: { type: 'income', category: 'Projeto' }, emptyTitle: 'Nenhum recebimento neste período', emptyText: 'Lance uma parcela ou navegue para outro período.' },
-    { value: 'payouts', label: 'Repasses a freelancers', defaults: { type: 'expense', category: 'Repasse' }, emptyTitle: 'Nenhum repasse neste período', emptyText: 'Lance um pagamento a freelancer ou navegue para outro período.' },
-    { value: 'other', label: 'Outros custos', defaults: { type: 'expense', category: 'Ferramentas' }, emptyTitle: 'Nenhum custo neste período', emptyText: 'Licenças, hospedagem e demais despesas entram aqui.' },
+    { value: 'expenses', label: 'Despesas', defaults: { type: 'expense', category: 'Ferramentas' }, emptyTitle: 'Nenhuma despesa neste período', emptyText: 'Ferramentas, hospedagem, impostos e demais gastos do seu trabalho entram aqui.' },
   ]
   const currentTab = tabs.find((t) => t.value === tab)!
   const newTransaction = () => openModal({ type: 'transaction', defaults: currentTab.defaults })
@@ -210,7 +203,7 @@ export default function Finance() {
     <>
       <PageHeader
         title="Financeiro"
-        description="Recebimentos de clientes, repasses e resultado por período."
+        description="O que você recebe, o que gasta e o resultado de cada período."
         actions={
           <Button onClick={newTransaction}>
             <Plus className="h-4 w-4" /> Nova transação
@@ -248,11 +241,13 @@ export default function Finance() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Summary label={range ? 'Saldo ao fim do período' : 'Saldo'} value={summary.balance} hint="Acumulado: tudo que entrou menos tudo que saiu" loading={loading} />
+        <Summary label={range ? 'Saldo do período' : 'Saldo'} value={summary.balance} hint={range ? 'Recebido menos pago dentro do período' : 'Tudo que entrou menos tudo que saiu'} loading={loading} />
         <Summary label="A receber" value={summary.receivable} hint="Clientes, vence no período e ainda não foi pago" loading={loading} />
-        <Summary label="A pagar" value={summary.payable} hint="Repasses a freelancers pendentes no período" loading={loading} />
+        <Summary label="A pagar" value={summary.payable} hint="Despesas que vencem no período e ainda não foram pagas" loading={loading} />
         <Summary label={isCurrent ? 'Lucro líquido projetado' : 'Resultado do período'} value={summary.profit} hint="Entradas menos saídas com vencimento no período" tone={summary.profit >= 0 ? 'good' : 'bad'} loading={loading} />
       </div>
+
+      <FinanceCharts transactions={all} clients={clients.data ?? []} range={range} loading={loading} />
 
       <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={onFile} />
 
@@ -273,7 +268,7 @@ export default function Finance() {
           {tabs.map((t) => (
             <Tabs.Content key={t.value} value={t.value} className="focus:outline-none">
               <DataTable
-                columns={columns(t.value)}
+                columns={columns}
                 rows={rowsByTab[t.value]}
                 loading={loading}
                 empty={

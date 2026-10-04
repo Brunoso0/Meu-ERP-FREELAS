@@ -20,6 +20,10 @@ export interface Profile {
   email: string | null
   phone: string | null
   avatar_url: string | null
+  /** Chave Pix para receber pagamentos (aparece nos orçamentos). */
+  pix_key: string | null
+  /** QR Code Pix, guardado como data URL de imagem. */
+  pix_qr_image: string | null
   created_at: string
 }
 

@@ -17,7 +17,6 @@ interface ProjectReport {
   client: string
   status: keyof typeof projectStatus
   charged: number
-  freelancers: number
   extras: number
   margin: number
   marginPct: number
@@ -62,9 +61,9 @@ export default function Goals() {
       const billed = sum(own.map((t) => t.charged_amount))
       // sem valores nas demandas, o orçamento do projeto é a melhor estimativa
       const charged = billed > 0 ? billed : Number(p.budget ?? 0)
-      const freelancers = sum(own.map((t) => t.cost_amount))
-      const extras = sum((transactions.data ?? []).filter((t) => t.project_id === p.id && t.type === 'expense' && !t.freelancer_id).map((t) => t.amount))
-      const margin = charged - freelancers - extras
+      // custos = despesas lançadas no financeiro e ligadas a este projeto
+      const extras = sum((transactions.data ?? []).filter((t) => t.project_id === p.id && t.type === 'expense').map((t) => t.amount))
+      const margin = charged - extras
       const client = clients.data?.find((c) => c.id === p.client_id)
       return {
         id: p.id,
@@ -72,7 +71,6 @@ export default function Goals() {
         client: client ? client.company_name ?? client.name : '—',
         status: p.status,
         charged,
-        freelancers,
         extras,
         margin,
         marginPct: charged > 0 ? (margin / charged) * 100 : 0,
@@ -92,8 +90,7 @@ export default function Goals() {
     },
     { header: 'Status', cell: (r) => <Badge tone={projectStatus[r.status].tone}>{projectStatus[r.status].label}</Badge> },
     { header: 'Cobrado', className: 'text-right', cell: (r) => <span className="tabular">{formatCurrency(r.charged)}</span> },
-    { header: 'Freelancers', className: 'text-right', cell: (r) => <span className="tabular text-slate-500 dark:text-slate-400">− {formatCurrency(r.freelancers)}</span> },
-    { header: 'Custos extras', className: 'text-right', cell: (r) => <span className="tabular text-slate-500 dark:text-slate-400">− {formatCurrency(r.extras)}</span> },
+    { header: 'Custos', className: 'text-right', cell: (r) => <span className="tabular text-slate-500 dark:text-slate-400">− {formatCurrency(r.extras)}</span> },
     {
       header: 'Margem líquida',
       className: 'text-right',
@@ -118,7 +115,7 @@ export default function Goals() {
     <>
       <PageHeader
         title="Metas & Relatórios"
-        description="Acompanhe o progresso das metas e a margem real de cada projeto."
+        description="Acompanhe o progresso das metas e quanto sobra de cada projeto."
         actions={
           <>
             <Segmented value={period} onChange={setPeriod} options={[{ value: 'month', label: 'Mês' }, { value: 'quarter', label: 'Trimestre' }, { value: 'all', label: 'Todas' }]} />
@@ -201,7 +198,7 @@ export default function Goals() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3.5">
           <div>
             <h2 className="text-sm font-semibold">Lucratividade por projeto</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Valor cobrado − custo de freelancers − custos extras = margem líquida</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Valor cobrado − despesas ligadas ao projeto = margem líquida</p>
           </div>
           {report.length > 0 && (
             <p className="tabular text-xs text-slate-500 dark:text-slate-400">

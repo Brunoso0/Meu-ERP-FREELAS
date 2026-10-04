@@ -6,7 +6,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import { CalendarDays, CheckCircle2, TrendingDown, TrendingUp, Video } from 'lucide-react'
 import { ChartLegend, ChartTooltip, Sparkline, useChartTheme } from '@/components/charts/theme'
 import { Pager, usePagination } from '@/components/ui/Pagination'
-import { Avatar, Badge, Card, EmptyState, PageHeader, Skeleton } from '@/components/ui/primitives'
+import { Badge, Card, EmptyState, PageHeader, Skeleton } from '@/components/ui/primitives'
 import { useTable } from '@/hooks/useData'
 import { eventType, taskPriority } from '@/lib/labels'
 import { cn, formatCompact, formatCurrency, formatDate, safeHttpUrl, sum, toDate } from '@/lib/utils'
@@ -58,12 +58,11 @@ export default function Dashboard() {
   const transactions = useTable('financial_transactions')
   const tasks = useTable('tasks')
   const proposals = useTable('proposals')
-  const freelancers = useTable('freelancers')
   const events = useTable('calendar_events')
   const projects = useTable('projects')
   const clients = useTable('clients')
 
-  const loading = transactions.isLoading || tasks.isLoading || proposals.isLoading || freelancers.isLoading
+  const loading = transactions.isLoading || tasks.isLoading || proposals.isLoading || projects.isLoading
 
   const data = useMemo(() => {
     const now = new Date()
@@ -84,11 +83,18 @@ export default function Dashboard() {
 
     const active = allTasks.filter((t) => t.status !== 'done')
     const pending = (proposals.data ?? []).filter((p) => p.status === 'sent' || p.status === 'draft')
-    const activeFreelancers = (freelancers.data ?? []).map((f) => ({
-      name: f.name.split(' ')[0],
-      demandas: active.filter((t) => t.freelancer_id === f.id).length,
-    }))
-    const allocated = activeFreelancers.filter((f) => f.demandas > 0)
+    const receivable = income.filter((t) => t.status !== 'paid').sort((a, b) => a.due_date.localeCompare(b.due_date))
+
+    // carga de trabalho: demandas em aberto agrupadas pelo projeto a que pertencem
+    const perProject = new Map<string, number>()
+    for (const t of active) {
+      const title = (projects.data ?? []).find((p) => p.id === t.project_id)?.title ?? 'Sem projeto'
+      perProject.set(title, (perProject.get(title) ?? 0) + 1)
+    }
+    const byProject = [...perProject.entries()]
+      .map(([name, demandas]) => ({ name, demandas }))
+      .sort((a, b) => b.demandas - a.demandas)
+      .slice(0, 6)
 
     const horizon = addHours(now, 48)
     const critical = active
@@ -106,21 +112,20 @@ export default function Dashboard() {
       trend,
       active,
       pending,
-      allocated,
-      byFreelancer: activeFreelancers.sort((a, b) => b.demandas - a.demandas),
+      receivable,
+      byProject,
       critical,
       today,
       monthLabel: format(monthEnd, "MMMM 'de' yyyy", { locale: ptBR }),
       taskSpark: [0, 1, 2, 3, 4, 5, 6].map((d) => active.filter((t) => t.scheduled_date && toDate(t.scheduled_date).getDay() === d).length),
     }
-  }, [transactions.data, tasks.data, proposals.data, freelancers.data, events.data])
+  }, [transactions.data, tasks.data, proposals.data, projects.data, events.data])
 
   const criticalPage = usePagination(data.critical)
   const todayPage = usePagination(data.today)
 
   const projectOf = (id: string | null) => projects.data?.find((p) => p.id === id)
   const clientOf = (projectId: string | null) => clients.data?.find((c) => c.id === projectOf(projectId)?.client_id)
-  const freelancerOf = (id: string | null) => freelancers.data?.find((f) => f.id === id)
 
   return (
     <>
@@ -150,10 +155,10 @@ export default function Dashboard() {
           loading={loading}
         />
         <Kpi
-          label="Freelancers alocados"
-          value={`${data.allocated.length} de ${freelancers.data?.length ?? 0}`}
-          detail="com demandas ativas"
-          spark={[0, ...data.byFreelancer.map((f) => f.demandas).reverse()]}
+          label="A receber"
+          value={formatCurrency(sum(data.receivable.map((t) => t.amount)))}
+          detail={`${data.receivable.length} ${data.receivable.length === 1 ? 'lançamento em aberto' : 'lançamentos em aberto'}`}
+          spark={[0, ...data.receivable.map((t) => Number(t.amount))]}
           loading={loading}
         />
       </div>
@@ -186,21 +191,29 @@ export default function Dashboard() {
         </Card>
 
         <Card className="p-5">
-          <h2 className="text-sm font-semibold">Demandas por freelancer</h2>
-          <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">Demandas ativas alocadas</p>
+          <h2 className="text-sm font-semibold">Demandas por projeto</h2>
+          <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">Demandas em aberto em cada projeto</p>
           {loading ? (
             <Skeleton className="h-64 w-full" />
-          ) : data.byFreelancer.length === 0 ? (
-            <EmptyState icon={CheckCircle2} title="Nenhum freelancer cadastrado" className="py-10" />
+          ) : data.byProject.length === 0 ? (
+            <EmptyState icon={CheckCircle2} title="Nenhuma demanda em aberto" className="py-10" />
           ) : (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.byFreelancer} margin={{ top: 6, right: 8, bottom: 0, left: 0 }} barCategoryGap="28%">
-                  <CartesianGrid stroke={chart.grid} vertical={false} />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: chart.axis, fontSize: 12 }} />
-                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={28} tick={{ fill: chart.axis, fontSize: 12 }} />
+                <BarChart data={data.byProject} layout="vertical" margin={{ top: 0, right: 12, bottom: 0, left: 0 }} barCategoryGap="28%">
+                  <CartesianGrid stroke={chart.grid} horizontal={false} />
+                  <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: chart.axis, fontSize: 12 }} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={112}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: chart.axis, fontSize: 12 }}
+                    tickFormatter={(name: string) => (name.length > 15 ? `${name.slice(0, 14)}…` : name)}
+                  />
                   <Tooltip cursor={{ fill: chart.cursor }} content={<ChartTooltip format={(v) => String(v)} />} />
-                  <Bar name="Demandas" dataKey="demandas" fill={chart.primary} radius={[4, 4, 0, 0]} maxBarSize={36} />
+                  <Bar name="Demandas" dataKey="demandas" fill={chart.primary} radius={[0, 4, 4, 0]} maxBarSize={22} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -232,7 +245,6 @@ export default function Dashboard() {
                     onClick={() => openModal({ type: 'task', record: t })}
                     className="flex w-full items-center gap-3 border-b px-5 py-3 text-left last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   >
-                    <Avatar name={freelancerOf(t.freelancer_id)?.name} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{t.title}</span>
                       <span className="block truncate text-xs text-slate-500 dark:text-slate-400">

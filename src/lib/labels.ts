@@ -20,11 +20,6 @@ export const clientStatus: LabelMap<ClientStatus> = {
   lead: { label: 'Lead', tone: 'blue' },
 }
 
-export const freelancerStatus: LabelMap<'active' | 'inactive'> = {
-  active: { label: 'Disponível', tone: 'green' },
-  inactive: { label: 'Inativo', tone: 'slate' },
-}
-
 export const proposalStatus: LabelMap<ProposalStatus> = {
   draft: { label: 'Rascunho', tone: 'slate' },
   sent: { label: 'Enviada', tone: 'blue' },

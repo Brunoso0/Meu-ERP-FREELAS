@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   ScrollText,
   Target,
-  UserCog,
   Users,
   Wallet,
   type LucideIcon,
@@ -28,7 +27,6 @@ export const mainNav: NavItem[] = [
   { to: '/projetos', label: 'Projetos', icon: Briefcase },
   { to: '/demandas', label: 'Demandas', icon: Kanban },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays },
-  { to: '/freelancers', label: 'Freelancers', icon: UserCog },
   { to: '/financeiro', label: 'Financeiro', icon: Wallet },
   { to: '/metas', label: 'Metas & Relatórios', icon: Target },
 ]

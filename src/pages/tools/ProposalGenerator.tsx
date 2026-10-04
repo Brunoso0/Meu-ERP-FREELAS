@@ -8,7 +8,6 @@ import { Download, Plus, Save, Trash2 } from 'lucide-react'
 import { ProposalDocument } from '@/components/proposals/ProposalDocument'
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from '@/components/ui/primitives'
 import { useInsert, useTable } from '@/hooks/useData'
-import { downloadProposalPdf } from '@/lib/pdf'
 import { buildProposalDoc, itemsTotal } from '@/lib/proposal'
 import { formatCurrency, formatProposalNumber } from '@/lib/utils'
 import { useUI } from '@/store/ui'
@@ -132,8 +131,8 @@ export default function ProposalGenerator() {
         const { proposal_number: _preview, ...values } = draft
         const created = await insert.mutateAsync({ ...values, status: 'draft' })
         toast.success(`Proposta ${formatProposalNumber(created.proposal_number)} salva`)
-        if (thenDownload) downloadProposalPdf(buildProposalDoc(created, client, profile))
-        navigate(`/propostas/${created.id}`)
+        // o PDF sai da própria página da proposta, pela impressão do navegador
+        navigate(`/propostas/${created.id}`, { state: { print: thenDownload } })
       } catch {
         // toast de erro já exibido pelo hook
       }
@@ -147,7 +146,7 @@ export default function ProposalGenerator() {
         actions={
           <>
             <Button variant="secondary" loading={isSubmitting} onClick={() => save(true)}>
-              <Download className="h-4 w-4" /> Salvar e baixar PDF
+              <Download className="h-4 w-4" /> Salvar e gerar PDF
             </Button>
             <Button loading={isSubmitting} onClick={() => save(false)}>
               <Save className="h-4 w-4" /> Salvar proposta

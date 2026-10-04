@@ -3,7 +3,7 @@ import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-p
 import { addDays, addWeeks, isBefore, startOfDay, startOfWeek } from 'date-fns'
 import { CalendarClock, ChevronLeft, ChevronRight, Kanban, LayoutGrid, List, Plus } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui/DataTable'
-import { Avatar, Badge, Button, Card, EmptyState, PageHeader, Segmented, Skeleton } from '@/components/ui/primitives'
+import { Badge, Button, Card, EmptyState, PageHeader, Segmented, Skeleton } from '@/components/ui/primitives'
 import { useTable, useUpdate } from '@/hooks/useData'
 import { taskPriority, taskStatus } from '@/lib/labels'
 import { cn, formatCurrency, formatDate, isoDay, toDate } from '@/lib/utils'
@@ -19,7 +19,6 @@ export default function Tasks() {
   const tasks = useTable('tasks')
   const projects = useTable('projects')
   const clients = useTable('clients')
-  const freelancers = useTable('freelancers')
   const update = useUpdate('tasks')
   const [view, setView] = useState<'kanban' | 'table'>('kanban')
   const [weekOffset, setWeekOffset] = useState(0)
@@ -48,7 +47,6 @@ export default function Tasks() {
     const client = clients.data?.find((c) => c.id === project?.client_id)
     return client?.company_name ?? client?.name ?? project?.title ?? null
   }
-  const freelancerOf = (id: string | null) => freelancers.data?.find((f) => f.id === id)
 
   const onDragEnd = ({ destination, source, draggableId }: DropResult) => {
     if (!destination || destination.droppableId === source.droppableId) return
@@ -74,19 +72,6 @@ export default function Tasks() {
         </div>
       ),
     },
-    {
-      header: 'Freelancer',
-      cell: (t) => {
-        const f = freelancerOf(t.freelancer_id)
-        return f ? (
-          <span className="inline-flex items-center gap-2">
-            <Avatar name={f.name} className="h-6 w-6" /> {f.name}
-          </span>
-        ) : (
-          <span className="text-slate-400">Não alocado</span>
-        )
-      },
-    },
     { header: 'Status', cell: (t) => <Badge tone={taskStatus[t.status].tone}>{taskStatus[t.status].label}</Badge> },
     { header: 'Prioridade', cell: (t) => <Badge tone={taskPriority[t.priority].tone}>{taskPriority[t.priority].label}</Badge> },
     { header: 'Dia', cell: (t) => <span className="tabular text-slate-600 dark:text-slate-300">{formatDate(t.scheduled_date, 'dd/MM')}</span> },
@@ -94,8 +79,7 @@ export default function Tasks() {
       header: 'Prazo',
       cell: (t) => <span className={cn('tabular', isLate(t) ? 'font-medium text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300')}>{formatDate(t.due_date, 'dd/MM')}</span>,
     },
-    { header: 'Cobrado', className: 'text-right', cell: (t) => <span className="tabular">{formatCurrency(t.charged_amount)}</span> },
-    { header: 'Repasse', className: 'text-right', cell: (t) => <span className="tabular text-slate-500 dark:text-slate-400">{formatCurrency(t.cost_amount)}</span> },
+    { header: 'Valor', className: 'text-right', cell: (t) => <span className="tabular">{formatCurrency(t.charged_amount)}</span> },
   ]
 
   const newTask = (defaults?: Record<string, unknown>) => openModal({ type: 'task', defaults })
@@ -205,7 +189,6 @@ export default function Tasks() {
                           {tasks.isLoading && <Skeleton className="h-20 w-full" />}
                           {items.map((task, index) => {
                             const tag = clientTag(task)
-                            const freelancer = freelancerOf(task.freelancer_id)
                             return (
                               <Draggable key={task.id} draggableId={task.id} index={index}>
                                 {(drag, dragSnapshot) => (
@@ -230,7 +213,7 @@ export default function Tasks() {
                                         <CalendarClock className="h-3.5 w-3.5" />
                                         {task.due_date ? formatDate(task.due_date, 'dd/MM') : 'Sem prazo'}
                                       </span>
-                                      {freelancer ? <Avatar name={freelancer.name} className="h-6 w-6 text-[10px]" /> : <span className="text-xs text-slate-400">Não alocado</span>}
+                                      {Number(task.charged_amount) > 0 && <span className="tabular text-xs font-medium text-slate-600 dark:text-slate-300">{formatCurrency(task.charged_amount)}</span>}
                                     </div>
                                   </div>
                                 )}
