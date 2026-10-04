@@ -5,6 +5,7 @@ import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { Check, ChevronLeft, ChevronRight, Eye, MoreHorizontal, Paperclip, Pencil, Plus, Wallet } from 'lucide-react'
 import { FinanceCharts } from '@/components/finance/FinanceCharts'
+import { RecurrenceList } from '@/components/finance/RecurrenceList'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dropdown, DropdownContent, DropdownItem, DropdownTrigger } from '@/components/ui/overlays'
 import { Badge, Button, Card, EmptyState, PageHeader, Segmented, Skeleton } from '@/components/ui/primitives'
@@ -140,7 +141,14 @@ export default function Finance() {
       header: 'Descrição',
       cell: (t) => (
         <div className="min-w-0">
-          <p className="truncate font-medium">{t.description ?? t.category ?? '—'}</p>
+          <p className="flex items-center gap-2 font-medium">
+            <span className="truncate">{t.description ?? t.category ?? '—'}</span>
+            {t.installment && t.installments ? (
+              <span className="tabular shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-normal text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={`Parcela ${t.installment} de ${t.installments}`}>
+                {t.installment}/{t.installments}
+              </span>
+            ) : null}
+          </p>
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
             {[counterpart(t), projectTitle(t.project_id), t.category].filter(Boolean).join(' · ') || '—'}
           </p>
@@ -248,6 +256,8 @@ export default function Finance() {
       </div>
 
       <FinanceCharts transactions={all} clients={clients.data ?? []} range={range} loading={loading} />
+
+      <RecurrenceList transactions={all} clients={clients.data ?? []} />
 
       <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={onFile} />
 

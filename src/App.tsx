@@ -21,6 +21,7 @@ const BudgetCalculator = lazy(() => import('@/pages/tools/BudgetCalculator'))
 const QuoteGenerator = lazy(() => import('@/pages/tools/QuoteGenerator'))
 const ProposalGenerator = lazy(() => import('@/pages/tools/ProposalGenerator'))
 const ContractGenerator = lazy(() => import('@/pages/tools/ContractGenerator'))
+const LeadFinder = lazy(() => import('@/pages/tools/LeadFinder'))
 
 export default function App() {
   const theme = useUI((s) => s.theme)
@@ -68,6 +69,7 @@ export default function App() {
             <Route path="ferramentas/orcamento" element={<QuoteGenerator />} />
             <Route path="ferramentas/proposta" element={<ProposalGenerator />} />
             <Route path="ferramentas/contrato" element={<ContractGenerator />} />
+            <Route path="ferramentas/leads" element={<LeadFinder />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

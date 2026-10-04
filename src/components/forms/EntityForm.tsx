@@ -7,7 +7,7 @@ import type { ZodTypeAny } from 'zod'
 import { ImagePlus, Trash2 } from 'lucide-react'
 import { Sheet } from '@/components/ui/overlays'
 import { Button, Field, Input, Select, Textarea } from '@/components/ui/primitives'
-import { useInsert, useRemove, useUpdate } from '@/hooks/useData'
+import { useInsert, useInsertMany, useRemove, useUpdate } from '@/hooks/useData'
 import { imageToDataUrl } from '@/lib/image'
 import type { TableName } from '@/types/database.types'
 
@@ -16,7 +16,7 @@ export interface FieldDef {
   label: string
   /** `image` guarda a imagem como data URL no próprio registro. */
   type?: 'text' | 'email' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'image'
-  /** Texto de ajuda abaixo do campo (hoje usado pelo campo de imagem). */
+  /** Texto de ajuda abaixo do campo. */
   hint?: string
   options?: Array<{ value: string; label: string }>
   /** Opção vazia do select (ex.: "Sem projeto"). */
@@ -26,6 +26,10 @@ export interface FieldDef {
   step?: string
   /** Ocupa a linha inteira no grid de 2 colunas. */
   full?: boolean
+  /** Campo que só existe ao criar e não é coluna do registro (ex.: repetição). */
+  createOnly?: boolean
+  /** Mostra o campo só quando a condição vale para os valores atuais. */
+  showWhen?: (values: Record<string, any>) => boolean
 }
 
 interface EntityFormProps {
@@ -42,6 +46,8 @@ interface EntityFormProps {
   variant?: 'drawer' | 'modal'
   /** Falso para registros que não podem ser excluídos (ex.: o próprio perfil). */
   allowDelete?: boolean
+  /** Ao criar, desdobra o que foi preenchido em uma ou mais linhas (ex.: parcelas mensais). */
+  expand?: (payload: Record<string, any>) => Record<string, any>[]
 }
 
 function initialValues(fields: FieldDef[], source: Record<string, any> | undefined) {
@@ -105,8 +111,10 @@ function ImageField({ field, value, error, onChange }: { field: FieldDef; value:
  * declara campos + schema Zod em GlobalModals e este componente cuida de
  * validação, máscaras, salvar, excluir e feedback.
  */
-export function EntityForm({ open, onClose, noun, title, table, fields, schema, record, defaults, variant = 'drawer', allowDelete = true }: EntityFormProps) {
+export function EntityForm({ open, onClose, noun, title, table, fields: allFields, schema, record, defaults, variant = 'drawer', allowDelete = true, expand }: EntityFormProps) {
+  const fields = record ? allFields.filter((f) => !f.createOnly) : allFields
   const insert = useInsert(table)
+  const insertMany = useInsertMany(table)
   const update = useUpdate(table)
   const remove = useRemove(table)
 
@@ -134,9 +142,11 @@ export function EntityForm({ open, onClose, noun, title, table, fields, schema, 
       payload[f.name] = v
     }
     try {
+      const rows = record ? [] : expand ? expand(payload) : [payload]
       if (record) await update.mutateAsync({ id: record.id, patch: payload })
-      else await insert.mutateAsync(payload)
-      toast.success(record ? 'Alterações salvas' : 'Registro criado')
+      else if (rows.length === 1) await insert.mutateAsync(rows[0])
+      else await insertMany.mutateAsync(rows)
+      toast.success(record ? 'Alterações salvas' : rows.length > 1 ? `${rows.length} lançamentos criados` : 'Registro criado')
       onClose()
     } catch {
       // o hook já mostrou o toast de erro; mantém o formulário aberto
@@ -159,6 +169,7 @@ export function EntityForm({ open, onClose, noun, title, table, fields, schema, 
       <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
         <div className="grid flex-1 grid-cols-2 content-start gap-4 overflow-y-auto px-5 py-5">
           {fields.map((f) => {
+            if (f.showWhen && !f.showWhen(watch())) return null
             const error = errors[f.name]?.message as string | undefined
             if (f.type === 'image') {
               return <ImageField key={f.name} field={f} value={watch(f.name) ?? ''} error={error} onChange={(v) => setValue(f.name, v, { shouldDirty: true })} />
@@ -186,6 +197,7 @@ export function EntityForm({ open, onClose, noun, title, table, fields, schema, 
                     {...reg}
                   />
                 )}
+                {f.hint && <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{f.hint}</span>}
               </Field>
             )
           })}

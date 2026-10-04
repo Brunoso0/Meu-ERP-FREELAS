@@ -93,6 +93,26 @@ export async function insertRow<T extends TableName>(table: T, values: Partial<T
   return data as Tables[T]
 }
 
+/** Insere várias linhas de uma vez (ex.: as parcelas de uma recorrência). */
+export async function insertRows<T extends TableName>(table: T, rows: Partial<Tables[T]>[]): Promise<Tables[T][]> {
+  if (!supabase) {
+    await latency()
+    const now = Date.now()
+    const created = rows.map((values, i) => ({
+      ...values,
+      id: crypto.randomUUID(),
+      user_id: DEMO_USER_ID,
+      created_at: new Date(now + i).toISOString(),
+    })) as unknown as Tables[T][]
+    rowsOf(table).push(...created)
+    persist()
+    return created
+  }
+  const { data, error } = await supabase.from(table).insert(rows as Record<string, unknown>[]).select()
+  fail(error)
+  return (data ?? []) as Tables[T][]
+}
+
 export async function updateRow<T extends TableName>(
   table: T,
   id: string,

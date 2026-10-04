@@ -1,4 +1,4 @@
-import { addDays, addHours, setHours, setMinutes, startOfMonth, startOfWeek, subDays, subMonths, endOfMonth, endOfQuarter, startOfQuarter } from 'date-fns'
+import { addDays, addHours, addMonths, setHours, setMinutes, startOfMonth, startOfWeek, subDays, subMonths, endOfMonth, endOfQuarter, startOfQuarter } from 'date-fns'
 import type { FinancialTransaction, Tables } from '@/types/database.types'
 import { isoDay } from './utils'
 
@@ -132,6 +132,14 @@ export function buildSeed(): MockDB {
   tx({ type: 'expense', category: 'Equipamento', description: 'Teclado e mouse', amount: 380, due_date: today, payment_date: today, status: 'paid', client_id: null, freelancer_id: null, project_id: null })
   tx({ type: 'expense', category: 'Ferramentas', description: 'Licenças e hospedagem', amount: 440, due_date: isoDay(addDays(thisMonth, 4)), payment_date: isoDay(addDays(thisMonth, 4)), status: 'paid', client_id: null, freelancer_id: null, project_id: null })
   tx({ type: 'expense', category: 'Infraestrutura', description: 'Servidor do App Bento', amount: 260, due_date: isoDay(addDays(now, 9)), payment_date: null, status: 'pending', client_id: null, freelancer_id: null, project_id: 'pr2' })
+
+  // mensalidade em andamento: 2 de 8 já recebidas
+  const monthlyStart = addDays(startOfMonth(subMonths(now, 2)), 14)
+  Array.from({ length: 8 }, (_, i) => {
+    const due = isoDay(addMonths(monthlyStart, i))
+    const paid = i < 2
+    tx({ type: 'income', category: 'Mensalidade', description: 'Mensalidade — Manutenção do sistema de pedidos', amount: 650, due_date: due, payment_date: paid ? due : null, status: paid ? 'paid' : 'pending', client_id: 'c2', freelancer_id: null, project_id: null, recurrence_id: 'r1', installment: i + 1, installments: 8, contract_id: null })
+  })
 
   const contracts: MockDB['contracts'] = [
     { id: 'k1', user_id: u, proposal_id: 'p1', client_id: 'c1', title: 'Contrato — Novo site institucional', content_markdown: '# Contrato de Prestação de Serviços\n\nContrato de exemplo gerado no modo demo. Abra o Gerador de Contratos para criar um novo a partir de uma proposta aprovada.', status: 'active', created_at: created(58) },

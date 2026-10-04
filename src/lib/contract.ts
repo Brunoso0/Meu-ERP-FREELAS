@@ -16,6 +16,14 @@ export interface ContractParams {
   warrantyDays: number
   responseHours: number
   termMonths: number
+  /** Mensalidade, quando o contrato é recorrente (0 = usa o valor da proposta). */
+  monthlyAmount: number
+  /** Dias que a contratante tem, após a assinatura, para enviar as informações. */
+  infoDeadlineDays: number
+  /** Dias de atraso tolerados antes de a diária começar a ser cobrada. */
+  infoGraceDays: number
+  /** Diária cobrada por dia de informação pendente, passada a tolerância. */
+  infoDailyFee: number
   forum: string
   /** Cláusulas opcionais ligadas (ids de `contractClauses`). */
   clauses: string[]
@@ -53,6 +61,8 @@ export interface ClauseDef {
 }
 
 const blank = (value: string | null | undefined, placeholder: string) => value?.trim() || `[${placeholder}]`
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 const joinList = (items: string[]) =>
   items.length <= 1 ? items.join('') : `${items.slice(0, -1).join('; ')}; e ${items[items.length - 1]}`
@@ -99,9 +109,9 @@ export const contractClauses: ClauseDef[] = [
   {
     id: 'recurring',
     title: 'Vigência e renovação',
-    hint: 'Para manutenção mensal continuada. Use no lugar do prazo de execução.',
+    hint: 'Para contrato com mensalidade. Use no lugar do prazo de execução.',
     body: ({ p }) => [
-      `Este contrato vigora por **${p.termMonths} meses** a partir da assinatura e se renova automaticamente por períodos iguais, salvo manifestação contrária de qualquer das partes com ${p.noticeDays} dias de antecedência.`,
+      `Este contrato vigora por **${p.termMonths} ${p.termMonths === 1 ? 'mês' : 'meses'}** a partir da assinatura e se renova automaticamente por períodos iguais, salvo manifestação contrária de qualquer das partes com ${p.noticeDays} dias de antecedência.`,
       'A cada renovação, o valor poderá ser reajustado pela variação do IPCA acumulado no período, ou por outro índice que venha a substituí-lo.',
     ],
   },
@@ -111,7 +121,9 @@ export const contractClauses: ClauseDef[] = [
     hint: 'Valor, vencimento e multa por atraso. Sempre presente.',
     required: true,
     body: ({ p, proposal, value }) => [
-      `Pelos serviços, a CONTRATANTE pagará o valor ${p.clauses.includes('recurring') ? 'mensal' : 'total'} de **${value}**.`,
+      p.clauses.includes('recurring')
+        ? `Pelos serviços, a CONTRATANTE pagará o valor mensal de **${value}**, durante os ${p.termMonths} ${p.termMonths === 1 ? 'mês' : 'meses'} de vigência.`
+        : `Pelos serviços, a CONTRATANTE pagará o valor total de **${value}**.`,
       proposal?.payment_terms ? `Condições: ${proposal.payment_terms}` : '',
       `Cada cobrança vence em até **${p.paymentDays} dias** após a emissão. O atraso sujeita a CONTRATANTE a multa de **${p.latePenaltyPct}%** sobre o valor em aberto e juros de 1% ao mês, e autoriza a CONTRATADA a suspender os serviços até a regularização.`,
     ],
@@ -134,6 +146,17 @@ export const contractClauses: ClauseDef[] = [
     body: () => [
       'Cabe à CONTRATANTE: (a) fornecer os acessos, arquivos e informações necessários à execução; (b) indicar uma pessoa responsável por esclarecer dúvidas e aprovar as entregas; (c) manter válidas as licenças dos sistemas e ferramentas que utiliza; e (d) efetuar os pagamentos nas datas combinadas.',
       'A CONTRATADA não responde por atrasos ou falhas decorrentes de informações incorretas, acessos indisponíveis ou materiais entregues fora do prazo.',
+    ],
+  },
+  {
+    id: 'client_delay',
+    title: 'Atraso no envio de informações',
+    hint: 'Prazo para o cliente enviar o que você precisa, com prorrogação e diária se ele atrasar.',
+    recommended: true,
+    body: ({ p }) => [
+      `A CONTRATANTE terá **${plural(p.infoDeadlineDays, 'dia', 'dias')}**, contados da assinatura deste contrato, para enviar todas as informações necessárias ao andamento do projeto.`,
+      'Cada dia de atraso da CONTRATANTE no envio dessas informações acrescenta um dia ao prazo de entrega do projeto.',
+      `Se o atraso passar de **${plural(p.infoGraceDays, 'dia', 'dias')}**, será cobrada, além da prorrogação do prazo, uma diária de **${formatCurrency(p.infoDailyFee)}** por dia em que as informações continuarem pendentes, até o envio completo.`,
     ],
   },
   {
@@ -285,7 +308,12 @@ export function buildContractMarkdown(
   const customer = blank(client?.company_name || client?.name, 'nome do contratante')
   const customerDoc = blank(client?.document, 'CPF/CNPJ do contratante')
   const representative = client?.company_name && client?.name ? `, neste ato representada por **${client.name}**` : ''
-  const ctx: ClauseContext = { p: params, proposal, value: proposal ? formatCurrency(proposal.total_amount) : '[valor]' }
+  const monthly = params.clauses.includes('recurring') && params.monthlyAmount > 0
+  const ctx: ClauseContext = {
+    p: params,
+    proposal,
+    value: monthly ? formatCurrency(params.monthlyAmount) : proposal ? formatCurrency(proposal.total_amount) : '[valor]',
+  }
 
   const lines = [
     '# Contrato de Prestação de Serviços',

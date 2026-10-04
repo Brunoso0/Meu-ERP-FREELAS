@@ -4,18 +4,20 @@ import { useForm, type UseFormRegisterReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Download, Lock, Save, ScrollText } from 'lucide-react'
+import { Download, Lock, Repeat, Save, ScrollText } from 'lucide-react'
 import { Pager, usePagination } from '@/components/ui/Pagination'
 import { Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from '@/components/ui/primitives'
 import { useInsert, useRemove, useTable, useUpdate } from '@/hooks/useData'
 import { buildContractMarkdown, contractClauses, defaultClauses, serviceKinds } from '@/lib/contract'
 import { contractStatus, proposalStatus, toOptions } from '@/lib/labels'
 import { downloadContractPdf } from '@/lib/pdf'
-import { cn, formatCurrency, formatDate, formatProposalNumber } from '@/lib/utils'
-import type { ContractStatus } from '@/types/database.types'
+import { MAX_INSTALLMENTS } from '@/lib/recurrence'
+import { cn, formatCurrency, formatDate, formatProposalNumber, isoDay } from '@/lib/utils'
+import type { Contract, ContractStatus } from '@/types/database.types'
 
 const days = (min: number, message: string) => z.coerce.number().int('Use um número inteiro').min(min, message)
 const pct = z.coerce.number().min(0, 'Não pode ser negativa').max(100, 'Máximo de 100%')
+const money = z.coerce.number({ invalid_type_error: 'Informe um número' }).min(0, 'Não pode ser negativo')
 
 const schema = z.object({
   proposal_id: z.string(),
@@ -23,7 +25,12 @@ const schema = z.object({
   title: z.string().min(3, 'Informe um título'),
   objectDetails: z.string(),
   executionDays: days(1, 'Mínimo de 1 dia'),
-  termMonths: days(1, 'Mínimo de 1 mês'),
+  termMonths: days(1, 'Mínimo de 1 mês').max(MAX_INSTALLMENTS, `Máximo de ${MAX_INSTALLMENTS} meses`),
+  monthlyAmount: money,
+  firstDueDate: z.string(),
+  infoDeadlineDays: days(1, 'Mínimo de 1 dia'),
+  infoGraceDays: days(0, 'Não pode ser negativo'),
+  infoDailyFee: money,
   revisionLimit: days(0, 'Não pode ser negativo'),
   paymentDays: days(0, 'Não pode ser negativo'),
   latePenaltyPct: pct,
@@ -34,14 +41,17 @@ const schema = z.object({
   forum: z.string().min(2, 'Informe a comarca'),
 })
 type Values = z.infer<typeof schema>
-type NumericField = Exclude<keyof Values, 'proposal_id' | 'client_id' | 'title' | 'objectDetails' | 'forum'>
+type NumericField = Exclude<keyof Values, 'proposal_id' | 'client_id' | 'title' | 'objectDetails' | 'forum' | 'firstDueDate'>
 
 /** Parâmetros que cada cláusula expõe quando está ligada. */
 const clauseParams: Record<string, Array<{ name: NumericField; label: string; step?: string }>> = {
   term: [{ name: 'executionDays', label: 'Prazo (dias corridos)' }],
-  recurring: [
-    { name: 'termMonths', label: 'Vigência (meses)' },
-    { name: 'noticeDays', label: 'Aviso prévio (dias)' },
+  // valor mensal e vigência ficam no cartão "Recorrência"
+  recurring: [{ name: 'noticeDays', label: 'Aviso prévio (dias)' }],
+  client_delay: [
+    { name: 'infoDeadlineDays', label: 'Prazo para enviar (dias)' },
+    { name: 'infoGraceDays', label: 'Diária após (dias de atraso)' },
+    { name: 'infoDailyFee', label: 'Valor da diária (R$)', step: '0.01' },
   ],
   payment: [
     { name: 'paymentDays', label: 'Vencimento (dias após a cobrança)' },
@@ -94,6 +104,8 @@ export default function ContractGenerator() {
   const proposals = useTable('proposals')
   const clients = useTable('clients')
   const contracts = useTable('contracts')
+  const transactions = useTable('financial_transactions')
+  const removeTransaction = useRemove('financial_transactions')
   const profile = useTable('profiles').data?.[0]
   const insert = useInsert('contracts')
   const update = useUpdate('contracts')
@@ -107,6 +119,8 @@ export default function ContractGenerator() {
     handleSubmit,
     watch,
     setValue,
+    setError,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -117,6 +131,11 @@ export default function ContractGenerator() {
       objectDetails: '',
       executionDays: 30,
       termMonths: 12,
+      monthlyAmount: 0,
+      firstDueDate: '',
+      infoDeadlineDays: 7,
+      infoGraceDays: 3,
+      infoDailyFee: 90,
       revisionLimit: 2,
       paymentDays: 5,
       latePenaltyPct: 2,
@@ -138,6 +157,7 @@ export default function ContractGenerator() {
     if (proposal.client_id) setValue('client_id', proposal.client_id)
     setValue('title', `Contrato — ${proposal.title}`)
     setValue('objectDetails', proposal.scope_text ?? '')
+    if (!Number(getValues('monthlyAmount'))) setValue('monthlyAmount', proposal.total_amount)
   }, [proposal?.id, setValue]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // aprovadas primeiro: são as que normalmente viram contrato
@@ -158,6 +178,10 @@ export default function ContractGenerator() {
       objectDetails: values.objectDetails ?? '',
       executionDays: num('executionDays'),
       termMonths: num('termMonths'),
+      monthlyAmount: num('monthlyAmount'),
+      infoDeadlineDays: num('infoDeadlineDays'),
+      infoGraceDays: num('infoGraceDays'),
+      infoDailyFee: num('infoDailyFee'),
       revisionLimit: num('revisionLimit'),
       paymentDays: num('paymentDays'),
       latePenaltyPct: num('latePenaltyPct'),
@@ -179,7 +203,18 @@ export default function ContractGenerator() {
   const guard = (run: (v: Values) => void | Promise<void>) =>
     handleSubmit(run, () => toast.error('Revise os campos destacados antes de continuar'))
 
+  const recurring = clauses.includes('recurring')
+
+  /** Contrato com mensalidade precisa do valor mensal antes de salvar ou exportar. */
+  const recurrenceReady = (v: Values) => {
+    if (!recurring || v.monthlyAmount > 0) return true
+    setError('monthlyAmount', { message: 'Informe o valor mensal' })
+    toast.error('Informe o valor mensal da recorrência')
+    return false
+  }
+
   const save = guard(async (v) => {
+    if (!recurrenceReady(v)) return
     try {
       await insert.mutateAsync({
         proposal_id: v.proposal_id || null,
@@ -187,6 +222,8 @@ export default function ContractGenerator() {
         title: v.title,
         content_markdown: markdown,
         status: 'draft',
+        // só vão para o banco quando há mensalidade
+        ...(recurring ? { monthly_amount: v.monthlyAmount, term_months: v.termMonths, first_due_date: v.firstDueDate || null } : {}),
       })
       toast.success('Contrato salvo')
     } catch {
@@ -194,7 +231,32 @@ export default function ContractGenerator() {
     }
   })
 
-  const download = guard((v) => downloadContractPdf(v.title, markdown, issuer))
+  const download = guard((v) => {
+    if (recurrenceReady(v)) downloadContractPdf(v.title, markdown, issuer)
+  })
+
+  /**
+   * Assinar lança as mensalidades (feito no hook de atualização). Encerrar
+   * oferece tirar do financeiro as que ainda não venceram.
+   */
+  const changeStatus = async (contract: Contract, status: ContractStatus) => {
+    try {
+      await update.mutateAsync({ id: contract.id, patch: { status } })
+    } catch {
+      return // toast de erro já exibido pelo hook
+    }
+    if (status !== 'terminated') return
+    const today = isoDay(new Date())
+    const future = (transactions.data ?? []).filter((t) => t.contract_id === contract.id && t.status !== 'paid' && t.due_date > today)
+    if (future.length === 0) return
+    if (!window.confirm(`Remover do financeiro as ${future.length} mensalidades deste contrato que ainda não venceram? As pagas e as já vencidas continuam lá.`)) return
+    try {
+      for (const t of future) await removeTransaction.mutateAsync(t.id)
+      toast.success('Mensalidades futuras removidas')
+    } catch {
+      // toast de erro já exibido pelo hook
+    }
+  }
 
   const paramInput = (reg: UseFormRegisterReturn, label: string, error: string | undefined, step?: string) => (
     <Field key={reg.name} label={label} error={error} className="w-full sm:w-44">
@@ -255,6 +317,37 @@ export default function ContractGenerator() {
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Valor da proposta: <span className="tabular font-medium text-slate-900 dark:text-slate-100">{formatCurrency(proposal.total_amount)}</span>
               </p>
+            )}
+          </Card>
+
+          <Card className="space-y-4 p-5">
+            <div>
+              <h2 className="text-sm font-semibold">Recorrência</h2>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Para contrato com mensalidade. As parcelas entram no financeiro quando o contrato for marcado como assinado.</p>
+            </div>
+            <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+              <Check checked={recurring} onChange={() => toggleClause('recurring')} label="Este contrato tem mensalidade" />
+              Este contrato tem mensalidade
+            </label>
+            {recurring && (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Valor mensal (R$)" error={errors.monthlyAmount?.message}>
+                    <Input type="number" min={0} step="0.01" {...register('monthlyAmount')} />
+                  </Field>
+                  <Field label="Tempo de contrato (meses)" error={errors.termMonths?.message}>
+                    <Input type="number" min={1} max={MAX_INSTALLMENTS} step="1" {...register('termMonths')} />
+                  </Field>
+                  <Field label="Primeiro vencimento (opcional)" error={errors.firstDueDate?.message} className="sm:col-span-2">
+                    <Input type="date" {...register('firstDueDate')} />
+                  </Field>
+                </div>
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                  {num('termMonths')} mensalidades de <span className="tabular font-medium">{formatCurrency(num('monthlyAmount'))}</span>, total de{' '}
+                  <span className="tabular font-medium">{formatCurrency(num('termMonths') * num('monthlyAmount'))}</span>.{' '}
+                  {values.firstDueDate ? `A primeira vence em ${formatDate(values.firstDueDate)}.` : 'Sem data informada, a primeira vence um mês após a assinatura.'}
+                </p>
+              </>
             )}
           </Card>
 
@@ -332,12 +425,20 @@ export default function ContractGenerator() {
                     <li key={c.id} className="flex items-center gap-3 border-b px-5 py-3 last:border-0">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{c.title}</p>
-                        <p className="tabular text-xs text-slate-500 dark:text-slate-400">{formatDate(c.created_at)}</p>
+                        <p className="tabular flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                          {formatDate(c.created_at)}
+                          {c.monthly_amount && c.term_months ? (
+                            <>
+                              <Repeat className="h-3 w-3" aria-hidden />
+                              {c.term_months} × {formatCurrency(c.monthly_amount)}
+                            </>
+                          ) : null}
+                        </p>
                       </div>
                       <Select
                         aria-label="Alterar status"
                         value={c.status}
-                        onChange={(e) => update.mutate({ id: c.id, patch: { status: e.target.value as ContractStatus } })}
+                        onChange={(e) => changeStatus(c, e.target.value as ContractStatus)}
                         className="h-8 w-28 text-xs"
                       >
                         {toOptions(contractStatus).map((o) => (

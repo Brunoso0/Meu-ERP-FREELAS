@@ -6,6 +6,7 @@ import {
   FileText,
   Kanban,
   QrCode,
+  Radar,
   LayoutDashboard,
   ScrollText,
   Target,
@@ -32,6 +33,7 @@ export const mainNav: NavItem[] = [
 ]
 
 export const toolsNav: NavItem[] = [
+  { to: '/ferramentas/leads', label: 'Busca de Leads', icon: Radar },
   { to: '/ferramentas/calculadora', label: 'Calculadora de Preço', icon: Calculator },
   { to: '/ferramentas/orcamento', label: 'Gerador de Orçamentos', icon: QrCode },
   { to: '/ferramentas/proposta', label: 'Gerador de Propostas', icon: FilePlus },

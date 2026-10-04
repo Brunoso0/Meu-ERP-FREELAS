@@ -162,6 +162,14 @@ export interface FinancialTransaction {
   freelancer_id: string | null
   project_id: string | null
   proof_url: string | null
+  /** Parcelas de uma mesma recorrência compartilham este id. */
+  recurrence_id?: string | null
+  /** Posição da parcela na série (1 = primeira). */
+  installment?: number | null
+  /** Total de parcelas da série. */
+  installments?: number | null
+  /** Contrato que gerou a parcela, quando veio de um contrato assinado. */
+  contract_id?: string | null
   created_at: string
 }
 
@@ -173,6 +181,12 @@ export interface Contract {
   title: string
   content_markdown: string
   status: ContractStatus
+  /** Mensalidade do contrato; vazio em contrato sem recorrência. */
+  monthly_amount?: number | null
+  /** Meses de vigência (quantas mensalidades serão lançadas). */
+  term_months?: number | null
+  /** Vencimento da primeira mensalidade; vazio = um mês após a assinatura. */
+  first_due_date?: string | null
   created_at: string
 }
 

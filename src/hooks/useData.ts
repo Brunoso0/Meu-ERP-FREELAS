@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { deleteRow, insertRow, listRows, updateRow } from '@/lib/db'
+import { deleteRow, insertRow, insertRows, listRows, updateRow } from '@/lib/db'
 import { registerProjectPayment } from '@/lib/project-payment'
+import { registerContractInstallments } from '@/lib/recurrence'
 import { formatCurrency } from '@/lib/utils'
-import type { Project, TableName, Tables } from '@/types/database.types'
+import type { Contract, Project, TableName, Tables } from '@/types/database.types'
 
 const describe = (error: unknown) => (error instanceof Error ? error.message : 'Erro inesperado.')
 
@@ -28,6 +29,27 @@ async function settleCompletedProject(qc: QueryClient, table: TableName, row: un
   }
 }
 
+const inForce = (status: string | undefined) => status === 'signed' || status === 'active'
+
+/**
+ * Contrato com mensalidade que acabou de ser assinado ganha as parcelas no
+ * financeiro, uma por mês de vigência.
+ */
+async function settleSignedContract(qc: QueryClient, table: TableName, row: unknown, previousStatus: string | undefined) {
+  if (table !== 'contracts') return
+  const contract = row as Contract
+  if (!inForce(contract.status) || inForce(previousStatus)) return
+  try {
+    const count = await registerContractInstallments(contract)
+    if (count > 0) {
+      await qc.invalidateQueries({ queryKey: ['financial_transactions'] })
+      toast.success('Mensalidades lançadas no financeiro', { description: `${count} × ${formatCurrency(contract.monthly_amount)} · ${contract.title}` })
+    }
+  } catch (error) {
+    toast.error('Contrato assinado, mas as mensalidades não foram lançadas', { description: describe(error) })
+  }
+}
+
 export function useTable<T extends TableName>(table: T) {
   return useQuery<Tables[T][]>({ queryKey: [table], queryFn: () => listRows(table) })
 }
@@ -39,7 +61,18 @@ export function useInsert<T extends TableName>(table: T) {
     onSuccess: async (row) => {
       await qc.invalidateQueries({ queryKey: [table] })
       await settleCompletedProject(qc, table, row, undefined, true)
+      await settleSignedContract(qc, table, row, undefined)
     },
+    onError: (error) => toast.error('Não foi possível salvar', { description: describe(error) }),
+  })
+}
+
+/** Cria várias linhas de uma vez (as parcelas de uma recorrência). */
+export function useInsertMany<T extends TableName>(table: T) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (rows: Partial<Tables[T]>[]) => insertRows(table, rows),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [table] }),
     onError: (error) => toast.error('Não foi possível salvar', { description: describe(error) }),
   })
 }
@@ -65,9 +98,10 @@ export function useUpdate<T extends TableName>(table: T) {
       if (context?.previous) qc.setQueryData([table], context.previous)
       toast.error('Alteração desfeita', { description: describe(error) })
     },
-    onSuccess: (row, { id }, context) => {
+    onSuccess: async (row, { id }, context) => {
       const before = context?.previous?.find((r) => r.id === id) as { status?: string } | undefined
-      return settleCompletedProject(qc, table, row, before?.status, false)
+      await settleCompletedProject(qc, table, row, before?.status, false)
+      await settleSignedContract(qc, table, row, before?.status)
     },
     onSettled: () => qc.invalidateQueries({ queryKey: [table] }),
   })

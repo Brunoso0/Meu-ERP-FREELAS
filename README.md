@@ -41,12 +41,13 @@ Para zerar os dados de exemplo, apague a chave `meu-erp-freelas:demo-db:v1` no a
 | **Projetos** | Agrupa as demandas, os recebimentos e as despesas de um trabalho para um cliente. |
 | **Demandas** | Tabela ou kanban semanal (Backlog, Segunda a Sexta). Arraste os cards entre os dias. |
 | **Agenda** | Mês ou semana, com reuniões, prazos e as demandas agendadas. |
-| **Financeiro** | O que você tem a receber e as suas despesas, por mês, trimestre, ano ou tudo, com gráficos de entradas e saídas por mês e de recebido por cliente. Dá para anexar comprovante a cada lançamento. |
+| **Financeiro** | O que você tem a receber e as suas despesas, por mês, trimestre, ano ou tudo, com gráficos de entradas e saídas por mês e de recebido por cliente. Dá para anexar comprovante a cada lançamento e criar lançamentos que se repetem todo mês (mensalidades), com um quadro de quanto tempo cada um ainda dura. |
 | **Metas & Relatórios** | Metas com progresso automático e a margem líquida de cada projeto. |
 | **Calculadora de Preço** | Soma as suas horas, ferramentas, impostos e margem e diz quanto cobrar. Vira proposta com um clique. |
 | **Gerador de Orçamentos** | Orçamento rápido em folha A4, no mesmo visual da proposta, com QR Code Pix para pagamento. Sai em PDF por "Salvar em PDF / Imprimir". |
 | **Gerador de Propostas** | Escopo, entregáveis, cronograma, preços e condições, com numeração automática. |
-| **Gerador de Contratos** | Biblioteca de cláusulas que você liga e desliga, a partir de uma proposta. |
+| **Busca de Leads** | Usa o Gemini para achar no Google Maps empresas por região, nicho e alvo (sem site, sem presença digital…). Salva como lead ou abre o WhatsApp com uma mensagem pronta. |
+| **Gerador de Contratos** | Biblioteca de cláusulas que você liga e desliga, a partir de uma proposta. Contrato com mensalidade lança as parcelas no financeiro ao ser assinado. |
 
 Em qualquer tela: **Ctrl+K** abre a busca global, o botão **+ Novo** cria proposta, demanda, cliente ou transação, e o ícone de lua/sol alterna entre tema claro e escuro.
 
@@ -66,6 +67,17 @@ No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase
 2. `002_quotes.sql` cria a tabela de orçamentos.
 3. `003_hardening.sql` fecha o acesso para quem não está logado.
 4. `004_profile_pix.sql` adiciona a chave e o QR Code Pix ao perfil.
+5. `005_recurrence.sql` adiciona a recorrência: parcelas mensais no financeiro e mensalidade nos contratos.
+
+#### Busca de leads (opcional)
+
+A Busca de Leads usa o Gemini por meio de uma função do Supabase, para a chave da API nunca ir para o navegador.
+
+1. Crie uma chave em [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
+2. No painel do Supabase, em **Edge Functions**, crie uma função chamada `find-leads` com o conteúdo de [`supabase/functions/find-leads/index.ts`](supabase/functions/find-leads/index.ts) (ou rode `supabase functions deploy find-leads`).
+3. Em **Edge Functions → Secrets**, cadastre `GEMINI_API_KEY` com a sua chave. Opcional: `GEMINI_MODEL` para trocar o modelo (padrão `gemini-2.5-flash`).
+
+A função só responde a quem está logado no app. A busca no Google Maps pelo Gemini é cobrada pelo Google conforme o plano da sua chave; se ela não estiver disponível, a função cai para a busca comum do Google, menos precisa. Os dados vêm de uma IA: confira o perfil da empresa antes de entrar em contato.
 
 O editor vai avisar que a consulta tem "operações destrutivas". Num projeto novo pode confirmar: os scripts só removem versões anteriores dos próprios objetos que criam.
 
@@ -135,6 +147,8 @@ Algumas regras que ajudam a entender os números:
 
 - Ao marcar um projeto como **Concluído**, o recebimento do orçamento é lançado sozinho no Financeiro, já como pago. Se parte do valor já tinha sido lançada para o projeto, entra só o que falta; reabrir e concluir de novo não duplica.
 - Uma transação pendente com vencimento no passado aparece como **Atrasado** automaticamente.
+- Ao lançar uma transação, escolha **Repetir: todo mês** e informe por quantos meses: o sistema cria uma parcela por mês a partir do vencimento. O quadro **Recorrências** do Financeiro mostra quanto entra por mês, quantas parcelas faltam e até quando. **Encerrar** remove só as parcelas que ainda não venceram.
+- No Gerador de Contratos, marque **Este contrato tem mensalidade** e informe o valor mensal e o tempo de contrato. Ao mudar o contrato para **Assinado**, as mensalidades entram no Financeiro como pendentes (a primeira no vencimento informado ou, sem data, um mês após a assinatura). Ao mudar para **Encerrado**, o sistema oferece remover as que ainda não venceram.
 - No Financeiro, o **saldo** é o que foi recebido menos o que foi pago dentro do período escolhido (pela data do pagamento); os demais cartões consideram o que vence dentro dele. Em "Tudo", o saldo é o acumulado geral.
 - A **margem do projeto** é o valor cobrado nas demandas menos as despesas que você lançou no financeiro ligadas àquele projeto.
 - O progresso das **metas** é medido pelo sistema (recebimentos pagos, clientes ou projetos criados no período) somado ao valor manual que você informar.

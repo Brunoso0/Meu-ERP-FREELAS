@@ -11,6 +11,7 @@ import {
   taskStatus,
   toOptions,
 } from '@/lib/labels'
+import { expandRecurrence, MAX_INSTALLMENTS } from '@/lib/recurrence'
 import { maskCpfCnpj, maskPhone } from '@/lib/utils'
 import type { TableName } from '@/types/database.types'
 
@@ -74,9 +75,16 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
       status: z.enum(['pending', 'paid', 'overdue']),
       payment_date: text,
       client_id: text,
-        project_id: text,
+      project_id: text,
+      // só existem ao criar; na edição chegam vazios
+      recurrence: z.enum(['none', 'monthly']).or(z.literal('')).optional(),
+      installments: z.coerce.number().optional(),
     })
-    .refine((v) => v.status !== 'paid' || v.payment_date, { path: ['payment_date'], message: 'Informe a data do pagamento' }),
+    .refine((v) => v.status !== 'paid' || v.payment_date, { path: ['payment_date'], message: 'Informe a data do pagamento' })
+    .refine((v) => v.recurrence !== 'monthly' || (Number.isInteger(v.installments) && v.installments! >= 2 && v.installments! <= MAX_INSTALLMENTS), {
+      path: ['installments'],
+      message: `Informe de 2 a ${MAX_INSTALLMENTS} meses`,
+    }),
   goal: z
     .object({
       title: text.min(2, 'Informe o título'),
@@ -106,6 +114,11 @@ const meta: Record<ModalType, { table: TableName; noun: string; create: string; 
   transaction: { table: 'financial_transactions', noun: 'a transação', create: 'Nova transação', edit: 'Editar transação' },
   goal: { table: 'goals', noun: 'a meta', create: 'Nova meta', edit: 'Editar meta', variant: 'modal' },
   profile: { table: 'profiles', noun: 'o perfil', create: 'Minha empresa', edit: 'Minha empresa', allowDelete: false },
+}
+
+/** Um lançamento com repetição mensal vira uma linha por mês. */
+function expandTransaction({ recurrence, installments, ...base }: Record<string, any>) {
+  return recurrence === 'monthly' ? expandRecurrence(base, Number(installments)) : [base]
 }
 
 /** Formulários de criação/edição abertos de qualquer tela via `useUI().openModal`. */
@@ -160,6 +173,8 @@ export function GlobalModals() {
       { name: 'description', label: 'Descrição', full: true },
       { name: 'category', label: 'Categoria', placeholder: 'Projeto, Ferramentas, Impostos…' },
       { name: 'due_date', label: 'Vencimento', type: 'date' },
+      { name: 'recurrence', label: 'Repetir', type: 'select', options: [{ value: 'none', label: 'Não repetir' }, { value: 'monthly', label: 'Todo mês (mensalidade)' }], createOnly: true },
+      { name: 'installments', label: 'Por quantos meses', type: 'number', step: '1', placeholder: '12', createOnly: true, full: true, showWhen: (v) => v.recurrence === 'monthly', hint: 'Um lançamento por mês a partir do vencimento acima. A situação escolhida vale só para o primeiro.' },
       { name: 'status', label: 'Situação', type: 'select', options: [{ value: 'pending', label: 'Pendente' }, { value: 'paid', label: 'Pago' }] },
       { name: 'payment_date', label: 'Data do pagamento', type: 'date' },
       { name: 'client_id', label: 'Cliente', type: 'select', options: clientOptions, emptyOption: 'Nenhum' },
@@ -203,6 +218,7 @@ export function GlobalModals() {
       defaults={modal?.defaults}
       variant={m.variant}
       allowDelete={m.allowDelete}
+      expand={type === 'transaction' ? expandTransaction : undefined}
     />
   )
 }
