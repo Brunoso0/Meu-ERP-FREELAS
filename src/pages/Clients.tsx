@@ -58,9 +58,8 @@ export default function Clients() {
         </div>
       ),
     },
-    { header: 'CPF / CNPJ', cell: (c) => <span className="tabular text-slate-600 dark:text-slate-300">{c.document ?? '—'}</span> },
+    { header: 'CPF / CNPJ', cell: (c) => <span className="tabular whitespace-nowrap text-slate-600 dark:text-slate-300">{c.document ?? '—'}</span> },
     { header: 'Status', cell: (c) => <Badge tone={clientStatus[c.status].tone}>{clientStatus[c.status].label}</Badge> },
-    { header: 'Valor/hora', className: 'text-right', cell: (c) => <span className="tabular">{formatCurrency(c.hourly_rate)}</span> },
     { header: 'LTV', className: 'text-right', cell: (c) => <span className="tabular font-medium">{formatCurrency(ltv.get(c.id) ?? 0)}</span> },
     {
       header: '',
@@ -106,7 +105,7 @@ export default function Clients() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome, empresa, e-mail ou documento" className="pl-9" />
           </div>
-          <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-40" aria-label="Filtrar por status">
+          <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-48" aria-label="Filtrar por status">
             <option value="">Todos os status</option>
             {toOptions(clientStatus).map((o) => (
               <option key={o.value} value={o.value}>

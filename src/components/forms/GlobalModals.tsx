@@ -29,7 +29,6 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
     phone,
     document,
     status: z.enum(['active', 'inactive', 'lead']),
-    hourly_rate: money,
     notes: text,
   }),
   project: z.object({
@@ -137,8 +136,7 @@ export function GlobalModals() {
       { name: 'document', label: 'CPF / CNPJ', mask: maskCpfCnpj, placeholder: '00.000.000/0000-00' },
       { name: 'email', label: 'E-mail', type: 'email' },
       { name: 'phone', label: 'WhatsApp', mask: maskPhone, placeholder: '(00) 00000-0000' },
-      { name: 'status', label: 'Status', type: 'select', options: toOptions(clientStatus) },
-      { name: 'hourly_rate', label: 'Valor/hora (R$)', type: 'number' },
+      { name: 'status', label: 'Status', type: 'select', options: toOptions(clientStatus), full: true },
       { name: 'notes', label: 'Observações', type: 'textarea' },
     ],
     project: [

@@ -129,6 +129,16 @@ O app é um site estático: qualquer hospedagem de arquivos serve. Abaixo, o cam
 
 Para atualizar depois, rode `npm run build` de novo e, no projeto do Pages, use **Create deployment** para enviar a nova pasta `dist`.
 
+#### Publicar a cada `git push` (opcional)
+
+Se o código está no GitHub, o Cloudflare pode fazer o build e publicar sozinho a cada push:
+
+1. No projeto do Pages, em **Settings → Variables and secrets**, cadastre `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (o botão **Import .env** aceita o seu `.env.local`). Faça isso antes de conectar: sem elas o build sai em modo demo.
+2. Em **Settings → Build → Git repository**, clique em **Connect**, escolha o repositório e a branch `main`, com build command `npm run build` e output directory `dist`.
+3. Se o repositório não aparecer na lista, libere-o para o aplicativo do Cloudflare em [github.com/settings/installations](https://github.com/settings/installations).
+
+A partir daí, cada push na `main` vai para o ar em cerca de um minuto.
+
 No Supabase, em **Authentication → URL Configuration**, coloque o endereço publicado em **Site URL**, para que e-mails de redefinição de senha apontem para o lugar certo.
 
 ## Como usar no dia a dia

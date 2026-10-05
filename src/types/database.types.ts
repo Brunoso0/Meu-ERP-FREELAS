@@ -36,6 +36,7 @@ export interface Client {
   phone: string | null
   document: string | null
   status: ClientStatus
+  /** Coluna antiga, sem uso na interface. */
   hourly_rate: number | null
   notes: string | null
   created_at: string
