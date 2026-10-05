@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Plus, Search, Users } from 'lucide-react'
+import { MessageCircle, Plus, Search, Users } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Avatar, Badge, Button, Card, EmptyState, Input, PageHeader, Select } from '@/components/ui/primitives'
 import { useTable } from '@/hooks/useData'
 import { clientStatus, toOptions } from '@/lib/labels'
+import { whatsappUrl } from '@/lib/leads'
 import { formatCurrency, sum } from '@/lib/utils'
 import { useUI } from '@/store/ui'
 import type { Client } from '@/types/database.types'
@@ -61,6 +62,29 @@ export default function Clients() {
     { header: 'Status', cell: (c) => <Badge tone={clientStatus[c.status].tone}>{clientStatus[c.status].label}</Badge> },
     { header: 'Valor/hora', className: 'text-right', cell: (c) => <span className="tabular">{formatCurrency(c.hourly_rate)}</span> },
     { header: 'LTV', className: 'text-right', cell: (c) => <span className="tabular font-medium">{formatCurrency(ltv.get(c.id) ?? 0)}</span> },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (c) => {
+        const wa = whatsappUrl(c.phone)
+        return wa ? (
+          <a
+            href={wa}
+            target="_blank"
+            rel="noopener noreferrer"
+            // a linha inteira abre a edição; o clique no botão não deve abrir junto
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <MessageCircle className="h-3.5 w-3.5" /> Entrar em contato
+          </a>
+        ) : (
+          <span className="whitespace-nowrap text-xs text-slate-400" title="Cadastre o WhatsApp do cliente para entrar em contato">
+            Sem WhatsApp
+          </span>
+        )
+      },
+    },
   ]
 
   const filtering = Boolean(search || status)

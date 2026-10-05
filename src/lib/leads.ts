@@ -158,16 +158,16 @@ export function fillLeadMessage(template: string, lead: Lead, myName: string) {
 }
 
 /**
- * Link do WhatsApp com a mensagem pronta. Número sem código de país é tratado
+ * Link do WhatsApp, com a mensagem pronta quando há uma. Número sem código de país é tratado
  * como brasileiro. Devolve null quando o telefone não serve para WhatsApp.
  */
-export function whatsappUrl(phone: string | null, message: string) {
+export function whatsappUrl(phone: string | null, message = '') {
   if (!phone) return null
   const international = phone.trim().startsWith('+')
   let digits = phone.replace(/\D/g, '').replace(/^0+/, '')
   if (!international && !(digits.startsWith('55') && digits.length >= 12)) digits = `55${digits}`
   if (digits.length < 10 || digits.length > 15) return null
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+  return `https://wa.me/${digits}${message ? `?text=${encodeURIComponent(message)}` : ''}`
 }
 
 /** Empresa já cadastrada como cliente ou lead (mesmo nome ou mesmo telefone). */
