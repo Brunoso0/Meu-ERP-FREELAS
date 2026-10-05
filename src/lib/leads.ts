@@ -145,7 +145,7 @@ export async function searchLeads(search: LeadSearch): Promise<LeadResult> {
 }
 
 export const defaultLeadMessage =
-  'Olá! Aqui é {meu_nome}. Encontrei a {empresa} no Google e notei que vocês ainda podem aparecer melhor para quem procura por {nicho} na internet. Trabalho ajudando negócios como o de vocês com isso. Posso te mandar uma proposta rápida, sem compromisso?'
+  'Olá! me chamo {meu_nome}. Encontrei a {empresa} no Google e notei que vocês ainda podem aparecer melhor para quem procura por {nicho} na internet. Trabalho ajudando negócios como o de vocês com isso. Posso te mandar um protótipo visual de como ficaria um site para a {empresa}, sem compromisso?'
 
 /** Preenche {empresa}, {nicho} e {meu_nome} na mensagem predefinida. */
 export function fillLeadMessage(template: string, lead: Lead, myName: string) {
