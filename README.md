@@ -68,6 +68,7 @@ No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase
 3. `003_hardening.sql` fecha o acesso para quem não está logado.
 4. `004_profile_pix.sql` adiciona a chave e o QR Code Pix ao perfil.
 5. `005_recurrence.sql` adiciona a recorrência: parcelas mensais no financeiro e mensalidade nos contratos.
+6. `006_quote_finance.sql` liga cada orçamento a um lançamento no financeiro e a proposta aprovada ao orçamento.
 
 #### Busca de leads (opcional)
 
@@ -157,6 +158,8 @@ Algumas regras que ajudam a entender os números:
 
 - Ao marcar um projeto como **Concluído**, o recebimento do orçamento é lançado sozinho no Financeiro, já como pago. Se parte do valor já tinha sido lançada para o projeto, entra só o que falta; reabrir e concluir de novo não duplica.
 - Uma transação pendente com vencimento no passado aparece como **Atrasado** automaticamente.
+- Todo **orçamento** tem um lançamento no Financeiro: pendente enquanto aguarda pagamento, pago quando você marca o orçamento como pago. Marcar o lançamento como pago no Financeiro também marca o orçamento. Excluir um orçamento ainda não pago tira a cobrança do Financeiro.
+- Ao marcar uma **proposta como aprovada**, ela vira um orçamento aguardando pagamento (com os mesmos itens e valor), que já aparece no Financeiro. Se depois você concluir um projeto criado a partir dessa proposta, o valor não é lançado de novo.
 - Ao lançar uma transação, escolha **Repetir: todo mês** e informe por quantos meses: o sistema cria uma parcela por mês a partir do vencimento. O quadro **Recorrências** do Financeiro mostra quanto entra por mês, quantas parcelas faltam e até quando. **Encerrar** remove só as parcelas que ainda não venceram.
 - No Gerador de Contratos, marque **Este contrato tem mensalidade** e informe o valor mensal e o tempo de contrato. Ao mudar o contrato para **Assinado**, as mensalidades entram no Financeiro como pendentes (a primeira no vencimento informado ou, sem data, um mês após a assinatura). Ao mudar para **Encerrado**, o sistema oferece remover as que ainda não venceram.
 - No Financeiro, o **saldo** é o que foi recebido menos o que foi pago dentro do período escolhido (pela data do pagamento); os demais cartões consideram o que vence dentro dele. Em "Tudo", o saldo é o acumulado geral.

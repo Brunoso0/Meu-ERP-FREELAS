@@ -104,6 +104,8 @@ export interface Quote {
   total_amount: number
   validity_days: number
   status: QuoteStatus
+  /** Proposta aprovada que deu origem ao orçamento, quando houver. */
+  proposal_id?: string | null
   created_at: string
 }
 
@@ -171,6 +173,8 @@ export interface FinancialTransaction {
   installments?: number | null
   /** Contrato que gerou a parcela, quando veio de um contrato assinado. */
   contract_id?: string | null
+  /** Orçamento a que o lançamento pertence; os dois mudam de situação juntos. */
+  quote_id?: string | null
   created_at: string
 }
 

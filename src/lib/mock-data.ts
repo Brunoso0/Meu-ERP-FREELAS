@@ -163,6 +163,9 @@ export function buildSeed(): MockDB {
     },
   ]
 
+  // todo orçamento tem o seu lançamento no financeiro
+  tx({ type: 'income', category: 'Orçamento', description: 'Orçamento #ORC-0001 — Atualização do cadastro de clientes', amount: 630, due_date: isoDay(addDays(now, 6)), payment_date: null, status: 'pending', client_id: 'c2', freelancer_id: null, project_id: null, quote_id: 'q1' })
+
   return { profiles, clients, freelancers, proposals, quotes, projects, tasks, calendar_events, financial_transactions, contracts, goals }
 }
 

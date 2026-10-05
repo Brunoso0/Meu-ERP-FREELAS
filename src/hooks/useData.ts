@@ -2,9 +2,10 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { toast } from 'sonner'
 import { deleteRow, insertRow, insertRows, listRows, updateRow } from '@/lib/db'
 import { registerProjectPayment } from '@/lib/project-payment'
+import { createQuoteFromProposal, removeQuoteTransaction, syncQuoteFromTransaction, syncQuoteTransaction } from '@/lib/quote-finance'
 import { registerContractInstallments } from '@/lib/recurrence'
-import { formatCurrency } from '@/lib/utils'
-import type { Contract, Project, TableName, Tables } from '@/types/database.types'
+import { formatCurrency, formatQuoteNumber } from '@/lib/utils'
+import type { Contract, FinancialTransaction, Project, Proposal, Quote, TableName, Tables } from '@/types/database.types'
 
 const describe = (error: unknown) => (error instanceof Error ? error.message : 'Erro inesperado.')
 
@@ -50,6 +51,31 @@ async function settleSignedContract(qc: QueryClient, table: TableName, row: unkn
   }
 }
 
+/**
+ * Orçamento, proposta e financeiro andam juntos:
+ * - orçamento criado ou alterado atualiza o seu lançamento no financeiro;
+ * - lançamento de orçamento marcado como pago (ou reaberto) leva o orçamento junto;
+ * - proposta que acabou de ser aprovada vira orçamento aguardando pagamento.
+ */
+async function settleQuoteLinks(qc: QueryClient, table: TableName, row: unknown, previousStatus: string | undefined) {
+  try {
+    if (table === 'quotes') {
+      if (await syncQuoteTransaction(row as Quote)) await qc.invalidateQueries({ queryKey: ['financial_transactions'] })
+    } else if (table === 'financial_transactions') {
+      if (await syncQuoteFromTransaction(row as FinancialTransaction)) await qc.invalidateQueries({ queryKey: ['quotes'] })
+    } else if (table === 'proposals') {
+      const proposal = row as Proposal
+      if (proposal.status !== 'approved' || previousStatus === 'approved') return
+      const quote = await createQuoteFromProposal(proposal)
+      if (!quote) return
+      await Promise.all([qc.invalidateQueries({ queryKey: ['quotes'] }), qc.invalidateQueries({ queryKey: ['financial_transactions'] })])
+      toast.success(`Orçamento ${formatQuoteNumber(quote.quote_number)} criado`, { description: `${formatCurrency(quote.total_amount)} aguardando pagamento, já no financeiro` })
+    }
+  } catch (error) {
+    toast.error('Salvo, mas o orçamento e o financeiro não foram sincronizados', { description: describe(error) })
+  }
+}
+
 export function useTable<T extends TableName>(table: T) {
   return useQuery<Tables[T][]>({ queryKey: [table], queryFn: () => listRows(table) })
 }
@@ -62,6 +88,7 @@ export function useInsert<T extends TableName>(table: T) {
       await qc.invalidateQueries({ queryKey: [table] })
       await settleCompletedProject(qc, table, row, undefined, true)
       await settleSignedContract(qc, table, row, undefined)
+      await settleQuoteLinks(qc, table, row, undefined)
     },
     onError: (error) => toast.error('Não foi possível salvar', { description: describe(error) }),
   })
@@ -102,6 +129,7 @@ export function useUpdate<T extends TableName>(table: T) {
       const before = context?.previous?.find((r) => r.id === id) as { status?: string } | undefined
       await settleCompletedProject(qc, table, row, before?.status, false)
       await settleSignedContract(qc, table, row, before?.status)
+      await settleQuoteLinks(qc, table, row, before?.status)
     },
     onSettled: () => qc.invalidateQueries({ queryKey: [table] }),
   })
@@ -110,8 +138,15 @@ export function useUpdate<T extends TableName>(table: T) {
 export function useRemove<T extends TableName>(table: T) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => deleteRow(table, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [table] }),
+    mutationFn: async (id: string) => {
+      // orçamento excluído não deixa cobrança pendente no financeiro
+      if (table === 'quotes') await removeQuoteTransaction(id)
+      await deleteRow(table, id)
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: [table] })
+      if (table === 'quotes') await qc.invalidateQueries({ queryKey: ['financial_transactions'] })
+    },
     onError: (error) => toast.error('Não foi possível excluir', { description: describe(error) }),
   })
 }

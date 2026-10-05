@@ -6,8 +6,9 @@ import { isoDay, sum } from './utils'
  * Lança no financeiro o recebimento de um projeto concluído.
  *
  * O valor é o orçamento do projeto menos o que já foi lançado como entrada
- * para ele (parcelas registradas à mão contam), então concluir duas vezes ou
- * já ter lançado tudo não duplica nada. Devolve o valor lançado (0 = nada a
+ * para ele (parcelas registradas à mão contam, e também o orçamento gerado
+ * pela proposta que originou o projeto), então concluir duas vezes ou já ter
+ * lançado tudo não duplica nada. Devolve o valor lançado (0 = nada a
  * lançar).
  *
  * `historic` é para projeto cadastrado já como concluído (registro de trabalho
@@ -19,7 +20,13 @@ export async function registerProjectPayment(project: Project, historic = false)
   if (budget <= 0) return 0
 
   const transactions = await listRows('financial_transactions')
-  const alreadyBilled = sum(transactions.filter((t) => t.type === 'income' && t.project_id === project.id).map((t) => t.amount))
+  // o orçamento criado quando a proposta foi aprovada já cobra este trabalho
+  const proposalQuotes = project.proposal_id ? (await listRows('quotes')).filter((q) => q.proposal_id === project.proposal_id).map((q) => q.id) : []
+  const alreadyBilled = sum(
+    transactions
+      .filter((t) => t.type === 'income' && (t.project_id === project.id || (t.quote_id && proposalQuotes.includes(t.quote_id))))
+      .map((t) => t.amount),
+  )
   const remaining = Math.round((budget - alreadyBilled) * 100) / 100
   if (remaining <= 0) return 0
 
