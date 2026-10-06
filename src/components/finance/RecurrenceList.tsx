@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { differenceInCalendarMonths } from 'date-fns'
 import { toast } from 'sonner'
+import { confirm } from '@/components/ui/confirm'
 import { Pager, usePagination } from '@/components/ui/Pagination'
 import { Badge, Button, Card } from '@/components/ui/primitives'
 import { useRemove } from '@/hooks/useData'
@@ -37,7 +38,12 @@ export function RecurrenceList({ transactions, clients }: { transactions: Financ
       toast.info('Nada a remover', { description: 'As parcelas em aberto desta recorrência já venceram.' })
       return
     }
-    if (!window.confirm(`Encerrar "${s.description}"? As ${s.futureIds.length} parcelas que ainda não venceram saem do financeiro. As pagas e as já vencidas continuam.`)) return
+    const ok = await confirm({
+      title: `Encerrar "${s.description}"?`,
+      description: `As ${s.futureIds.length} parcelas que ainda não venceram saem do financeiro. As pagas e as já vencidas continuam.`,
+      confirmLabel: 'Encerrar',
+    })
+    if (!ok) return
     try {
       for (const id of s.futureIds) await remove.mutateAsync(id)
       toast.success('Recorrência encerrada')

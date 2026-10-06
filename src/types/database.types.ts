@@ -165,6 +165,8 @@ export interface FinancialTransaction {
   freelancer_id: string | null
   project_id: string | null
   proof_url: string | null
+  /** PDF da nota fiscal emitida para este recebimento. */
+  invoice_url?: string | null
   /** Parcelas de uma mesma recorrência compartilham este id. */
   recurrence_id?: string | null
   /** Posição da parcela na série (1 = primeira). */

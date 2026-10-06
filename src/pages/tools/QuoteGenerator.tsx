@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Check, Download, MoreHorizontal, Pencil, Plus, QrCode, Save, Trash2, Undo2 } from 'lucide-react'
 import { PrintPortal } from '@/components/proposals/PrintPortal'
 import { QuoteDocument } from '@/components/quotes/QuoteDocument'
+import { confirm } from '@/components/ui/confirm'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dropdown, DropdownContent, DropdownItem, DropdownSeparator, DropdownTrigger } from '@/components/ui/overlays'
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from '@/components/ui/primitives'
@@ -142,8 +143,9 @@ export default function QuoteGenerator() {
       }
     })()
 
-  const handleDelete = (q: Quote) => {
-    if (!window.confirm(`Excluir o orçamento ${formatQuoteNumber(q.quote_number)}?`)) return
+  const handleDelete = async (q: Quote) => {
+    const description = q.status === 'paid' ? 'O recebimento já lançado no financeiro continua lá. Esta ação não pode ser desfeita.' : 'A cobrança pendente dele também sai do financeiro. Esta ação não pode ser desfeita.'
+    if (!(await confirm({ title: `Excluir o orçamento ${formatQuoteNumber(q.quote_number)}?`, description }))) return
     remove.mutate(q.id, { onSuccess: () => toast.success('Orçamento excluído') })
     if (editing?.id === q.id) startNew()
   }

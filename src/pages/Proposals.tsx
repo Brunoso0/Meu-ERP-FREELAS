@@ -4,6 +4,7 @@ import { Check, Eye, FileText, MoreHorizontal, Plus, ScrollText, Send, Trash2, X
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dropdown, DropdownContent, DropdownItem, DropdownSeparator, DropdownTrigger } from '@/components/ui/overlays'
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/ui/primitives'
+import { confirm } from '@/components/ui/confirm'
 import { useRemove, useTable, useUpdate } from '@/hooks/useData'
 import { proposalStatus } from '@/lib/labels'
 import { formatCurrency, formatDate, formatProposalNumber, sum } from '@/lib/utils'
@@ -24,10 +25,9 @@ export default function Proposals() {
   const setStatus = (p: Proposal, status: ProposalStatus) =>
     update.mutate({ id: p.id, patch: { status } }, { onSuccess: () => toast.success(`Proposta marcada como ${proposalStatus[status].label.toLowerCase()}`) })
 
-  const handleDelete = (p: Proposal) => {
-    if (window.confirm(`Excluir a proposta ${formatProposalNumber(p.proposal_number)}?`)) {
-      remove.mutate(p.id, { onSuccess: () => toast.success('Proposta excluída') })
-    }
+  const handleDelete = async (p: Proposal) => {
+    if (!(await confirm({ title: `Excluir a proposta ${formatProposalNumber(p.proposal_number)}?`, description: `"${p.title}" será apagada. Esta ação não pode ser desfeita.` }))) return
+    remove.mutate(p.id, { onSuccess: () => toast.success('Proposta excluída') })
   }
 
   const columns: Column<Proposal>[] = [

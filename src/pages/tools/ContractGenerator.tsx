@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { Download, Lock, Repeat, Save, ScrollText } from 'lucide-react'
+import { confirm } from '@/components/ui/confirm'
 import { Pager, usePagination } from '@/components/ui/Pagination'
 import { Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from '@/components/ui/primitives'
 import { useInsert, useRemove, useTable, useUpdate } from '@/hooks/useData'
@@ -249,7 +250,13 @@ export default function ContractGenerator() {
     const today = isoDay(new Date())
     const future = (transactions.data ?? []).filter((t) => t.contract_id === contract.id && t.status !== 'paid' && t.due_date > today)
     if (future.length === 0) return
-    if (!window.confirm(`Remover do financeiro as ${future.length} mensalidades deste contrato que ainda não venceram? As pagas e as já vencidas continuam lá.`)) return
+    const ok = await confirm({
+      title: 'Remover as mensalidades futuras?',
+      description: `As ${future.length} mensalidades deste contrato que ainda não venceram saem do financeiro. As pagas e as já vencidas continuam lá.`,
+      confirmLabel: 'Remover',
+      cancelLabel: 'Manter',
+    })
+    if (!ok) return
     try {
       for (const t of future) await removeTransaction.mutateAsync(t.id)
       toast.success('Mensalidades futuras removidas')
@@ -453,7 +460,11 @@ export default function ContractGenerator() {
                       <Button
                         variant="danger"
                         size="sm"
-                        onClick={() => window.confirm(`Excluir "${c.title}"?`) && remove.mutate(c.id, { onSuccess: () => toast.success('Contrato excluído') })}
+                        onClick={async () => {
+                          if (await confirm({ title: 'Excluir este contrato?', description: `"${c.title}" será apagado. Esta ação não pode ser desfeita.` })) {
+                            remove.mutate(c.id, { onSuccess: () => toast.success('Contrato excluído') })
+                          }
+                        }}
                       >
                         Excluir
                       </Button>

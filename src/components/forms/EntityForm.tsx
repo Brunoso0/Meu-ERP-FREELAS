@@ -5,6 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import type { ZodTypeAny } from 'zod'
 import { ImagePlus, Trash2 } from 'lucide-react'
+import { confirm } from '@/components/ui/confirm'
 import { Sheet } from '@/components/ui/overlays'
 import { Button, Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import { useInsert, useInsertMany, useRemove, useUpdate } from '@/hooks/useData'
@@ -154,7 +155,7 @@ export function EntityForm({ open, onClose, noun, title, table, fields: allField
   })
 
   const handleDelete = async () => {
-    if (!record || !window.confirm(`Excluir ${noun}? Esta ação não pode ser desfeita.`)) return
+    if (!record || !(await confirm({ title: `Excluir ${noun}?` }))) return
     try {
       await remove.mutateAsync(record.id)
       toast.success('Registro excluído')

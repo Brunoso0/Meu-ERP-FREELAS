@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Skeleton } from '@/components/ui/primitives'
 import { GlobalModals } from '@/components/forms/GlobalModals'
+import { ConfirmDialog } from '@/components/ui/confirm'
 import { CommandPalette } from './CommandPalette'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
@@ -20,6 +21,7 @@ export function AppLayout() {
       </div>
       <CommandPalette />
       <GlobalModals />
+      <ConfirmDialog />
     </div>
   )
 }
