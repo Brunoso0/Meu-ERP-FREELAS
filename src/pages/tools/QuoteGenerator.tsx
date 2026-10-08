@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,7 +14,8 @@ import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Text
 import { useInsert, useRemove, useTable, useUpdate } from '@/hooks/useData'
 import { itemsTotal } from '@/lib/proposal'
 import { buildQuoteDoc, type QuoteDoc, type QuoteDraft } from '@/lib/quote'
-import { formatCurrency, formatDate, formatQuoteNumber } from '@/lib/utils'
+import { DEFAULT_DEPOSIT_PCT, depositAmount, quoteProgress, registerQuotePayment, undoQuotePayment } from '@/lib/quote-finance'
+import { formatCurrency, formatDate, formatProposalNumber, formatQuoteNumber } from '@/lib/utils'
 import { useUI } from '@/store/ui'
 import type { Quote } from '@/types/database.types'
 
@@ -33,6 +35,13 @@ const schema = z
       )
       .min(1, 'Adicione ao menos um item'),
     notes: z.string(),
+    proposal_id: z.string(),
+    billing: z.enum(['full', 'deposit']),
+    deposit_pct: z.coerce.number(),
+  })
+  .refine((v) => v.billing === 'full' || (Number.isInteger(v.deposit_pct) && v.deposit_pct >= 1 && v.deposit_pct <= 99), {
+    path: ['deposit_pct'],
+    message: 'Use de 1 a 99%',
   })
   .refine((v) => v.client_id || v.customer_name.trim().length >= 2, {
     path: ['customer_name'],
@@ -48,14 +57,24 @@ const blank: Values = {
   validity_days: 7,
   items: [{ description: '', quantity: 1, unit_price: 0 }],
   notes: '',
+  proposal_id: '',
+  billing: 'full',
+  deposit_pct: DEFAULT_DEPOSIT_PCT,
 }
 
-const quoteStatus = { pending: { label: 'Aguardando Pix', tone: 'amber' }, paid: { label: 'Pago', tone: 'green' } } as const
+const quoteStatus = {
+  pending: { label: 'Aguardando Pix', tone: 'amber' },
+  partial: { label: 'Parcialmente pago', tone: 'blue' },
+  paid: { label: 'Pago', tone: 'green' },
+} as const
 
 export default function QuoteGenerator() {
   const quotes = useTable('quotes')
   const clients = useTable('clients')
   const profile = useTable('profiles').data?.[0]
+  const transactions = useTable('financial_transactions').data ?? []
+  const proposals = useTable('proposals')
+  const qc = useQueryClient()
   const insert = useInsert('quotes')
   const update = useUpdate('quotes')
   const remove = useRemove('quotes')
@@ -82,6 +101,7 @@ export default function QuoteGenerator() {
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: blank })
   const items = useFieldArray({ control, name: 'items' })
@@ -106,8 +126,51 @@ export default function QuoteGenerator() {
     total_amount: itemsTotal(cleanItems),
     validity_days: Number(values.validity_days) || 0,
     created_at: editing?.created_at,
+    deposit_pct: values.billing === 'deposit' ? Number(values.deposit_pct) || null : null,
   }
-  const doc = buildQuoteDoc(draft, clientOf(draft.client_id), profile)
+  const progressOf = (q: Quote) => quoteProgress(transactions, q.id)
+  const editingProgress = editing ? progressOf(editing) : null
+  // com pagamento registrado, a forma de cobrança fica travada
+  const billingLocked = (editingProgress?.received ?? 0) > 0
+  const doc = buildQuoteDoc(draft, clientOf(draft.client_id), profile, editingProgress?.received ?? 0)
+
+  // propostas que podem originar este orçamento: as que ainda não têm orçamento (ou a deste)
+  const linkedProposals = new Set((quotes.data ?? []).filter((q) => q.proposal_id && q.id !== editing?.id).map((q) => q.proposal_id))
+  const proposalOptions = (proposals.data ?? []).filter((p) => !linkedProposals.has(p.id))
+
+  // escolher a proposta puxa cliente, título, itens e condições dela
+  const pickProposal = (id: string) => {
+    setValue('proposal_id', id)
+    const p = proposals.data?.find((x) => x.id === id)
+    if (!p) return
+    if (p.client_id) setValue('client_id', p.client_id)
+    setValue('title', p.title)
+    const fromProposal = p.content?.items?.filter((i) => i.description?.trim()) ?? []
+    items.replace(fromProposal.length ? fromProposal : [{ description: p.title, quantity: 1, unit_price: Number(p.total_amount) }])
+    setValue('notes', [`Referente à proposta ${formatProposalNumber(p.proposal_number)}.`, p.payment_terms].filter(Boolean).join(' '))
+  }
+
+  const refreshLinked = () => Promise.all(['quotes', 'financial_transactions'].map((key) => qc.invalidateQueries({ queryKey: [key] })))
+
+  const pay = async (q: Quote) => {
+    try {
+      const paid = await registerQuotePayment(q)
+      await refreshLinked()
+      if (paid) toast.success('Pagamento registrado', { description: `${formatCurrency(paid.amount)} · ${formatQuoteNumber(q.quote_number)}` })
+    } catch (error) {
+      toast.error('Não foi possível registrar o pagamento', { description: error instanceof Error ? error.message : undefined })
+    }
+  }
+
+  const undoPayment = async (q: Quote) => {
+    try {
+      const reopened = await undoQuotePayment(q)
+      await refreshLinked()
+      if (reopened) toast.success('Pagamento desfeito', { description: `${formatCurrency(reopened.amount)} voltou para pendente` })
+    } catch (error) {
+      toast.error('Não foi possível desfazer', { description: error instanceof Error ? error.message : undefined })
+    }
+  }
 
   const startNew = () => {
     setEditing(null)
@@ -123,6 +186,9 @@ export default function QuoteGenerator() {
       validity_days: q.validity_days,
       items: q.items?.length ? q.items : blank.items,
       notes: q.notes ?? '',
+      proposal_id: q.proposal_id ?? '',
+      billing: q.deposit_pct ? 'deposit' : 'full',
+      deposit_pct: q.deposit_pct ?? DEFAULT_DEPOSIT_PCT,
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -130,13 +196,14 @@ export default function QuoteGenerator() {
   const save = (thenDownload: boolean) =>
     handleSubmit(async () => {
       // o número exibido é só uma prévia: quem numera é o banco (trigger) ou o repositório demo
-      const { quote_number: _preview, created_at: _created, ...payload } = draft
+      const { quote_number: _preview, created_at: _created, ...rest } = draft
+      const payload = { ...rest, proposal_id: values.proposal_id || null }
       try {
         const saved = editing
           ? await update.mutateAsync({ id: editing.id, patch: payload })
           : await insert.mutateAsync({ ...payload, status: 'pending' })
         toast.success(`Orçamento ${formatQuoteNumber(saved.quote_number)} salvo`)
-        if (thenDownload) setPrinting(buildQuoteDoc(saved, clientOf(saved.client_id), profile))
+        if (thenDownload) setPrinting(buildQuoteDoc(saved, clientOf(saved.client_id), profile, editingProgress?.received ?? 0))
         startNew()
       } catch {
         // toast de erro já exibido pelo hook
@@ -144,7 +211,12 @@ export default function QuoteGenerator() {
     })()
 
   const handleDelete = async (q: Quote) => {
-    const description = q.status === 'paid' ? 'O recebimento já lançado no financeiro continua lá. Esta ação não pode ser desfeita.' : 'A cobrança pendente dele também sai do financeiro. Esta ação não pode ser desfeita.'
+    const description =
+      q.status === 'paid'
+        ? 'O recebimento já lançado no financeiro continua lá. Esta ação não pode ser desfeita.'
+        : q.status === 'partial'
+          ? 'O que já foi pago continua no financeiro; o que falta receber sai. Esta ação não pode ser desfeita.'
+          : 'A cobrança pendente dele também sai do financeiro. Esta ação não pode ser desfeita.'
     if (!(await confirm({ title: `Excluir o orçamento ${formatQuoteNumber(q.quote_number)}?`, description }))) return
     remove.mutate(q.id, { onSuccess: () => toast.success('Orçamento excluído') })
     if (editing?.id === q.id) startNew()
@@ -164,13 +236,28 @@ export default function QuoteGenerator() {
         )
       },
     },
-    { header: 'Situação', cell: (q) => <Badge tone={quoteStatus[q.status].tone}>{quoteStatus[q.status].label}</Badge> },
+    {
+      header: 'Situação',
+      cell: (q) => (
+        <div>
+          <Badge tone={quoteStatus[q.status].tone}>{quoteStatus[q.status].label}</Badge>
+          {q.deposit_pct ? (
+            <p className="tabular mt-1 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+              {formatCurrency(progressOf(q).received)} de {formatCurrency(q.total_amount)}
+            </p>
+          ) : null}
+        </div>
+      ),
+    },
     { header: 'Emitido em', cell: (q) => <span className="tabular text-slate-600 dark:text-slate-300">{formatDate(q.created_at)}</span> },
     { header: 'Valor', className: 'text-right', cell: (q) => <span className="tabular font-medium">{formatCurrency(q.total_amount)}</span> },
     {
       header: '',
       className: 'w-12 text-right',
-      cell: (q) => (
+      cell: (q) => {
+        const { next, lastPaid, received } = progressOf(q)
+        const payLabel = !next ? null : !q.deposit_pct ? 'Marcar como pago' : next.installment === 1 ? `Registrar entrada (${formatCurrency(next.amount)})` : `Registrar saldo (${formatCurrency(next.amount)})`
+        return (
         <Dropdown>
           <DropdownTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Ações" className="h-8 w-8">
@@ -178,20 +265,24 @@ export default function QuoteGenerator() {
             </Button>
           </DropdownTrigger>
           <DropdownContent>
-            <DropdownItem icon={Download} onSelect={() => setPrinting(buildQuoteDoc(q, clientOf(q.client_id), profile))}>Salvar em PDF / Imprimir</DropdownItem>
+            <DropdownItem icon={Download} onSelect={() => setPrinting(buildQuoteDoc(q, clientOf(q.client_id), profile, received))}>Salvar em PDF / Imprimir</DropdownItem>
             <DropdownItem icon={Pencil} onSelect={() => edit(q)}>Editar</DropdownItem>
-            {q.status === 'pending' ? (
-              <DropdownItem icon={Check} onSelect={() => update.mutate({ id: q.id, patch: { status: 'paid' } }, { onSuccess: () => toast.success('Orçamento marcado como pago') })}>
-                Marcar como pago
+            {payLabel && (
+              <DropdownItem icon={Check} onSelect={() => pay(q)}>
+                {payLabel}
               </DropdownItem>
-            ) : (
-              <DropdownItem icon={Undo2} onSelect={() => update.mutate({ id: q.id, patch: { status: 'pending' } })}>Voltar para aguardando</DropdownItem>
+            )}
+            {lastPaid && (
+              <DropdownItem icon={Undo2} onSelect={() => undoPayment(q)}>
+                Desfazer último pagamento
+              </DropdownItem>
             )}
             <DropdownSeparator />
             <DropdownItem icon={Trash2} danger onSelect={() => handleDelete(q)}>Excluir</DropdownItem>
           </DropdownContent>
         </Dropdown>
-      ),
+        )
+      },
     },
   ]
 
@@ -230,6 +321,16 @@ export default function QuoteGenerator() {
         <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
           <Card className="grid gap-4 p-5 sm:grid-cols-2">
             <h2 className="text-sm font-semibold sm:col-span-2">Cliente e identificação</h2>
+            <Field label="Referente à proposta (opcional)" className="sm:col-span-2">
+              <Select value={values.proposal_id} onChange={(e) => (e.target.value ? pickProposal(e.target.value) : setValue('proposal_id', ''))}>
+                <option value="">Nenhuma (orçamento avulso)</option>
+                {proposalOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {formatProposalNumber(p.proposal_number)} · {p.title} · {formatCurrency(p.total_amount)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
             <Field label="Cliente cadastrado">
               <Select {...register('client_id')}>
                 <option value="">Cliente avulso (digitar nome)</option>
@@ -280,6 +381,31 @@ export default function QuoteGenerator() {
               <span className="text-sm font-medium">Total</span>
               <span className="tabular text-lg font-semibold">{formatCurrency(draft.total_amount)}</span>
             </div>
+          </Card>
+
+          <Card className="space-y-3 p-5">
+            <h2 className="text-sm font-semibold">Forma de pagamento</h2>
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="Cobrança" className="w-full sm:w-56">
+                <Select disabled={billingLocked} {...register('billing')}>
+                  <option value="full">Valor integral</option>
+                  <option value="deposit">Entrada + saldo</option>
+                </Select>
+              </Field>
+              {values.billing === 'deposit' && (
+                <Field label="Entrada (%)" error={errors.deposit_pct?.message} className="w-28">
+                  <Input type="number" min={1} max={99} step={1} disabled={billingLocked} {...register('deposit_pct')} />
+                </Field>
+              )}
+            </div>
+            {values.billing === 'deposit' && Number(values.deposit_pct) >= 1 && Number(values.deposit_pct) <= 99 && (
+              <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                Entrada de <span className="tabular font-medium">{formatCurrency(depositAmount(draft.total_amount, Number(values.deposit_pct)))}</span> agora e saldo de{' '}
+                <span className="tabular font-medium">{formatCurrency(draft.total_amount - depositAmount(draft.total_amount, Number(values.deposit_pct)))}</span> depois. O orçamento fica
+                como parcialmente pago até o saldo entrar.
+              </p>
+            )}
+            {billingLocked && <p className="text-xs text-slate-500 dark:text-slate-400">Já há pagamento registrado: a forma de cobrança não pode mais mudar.</p>}
           </Card>
 
           <Card className="p-5">

@@ -4,8 +4,9 @@ import { Check, Eye, FileText, MoreHorizontal, Plus, ScrollText, Send, Trash2, X
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dropdown, DropdownContent, DropdownItem, DropdownSeparator, DropdownTrigger } from '@/components/ui/overlays'
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/ui/primitives'
+import { choosePayment } from '@/components/quotes/PaymentChoice'
 import { confirm } from '@/components/ui/confirm'
-import { useRemove, useTable, useUpdate } from '@/hooks/useData'
+import { useApproveProposal, useRemove, useTable, useUpdate } from '@/hooks/useData'
 import { proposalStatus } from '@/lib/labels'
 import { formatCurrency, formatDate, formatProposalNumber, sum } from '@/lib/utils'
 import type { Proposal, ProposalStatus } from '@/types/database.types'
@@ -16,6 +17,8 @@ export default function Proposals() {
   const clients = useTable('clients')
   const update = useUpdate('proposals')
   const remove = useRemove('proposals')
+  const approveProposal = useApproveProposal()
+  const quotes = useTable('quotes')
 
   const clientName = (id: string | null) => {
     const c = clients.data?.find((x) => x.id === id)
@@ -24,6 +27,14 @@ export default function Proposals() {
 
   const setStatus = (p: Proposal, status: ProposalStatus) =>
     update.mutate({ id: p.id, patch: { status } }, { onSuccess: () => toast.success(`Proposta marcada como ${proposalStatus[status].label.toLowerCase()}`) })
+
+  /** Aprovar pergunta como o cliente vai pagar e gera o orçamento (se a proposta ainda não tem um). */
+  const approve = async (p: Proposal) => {
+    const hasQuote = quotes.data?.some((q) => q.proposal_id === p.id)
+    const depositPct = hasQuote ? null : await choosePayment(p.title, Number(p.total_amount))
+    if (depositPct === undefined) return
+    await approveProposal(p, depositPct)
+  }
 
   const handleDelete = async (p: Proposal) => {
     if (!(await confirm({ title: `Excluir a proposta ${formatProposalNumber(p.proposal_number)}?`, description: `"${p.title}" será apagada. Esta ação não pode ser desfeita.` }))) return
@@ -60,7 +71,7 @@ export default function Proposals() {
             <DropdownItem icon={Eye} onSelect={() => navigate(`/propostas/${p.id}`)}>Ver e exportar PDF</DropdownItem>
             <DropdownSeparator />
             {p.status !== 'sent' && <DropdownItem icon={Send} onSelect={() => setStatus(p, 'sent')}>Marcar como enviada</DropdownItem>}
-            {p.status !== 'approved' && <DropdownItem icon={Check} onSelect={() => setStatus(p, 'approved')}>Marcar como aprovada</DropdownItem>}
+            {p.status !== 'approved' && <DropdownItem icon={Check} onSelect={() => approve(p)}>Marcar como aprovada</DropdownItem>}
             {p.status !== 'rejected' && <DropdownItem icon={X} onSelect={() => setStatus(p, 'rejected')}>Marcar como recusada</DropdownItem>}
             {p.status === 'approved' && (
               <DropdownItem icon={ScrollText} onSelect={() => navigate('/ferramentas/contrato', { state: { proposalId: p.id } })}>

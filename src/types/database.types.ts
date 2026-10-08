@@ -88,7 +88,7 @@ export interface Proposal {
   created_at: string
 }
 
-export type QuoteStatus = 'pending' | 'paid'
+export type QuoteStatus = 'pending' | 'partial' | 'paid'
 
 /** Orçamento rápido com pagamento via Pix. Mais leve que uma proposta. */
 export interface Quote {
@@ -106,6 +106,8 @@ export interface Quote {
   status: QuoteStatus
   /** Proposta aprovada que deu origem ao orçamento, quando houver. */
   proposal_id?: string | null
+  /** Percentual pago de entrada (ex.: 50); vazio = cobrança integral. */
+  deposit_pct?: number | null
   created_at: string
 }
 

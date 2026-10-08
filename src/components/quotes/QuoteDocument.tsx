@@ -101,6 +101,17 @@ export function QuoteDocument({ doc, className }: { doc: QuoteDoc; className?: s
                     <td colSpan={3}>Total do orçamento</td>
                     <td className="pd-num">{formatCurrency(doc.total)}</td>
                   </tr>
+                  {doc.split.map((part) => (
+                    <tr key={part.label}>
+                      <td colSpan={3} style={{ fontWeight: 600 }}>
+                        {part.label}
+                        {part.paid && ' · pago'}
+                      </td>
+                      <td className="pd-num" style={{ fontWeight: 600 }}>
+                        {formatCurrency(part.amount)}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -123,7 +134,8 @@ export function QuoteDocument({ doc, className }: { doc: QuoteDoc; className?: s
                 )}
                 <div className="pd-pix-info">
                   <h3>Pagamento via Pix</h3>
-                  <p className="pd-pix-total">{formatCurrency(doc.total)}</p>
+                  {doc.split.length > 0 && <p className="pd-pix-due">{doc.due.label}</p>}
+                  <p className="pd-pix-total">{formatCurrency(doc.due.amount)}</p>
                   {doc.pix.key && (
                     <p className="pd-pix-key">
                       Chave Pix: <strong>{doc.pix.key}</strong>
@@ -141,7 +153,7 @@ export function QuoteDocument({ doc, className }: { doc: QuoteDoc; className?: s
                         <li>Informe a chave acima.</li>
                       </>
                     )}
-                    <li>Confira o favorecido, informe o valor de {formatCurrency(doc.total)} e confirme.</li>
+                    <li>Confira o favorecido, informe o valor de {formatCurrency(doc.due.amount)} e confirme.</li>
                     <li>Envie o comprovante para darmos início ao serviço.</li>
                   </ol>
                 </div>
