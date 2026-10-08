@@ -10,6 +10,8 @@ export interface ConfirmOptions {
   /** Texto do botão que confirma. Padrão: "Excluir". */
   confirmLabel?: string
   cancelLabel?: string
+  /** `danger` (padrão) para excluir e remover; `default` para confirmações comuns. */
+  tone?: 'danger' | 'default'
 }
 
 interface ConfirmState {
@@ -54,9 +56,11 @@ export function ConfirmDialog() {
           className="fixed left-1/2 top-1/2 z-[70] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 animate-pop-in rounded-xl border bg-white p-5 shadow-2xl focus:outline-none dark:bg-slate-900"
         >
           <div className="flex items-start gap-3.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-950/60 dark:text-red-400">
-              <AlertTriangle className="h-5 w-5" aria-hidden />
-            </div>
+            {request?.tone !== 'default' && (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-950/60 dark:text-red-400">
+                <AlertTriangle className="h-5 w-5" aria-hidden />
+              </div>
+            )}
             <div className="min-w-0 pt-0.5">
               <Dialog.Title className="break-words text-base font-semibold">{request?.title}</Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -68,7 +72,7 @@ export function ConfirmDialog() {
             <Button variant="secondary" onClick={() => settle(false)}>
               {request?.cancelLabel ?? 'Cancelar'}
             </Button>
-            <Button variant="danger" onClick={() => settle(true)}>
+            <Button variant={request?.tone === 'default' ? 'primary' : 'danger'} onClick={() => settle(true)}>
               {request?.confirmLabel ?? 'Excluir'}
             </Button>
           </div>

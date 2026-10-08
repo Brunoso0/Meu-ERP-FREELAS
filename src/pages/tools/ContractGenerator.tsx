@@ -67,6 +67,9 @@ const clauseParams: Record<string, Array<{ name: NumericField; label: string; st
   ],
 }
 
+/** Proposta que o cliente já aceitou (aprovada ou assinada). */
+const accepted = (status: string) => status === 'approved' || status === 'signed'
+
 // prazo único e vigência mensal descrevem modelos de contrato diferentes
 const exclusive: Record<string, string> = { term: 'recurring', recurring: 'term' }
 
@@ -163,7 +166,7 @@ export default function ContractGenerator() {
 
   // aprovadas primeiro: são as que normalmente viram contrato
   const proposalOptions = useMemo(
-    () => [...(proposals.data ?? [])].sort((a, b) => Number(b.status === 'approved') - Number(a.status === 'approved')),
+    () => [...(proposals.data ?? [])].sort((a, b) => Number(accepted(b.status)) - Number(accepted(a.status))),
     [proposals.data],
   )
 
@@ -302,9 +305,9 @@ export default function ContractGenerator() {
                 ))}
               </Select>
             </Field>
-            {proposal && proposal.status !== 'approved' && (
+            {proposal && !accepted(proposal.status) && (
               <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                Esta proposta ainda não foi aprovada pelo cliente.
+                Esta proposta ainda não foi aprovada nem assinada pelo cliente.
               </p>
             )}
             <Field label="Cliente" error={errors.client_id?.message}>

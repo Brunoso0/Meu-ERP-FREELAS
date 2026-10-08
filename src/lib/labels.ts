@@ -23,6 +23,8 @@ export const clientStatus: LabelMap<ClientStatus> = {
 export const proposalStatus: LabelMap<ProposalStatus> = {
   draft: { label: 'Rascunho', tone: 'slate' },
   sent: { label: 'Enviada', tone: 'blue' },
+  awaiting_signature: { label: 'Assinatura pendente', tone: 'amber' },
+  signed: { label: 'Assinado', tone: 'indigo' },
   approved: { label: 'Aprovada', tone: 'green' },
   rejected: { label: 'Recusada', tone: 'red' },
 }

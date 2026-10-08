@@ -2,7 +2,7 @@
 
 export type ClientStatus = 'active' | 'inactive' | 'lead'
 export type FreelancerStatus = 'active' | 'inactive'
-export type ProposalStatus = 'draft' | 'sent' | 'approved' | 'rejected'
+export type ProposalStatus = 'draft' | 'sent' | 'awaiting_signature' | 'signed' | 'approved' | 'rejected'
 export type ProjectStatus = 'planning' | 'in_progress' | 'review' | 'completed' | 'cancelled'
 export type TaskStatus = 'backlog' | 'in_progress' | 'review' | 'done'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
@@ -85,6 +85,19 @@ export interface Proposal {
   validity_days: number
   status: ProposalStatus
   payment_terms: string | null
+  /** Token do link público de assinatura; vazio enquanto o link não foi gerado. */
+  share_token?: string | null
+  signed_at?: string | null
+  signer_name?: string | null
+  signer_document?: string | null
+  /** Assinatura desenhada pelo cliente (PNG em data URL), quando assinou pelo link. */
+  signature_image?: string | null
+  /** `link` = assinou pela página pública; `manual` = cópia assinada recebida por fora. */
+  signature_method?: 'link' | 'manual' | null
+  signature_ip?: string | null
+  signature_user_agent?: string | null
+  /** Resumo (SHA-256) do conteúdo assinado, gerado pelo banco. */
+  signature_hash?: string | null
   created_at: string
 }
 

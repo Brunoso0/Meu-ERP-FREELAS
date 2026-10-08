@@ -71,6 +71,7 @@ No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase
 6. `006_quote_finance.sql` liga cada orçamento a um lançamento no financeiro e a proposta aprovada ao orçamento.
 7. `007_invoice.sql` adiciona o campo da nota fiscal ao lançamento.
 8. `008_quote_deposit.sql` permite orçamento com entrada + saldo e a situação "parcialmente pago".
+9. `009_proposal_signature.sql` cria o link público de assinatura da proposta e os status "assinatura pendente" e "assinado".
 
 #### Busca de leads (opcional)
 
@@ -161,6 +162,7 @@ Algumas regras que ajudam a entender os números:
 - Ao marcar um projeto como **Concluído**, o recebimento do orçamento é lançado sozinho no Financeiro, já como pago. Se parte do valor já tinha sido lançada para o projeto, entra só o que falta; reabrir e concluir de novo não duplica.
 - Uma transação pendente com vencimento no passado aparece como **Atrasado** automaticamente.
 - Todo **orçamento** tem um lançamento no Financeiro: pendente enquanto aguarda pagamento, pago quando você marca o orçamento como pago. Marcar o lançamento como pago no Financeiro também marca o orçamento. Excluir um orçamento ainda não pago tira a cobrança do Financeiro.
+- **Assinatura da proposta:** em Propostas, "Enviar para assinatura" gera um link que o cliente abre sem cadastro, lê a proposta e assina (nome, CPF/CNPJ e assinatura desenhada). A proposta fica em **Assinatura pendente** e passa a **Assinado** quando ele assina; o PDF passa a trazer o aceite. Se o cliente devolver uma cópia assinada por fora, use "Marcar como assinada". É uma assinatura eletrônica simples (registra data, hora e IP), não uma assinatura com certificado digital ICP-Brasil.
 - Ao marcar uma **proposta como aprovada**, o sistema pergunta como o cliente vai pagar (valor integral ou entrada + saldo, por exemplo 50%) e cria o orçamento aguardando pagamento, com os mesmos itens e valor, que já aparece no Financeiro.
 - Orçamento com **entrada + saldo** gera dois lançamentos no Financeiro (1/2 e 2/2) que somam o total. Paga a entrada, ele fica **parcialmente pago**; pago o saldo, fica **pago**. No Gerador de Orçamentos, use "Registrar entrada" e "Registrar saldo"; ou marque os lançamentos como pagos no Financeiro. Uma proposta tem um único orçamento: para cobrar só uma parte, edite o orçamento dela em vez de criar outro. Se depois você concluir um projeto criado a partir dessa proposta, o valor não é lançado de novo.
 - Em cada recebimento dá para guardar a **nota fiscal** emitida (PDF de até 5 MB), na coluna "Nota fiscal" da aba A receber, ao lado do comprovante. Os arquivos ficam em um espaço privado, acessível só com o seu login.
@@ -176,6 +178,7 @@ Algumas regras que ajudam a entender os números:
 O que já vem configurado:
 
 - Cada linha do banco pertence a um usuário, e as regras de acesso (RLS) garantem que só ele a lê ou altera.
+- O **link de assinatura** de proposta é a única parte acessível sem login. Quem tem o link vê só aquela proposta: o acesso passa por duas funções do banco que exigem o código aleatório do link, e as tabelas continuam fechadas para visitantes.
 - Quem não está logado não lê nem escreve nada pela API.
 - Comprovantes ficam num espaço privado, limitados a 5 MB e a imagem ou PDF.
 - O site publicado envia cabeçalhos que bloqueiam scripts de terceiros, conexões com outros servidores e a exibição dentro de outras páginas.

@@ -17,13 +17,24 @@ export interface ProposalDoc {
   items: ProposalItem[]
   total: number
   paymentTerms: string
+  /** Aceite do cliente, quando a proposta já foi assinada. */
+  signature: {
+    name: string
+    document: string
+    signedAt: Date
+    method: 'link' | 'manual'
+    image: string | null
+    ip: string
+    hash: string
+  } | null
 }
 
 export const itemsTotal = (items: ProposalItem[]) =>
   sum(items.map((i) => Number(i.quantity || 0) * Number(i.unit_price || 0)))
 
 export function buildProposalDoc(
-  proposal: Pick<Proposal, 'proposal_number' | 'title' | 'scope_text' | 'content' | 'total_amount' | 'validity_days' | 'payment_terms'> & { created_at?: string },
+  proposal: Pick<Proposal, 'proposal_number' | 'title' | 'scope_text' | 'content' | 'total_amount' | 'validity_days' | 'payment_terms'> &
+    Partial<Pick<Proposal, 'created_at' | 'signed_at' | 'signer_name' | 'signer_document' | 'signature_image' | 'signature_method' | 'signature_ip' | 'signature_hash'>>,
   client: Client | undefined,
   profile: Profile | undefined,
 ): ProposalDoc {
@@ -54,5 +65,17 @@ export function buildProposalDoc(
     items: (proposal.content?.items ?? []).filter((i) => i.description),
     total: Number(proposal.total_amount) || 0,
     paymentTerms: proposal.payment_terms ?? '',
+    signature: proposal.signed_at
+      ? {
+          name: proposal.signer_name ?? '',
+          document: proposal.signer_document ?? '',
+          signedAt: new Date(proposal.signed_at),
+          method: proposal.signature_method === 'link' ? 'link' : 'manual',
+          // só data URL de PNG vira <img>: o valor vem do banco e não pode apontar para outro lugar
+          image: proposal.signature_image?.startsWith('data:image/png;base64,') ? proposal.signature_image : null,
+          ip: proposal.signature_ip ?? '',
+          hash: proposal.signature_hash ?? '',
+        }
+      : null,
   }
 }

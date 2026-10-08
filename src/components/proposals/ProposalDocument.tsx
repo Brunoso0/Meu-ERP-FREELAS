@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import type { ProposalDoc } from '@/lib/proposal'
-import { cn, formatCurrency, formatDate } from '@/lib/utils'
+import { cn, formatCurrency, formatDate, maskCpfCnpj } from '@/lib/utils'
 import { useA4Fit } from './useA4Fit'
 import './proposal-document.css'
 
@@ -314,10 +314,27 @@ export function ProposalDocument({ doc, className }: { doc: ProposalDoc; classNa
                 <strong>{doc.issuer.name}</strong>
                 {doc.issuer.document ? `CPF/CNPJ: ${doc.issuer.document}` : 'Contratada'}
               </div>
-              <div className="pd-sign-line">
-                <strong>De acordo: {clientShort}</strong>
-                Assinatura / Data: ____/____/______
-              </div>
+              {doc.signature ? (
+                <div className="pd-sign-line pd-signed">
+                  {doc.signature.image && <img src={doc.signature.image} alt="Assinatura do cliente" className="pd-sign-image" />}
+                  <strong>De acordo: {doc.signature.name || clientShort}</strong>
+                  {doc.signature.document && <>CPF/CNPJ: {maskCpfCnpj(doc.signature.document)} · </>}
+                  {doc.signature.method === 'link' ? 'Assinado eletronicamente em ' : 'Cópia assinada recebida em '}
+                  {formatDate(doc.signature.signedAt, doc.signature.method === 'link' ? "dd/MM/yyyy 'às' HH:mm" : 'dd/MM/yyyy')}
+                  {(doc.signature.ip || doc.signature.hash) && (
+                    <span className="pd-sign-evidence">
+                      {doc.signature.ip && <>IP {doc.signature.ip}</>}
+                      {doc.signature.ip && doc.signature.hash && ' · '}
+                      {doc.signature.hash && <>Registro {doc.signature.hash.slice(0, 16)}</>}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="pd-sign-line">
+                  <strong>De acordo: {clientShort}</strong>
+                  Assinatura / Data: ____/____/______
+                </div>
+              )}
             </div>
           </div>
           <Footer doc={doc} page={investmentPage} />

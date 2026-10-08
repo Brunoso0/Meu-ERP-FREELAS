@@ -7,6 +7,7 @@ import { Badge, Button, EmptyState, PageHeader, Skeleton } from '@/components/ui
 import { useTable } from '@/hooks/useData'
 import { proposalStatus } from '@/lib/labels'
 import { buildProposalDoc } from '@/lib/proposal'
+import { formatDate } from '@/lib/utils'
 
 /** Abre a impressão só depois que as fontes do documento carregaram, senão o PDF sai com fonte errada. */
 const printWhenReady = () => document.fonts.ready.then(() => window.print())
@@ -63,7 +64,7 @@ export default function ProposalView() {
             <Button variant="ghost" onClick={() => navigate('/propostas')}>
               <ArrowLeft className="h-4 w-4" /> Voltar
             </Button>
-            {proposal.status === 'approved' && (
+            {(proposal.status === 'approved' || proposal.status === 'signed') && (
               <Button variant="secondary" onClick={() => navigate('/ferramentas/contrato', { state: { proposalId: proposal.id } })}>
                 <ScrollText className="h-4 w-4" /> Gerar contrato
               </Button>
@@ -76,6 +77,12 @@ export default function ProposalView() {
       />
       <div className="no-print mb-4 flex flex-wrap items-center gap-3">
         <Badge tone={proposalStatus[proposal.status].tone}>{proposalStatus[proposal.status].label}</Badge>
+        {doc.signature && (
+          <span className="text-xs text-slate-600 dark:text-slate-300">
+            {doc.signature.method === 'link' ? 'Assinada pelo link' : 'Cópia assinada recebida'}
+            {doc.signature.name && ` por ${doc.signature.name}`} em {formatDate(doc.signature.signedAt)}
+          </span>
+        )}
         <span className="text-xs text-slate-500 dark:text-slate-400">
           Na janela de impressão, escolha "Salvar como PDF" como destino.
         </span>

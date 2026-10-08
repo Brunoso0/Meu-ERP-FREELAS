@@ -131,20 +131,21 @@ export function useUpdate<T extends TableName>(table: T) {
 /**
  * Aprova a proposta e, se ela ainda não tem orçamento, gera o orçamento
  * aguardando pagamento, integral ou com entrada (`depositPct`, ex.: 50).
+ * Com `keepStatus`, só gera o orçamento (proposta assinada continua "Assinado").
  */
 export function useApproveProposal() {
   const qc = useQueryClient()
-  return async (proposal: Proposal, depositPct: number | null) => {
+  return async (proposal: Proposal, depositPct: number | null, keepStatus = false) => {
     try {
       const existing = await quoteOfProposal(proposal.id)
-      await updateRow('proposals', proposal.id, { status: 'approved' })
+      if (!keepStatus) await updateRow('proposals', proposal.id, { status: 'approved' })
       const quote = existing ? null : await createQuoteFromProposal(proposal, depositPct)
       await Promise.all(['proposals', 'quotes', 'financial_transactions'].map((key) => qc.invalidateQueries({ queryKey: [key] })))
       if (quote) {
         const first = depositPct ? `entrada de ${formatCurrency(Math.round(Number(quote.total_amount) * depositPct) / 100)} (${depositPct}%)` : formatCurrency(quote.total_amount)
-        toast.success(`Proposta aprovada · orçamento ${formatQuoteNumber(quote.quote_number)} criado`, { description: `Aguardando ${first}, já no financeiro` })
+        toast.success(`${keepStatus ? 'Orçamento' : 'Proposta aprovada · orçamento'} ${formatQuoteNumber(quote.quote_number)} criado`, { description: `Aguardando ${first}, já no financeiro` })
       } else {
-        toast.success('Proposta marcada como aprovada', existing ? { description: `Ela já tem o orçamento ${formatQuoteNumber(existing.quote_number)}` } : undefined)
+        if (!keepStatus || existing) toast.success(keepStatus ? 'A proposta já tem orçamento' : 'Proposta marcada como aprovada', existing ? { description: `Ela já tem o orçamento ${formatQuoteNumber(existing.quote_number)}` } : undefined)
       }
     } catch (error) {
       toast.error('Não foi possível aprovar a proposta', { description: describe(error) })

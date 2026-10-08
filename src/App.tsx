@@ -1,5 +1,5 @@
-import { lazy, useEffect, useRef } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, useEffect, useRef } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { Loader2 } from 'lucide-react'
@@ -22,6 +22,7 @@ const QuoteGenerator = lazy(() => import('@/pages/tools/QuoteGenerator'))
 const ProposalGenerator = lazy(() => import('@/pages/tools/ProposalGenerator'))
 const ContractGenerator = lazy(() => import('@/pages/tools/ContractGenerator'))
 const LeadFinder = lazy(() => import('@/pages/tools/LeadFinder'))
+const PublicProposal = lazy(() => import('@/pages/PublicProposal'))
 
 export default function App() {
   const theme = useUI((s) => s.theme)
@@ -43,11 +44,19 @@ export default function App() {
   }, [userId, queryClient])
 
   const needsLogin = isSupabaseConfigured && !session
+  // o link de assinatura é aberto pelo cliente, que não tem (nem precisa de) login
+  const isPublicPage = useLocation().pathname.startsWith('/assinar/')
 
   return (
     <>
       <Toaster theme={theme} position="bottom-right" richColors closeButton />
-      {!ready ? (
+      {isPublicPage ? (
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="assinar/:token" element={<PublicProposal />} />
+          </Routes>
+        </Suspense>
+      ) : !ready ? (
         <div className="flex min-h-screen items-center justify-center">
           <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
         </div>

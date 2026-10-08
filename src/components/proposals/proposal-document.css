@@ -645,6 +645,28 @@
   font-size: 12px;
 }
 
+.pdoc .pd-signed {
+  position: relative;
+}
+
+/* a assinatura desenhada fica apoiada na linha, como numa folha assinada à mão */
+.pdoc .pd-sign-image {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  height: 52px;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: left bottom;
+}
+
+.pdoc .pd-sign-evidence {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  color: #94a3b8;
+}
+
 /* ---------- contracapa ---------- */
 
 .pdoc .pd-back {
