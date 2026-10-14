@@ -9,3 +9,10 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
   Cross-Origin-Opener-Policy: same-origin
   X-Robots-Tag: noindex, nofollow
+
+# O service worker precisa ser conferido a cada visita, senão uma versão antiga fica presa no aparelho.
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache

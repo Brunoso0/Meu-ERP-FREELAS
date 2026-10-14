@@ -176,6 +176,13 @@ Algumas regras que ajudam a entender os números:
 - O progresso das **metas** é medido pelo sistema (recebimentos pagos, clientes ou projetos criados no período) somado ao valor manual que você informar.
 - Todas as listas mostram **10 itens por página**.
 
+### No celular
+
+- **Instalar como app:** abra o site no celular e use **Instalar app** (no menu lateral do sistema, quando o navegador oferece) ou, no menu do navegador, "Instalar app" / "Adicionar à tela inicial" (no iPhone: Compartilhar → Adicionar à Tela de Início, pelo Safari). Ele abre em tela cheia, com ícone próprio. Também instala no computador pelo Chrome ou Edge.
+- O app instalado guarda as telas no aparelho, então abre rápido e mesmo sem internet. **Os dados não ficam guardados:** sem conexão as listas não carregam e nada é salvo. A cada publicação o app se atualiza sozinho na abertura seguinte.
+- O menu vira uma gaveta (botão ☰ no topo), as tabelas viram cartões e a agenda mostra o mês com pontos nos dias: toque num dia para ver os compromissos.
+- **Assinar no celular:** o quadro de assinatura abre em **tela cheia e deitado**, para ter mais espaço para o dedo. No Android o aparelho gira sozinho; no iPhone o quadro aparece girado e basta virar o aparelho. Vale para a sua assinatura (Minha empresa) e para o cliente nos links de proposta e contrato.
+
 ## Segurança
 
 O que já vem configurado:

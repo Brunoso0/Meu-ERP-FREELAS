@@ -26,6 +26,49 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+  /* áreas seguras do aparelho (entalhe, barra de gestos) no app instalado */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  .safe-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* quadro de assinatura com o celular em pé: ocupa a tela girado 90°, como se o aparelho estivesse deitado */
+.sign-stage-rotated {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vh;
+  height: 100vw;
+  width: 100dvh;
+  height: 100dvw;
+  transform-origin: top left;
+  transform: translateX(100vw) rotate(90deg);
+  transform: translateX(100dvw) rotate(90deg);
+  padding-left: max(0.75rem, env(safe-area-inset-top));
+  padding-right: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 767px) {
+  /* abaixo de 16px o iOS dá zoom na página ao focar o campo */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
 }
 
 @media print {

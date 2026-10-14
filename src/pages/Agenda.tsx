@@ -4,6 +4,7 @@ import { ptBR } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Plus, Video } from 'lucide-react'
 import { Button, Card, PageHeader, Segmented, Skeleton } from '@/components/ui/primitives'
 import { useTable } from '@/hooks/useData'
+import { useNarrowScreen } from '@/hooks/useMediaQuery'
 import { cn, toDate } from '@/lib/utils'
 import { useUI } from '@/store/ui'
 import type { EventType } from '@/types/database.types'
@@ -35,6 +36,9 @@ export default function Agenda() {
   const tasks = useTable('tasks')
   const [view, setView] = useState<'month' | 'week'>('month')
   const [cursor, setCursor] = useState(new Date())
+  // no celular o mês mostra só pontos; o dia tocado abre a lista embaixo
+  const [selected, setSelected] = useState(new Date())
+  const narrow = useNarrowScreen()
 
   const items = useMemo<AgendaItem[]>(() => {
     const fromEvents: AgendaItem[] = (events.data ?? []).map((e) => ({
@@ -70,6 +74,10 @@ export default function Agenda() {
   }, [cursor, view])
 
   const move = (step: number) => setCursor(view === 'month' ? addMonths(cursor, step) : addWeeks(cursor, step))
+  const goToday = () => {
+    setCursor(new Date())
+    setSelected(new Date())
+  }
   const newEvent = (day: Date) => openModal({ type: 'event', defaults: { start_time: setMinutes(setHours(day, 9), 0).toISOString(), event_type: 'meeting' } })
   const itemsOf = (day: Date) => items.filter((i) => isSameDay(i.date, day))
   const today = new Date()
@@ -103,89 +111,177 @@ export default function Agenda() {
           <ChevronRight className="h-4 w-4" />
         </Button>
         <span className="inline-block text-sm font-semibold first-letter:uppercase">{title}</span>
-        <Button variant="ghost" size="sm" onClick={() => setCursor(new Date())}>
+        <Button variant="ghost" size="sm" onClick={goToday}>
           Hoje
         </Button>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <div className="min-w-[760px]">
-            <div className="grid grid-cols-7 border-b bg-slate-50 dark:bg-slate-900/60">
-              {WEEK_HEADER.map((d) => (
-                <div key={d} className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {d}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7">
-              {days.map((day) => {
-                const dayItems = itemsOf(day)
-                const limit = view === 'month' ? 3 : dayItems.length
-                const outside = view === 'month' && !isSameMonth(day, cursor)
-                return (
-                  <div
-                    key={day.toISOString()}
-                    onClick={() => newEvent(day)}
-                    className={cn(
-                      'group cursor-pointer border-b border-r p-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 [&:nth-child(7n)]:border-r-0',
-                      view === 'month' ? 'min-h-[118px]' : 'min-h-[420px]',
-                      outside && 'bg-slate-50/60 dark:bg-slate-950/40',
-                    )}
-                  >
-                    <div className="mb-1.5 flex items-center justify-between">
+      {narrow ? (
+        <div className="space-y-3">
+          {view === 'month' && (
+            <Card className="overflow-hidden">
+              <div className="grid grid-cols-7 border-b bg-slate-50 dark:bg-slate-900/60">
+                {WEEK_HEADER.map((d) => (
+                  <div key={d} className="py-2 text-center text-[11px] font-medium uppercase text-slate-500 dark:text-slate-400">
+                    {d}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7">
+                {days.map((day) => {
+                  const dayItems = itemsOf(day)
+                  const outside = !isSameMonth(day, cursor)
+                  const isSelected = isSameDay(day, selected)
+                  return (
+                    <button
+                      key={day.toISOString()}
+                      type="button"
+                      onClick={() => setSelected(day)}
+                      aria-pressed={isSelected}
+                      aria-label={format(day, "d 'de' MMMM", { locale: ptBR }) + (dayItems.length ? `, ${dayItems.length} na agenda` : '')}
+                      className={cn('flex h-14 flex-col items-center gap-1 border-b border-r pt-1.5 [&:nth-child(7n)]:border-r-0', isSelected && 'bg-brand-50 dark:bg-brand-600/15')}
+                    >
                       <span
                         className={cn(
-                          'tabular inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-medium',
+                          'tabular inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-medium',
                           isSameDay(day, today) ? 'bg-brand-600 text-white' : outside ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300',
                         )}
                       >
                         {format(day, 'd')}
                       </span>
-                      <Plus className="h-3.5 w-3.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" />
-                    </div>
-                    {loading ? (
-                      <Skeleton className="h-5 w-full" />
-                    ) : (
-                      <div className="space-y-1">
-                        {dayItems.slice(0, limit).map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            title={`${kindLabel[item.kind]}: ${item.title}`}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              item.open()
-                            }}
-                            className={cn('flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-xs font-medium hover:brightness-95', kindStyle[item.kind])}
-                          >
-                            {item.time && <span className="tabular shrink-0 opacity-75">{item.time}</span>}
-                            <span className={cn(view === 'month' ? 'truncate' : 'line-clamp-3')}>{item.title}</span>
-                            {item.link && view === 'week' && <Video className="ml-auto h-3 w-3 shrink-0" />}
-                          </button>
+                      <span className="flex h-1.5 gap-0.5">
+                        {dayItems.slice(0, 4).map((item) => (
+                          <span key={item.id} className={cn('h-1.5 w-1.5 rounded-full', kindDot[item.kind])} />
                         ))}
-                        {dayItems.length > limit && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setCursor(day)
-                              setView('week')
-                            }}
-                            className="px-1.5 text-xs font-medium text-slate-500 hover:text-brand-600 dark:text-slate-400"
-                          >
-                            +{dayItems.length - limit} mais
-                          </button>
-                        )}
-                      </div>
-                    )}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </Card>
+          )}
+          {(view === 'month' ? [selected] : days).map((day) => {
+            const dayItems = itemsOf(day)
+            return (
+              <Card key={day.toISOString()}>
+                <div className="flex items-center justify-between gap-3 border-b px-4 py-2.5">
+                  <p className={cn('text-sm font-semibold first-letter:uppercase', isSameDay(day, today) && 'text-brand-600 dark:text-brand-400')}>
+                    {format(day, "EEEE, d 'de' MMM", { locale: ptBR })}
+                    {isSameDay(day, today) && <span className="ml-1.5 text-xs font-medium">· hoje</span>}
+                  </p>
+                  <Button variant="ghost" size="icon" aria-label="Novo compromisso neste dia" onClick={() => newEvent(day)}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {loading ? (
+                  <div className="p-4">
+                    <Skeleton className="h-5 w-full" />
                   </div>
-                )
-              })}
+                ) : dayItems.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">Nada agendado.</p>
+                ) : (
+                  <ul>
+                    {dayItems.map((item) => (
+                      <li key={item.id} className="border-b last:border-0">
+                        <button type="button" onClick={item.open} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50 dark:active:bg-slate-800/50">
+                          <span className={cn('h-2 w-2 shrink-0 rounded-full', kindDot[item.kind])} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium">{item.title}</span>
+                            <span className="tabular block text-xs text-slate-500 dark:text-slate-400">
+                              {kindLabel[item.kind]}
+                              {item.time && ` · ${item.time}`}
+                            </span>
+                          </span>
+                          {item.link && <Video className="h-4 w-4 shrink-0 text-slate-400" />}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            )
+          })}
+        </div>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="min-w-[760px]">
+              <div className="grid grid-cols-7 border-b bg-slate-50 dark:bg-slate-900/60">
+                {WEEK_HEADER.map((d) => (
+                  <div key={d} className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    {d}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7">
+                {days.map((day) => {
+                  const dayItems = itemsOf(day)
+                  const limit = view === 'month' ? 3 : dayItems.length
+                  const outside = view === 'month' && !isSameMonth(day, cursor)
+                  return (
+                    <div
+                      key={day.toISOString()}
+                      onClick={() => newEvent(day)}
+                      className={cn(
+                        'group cursor-pointer border-b border-r p-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 [&:nth-child(7n)]:border-r-0',
+                        view === 'month' ? 'min-h-[118px]' : 'min-h-[420px]',
+                        outside && 'bg-slate-50/60 dark:bg-slate-950/40',
+                      )}
+                    >
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span
+                          className={cn(
+                            'tabular inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-medium',
+                            isSameDay(day, today) ? 'bg-brand-600 text-white' : outside ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300',
+                          )}
+                        >
+                          {format(day, 'd')}
+                        </span>
+                        <Plus className="h-3.5 w-3.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" />
+                      </div>
+                      {loading ? (
+                        <Skeleton className="h-5 w-full" />
+                      ) : (
+                        <div className="space-y-1">
+                          {dayItems.slice(0, limit).map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              title={`${kindLabel[item.kind]}: ${item.title}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                item.open()
+                              }}
+                              className={cn('flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-xs font-medium hover:brightness-95', kindStyle[item.kind])}
+                            >
+                              {item.time && <span className="tabular shrink-0 opacity-75">{item.time}</span>}
+                              <span className={cn(view === 'month' ? 'truncate' : 'line-clamp-3')}>{item.title}</span>
+                              {item.link && view === 'week' && <Video className="ml-auto h-3 w-3 shrink-0" />}
+                            </button>
+                          ))}
+                          {dayItems.length > limit && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setCursor(day)
+                                setView('week')
+                              }}
+                              className="px-1.5 text-xs font-medium text-slate-500 hover:text-brand-600 dark:text-slate-400"
+                            >
+                              +{dayItems.length - limit} mais
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400">
         {(Object.keys(kindLabel) as AgendaItem['kind'][]).map((k) => (

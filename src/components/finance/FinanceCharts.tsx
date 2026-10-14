@@ -77,7 +77,7 @@ export function FinanceCharts({ transactions, clients, range, loading }: Finance
   const singleMonth = !!range && differenceInCalendarMonths(range.end, range.start) === 0
 
   return (
-    <div className="mt-4 grid gap-4 xl:grid-cols-3">
+    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
       <Card className="p-5 xl:col-span-2">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>

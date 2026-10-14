@@ -312,7 +312,7 @@ export default function ContractGenerator() {
         }
       />
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,460px)_1fr]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,460px)_1fr]">
         <div className="space-y-4">
           <Card className="space-y-4 p-5">
             <h2 className="text-sm font-semibold">Origem</h2>
@@ -453,10 +453,10 @@ export default function ContractGenerator() {
               <>
                 <ul>
                   {saved.visible.map((c) => (
-                    <li key={c.id} className="flex items-center gap-3 border-b px-5 py-3 last:border-0">
-                      <div className="min-w-0 flex-1">
+                    <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-5 py-3 last:border-0 sm:flex-nowrap">
+                      <div className="min-w-0 flex-1 basis-full sm:basis-0">
                         <p className="truncate text-sm font-medium">{c.title}</p>
-                        <p className="tabular flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <p className="tabular flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                           {formatDate(c.created_at)}
                           {c.signed_at && <span>· assinado em {formatDate(c.signed_at)}{c.signature_method === 'link' ? ' pelo link' : ''}</span>}
                           {c.monthly_amount && c.term_months ? (
@@ -471,7 +471,7 @@ export default function ContractGenerator() {
                         aria-label="Alterar status"
                         value={c.status}
                         onChange={(e) => changeStatus(c, e.target.value as ContractStatus)}
-                        className="h-8 w-40 text-xs"
+                        className="mr-auto h-8 w-40 text-xs sm:mr-0"
                       >
                         {/* "assinatura pendente" só entra pelo botão de assinatura, que gera o link */}
                         {toOptions(contractStatus).filter((o) => o.value !== 'awaiting_signature' || c.status === 'awaiting_signature').map((o) => (

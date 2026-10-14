@@ -44,9 +44,10 @@ export async function imageToDataUrl(file: File, maxSize = 480): Promise<string>
 /**
  * Recorta o canvas na área que tem tinta e devolve o PNG (data URL), com uma
  * pequena margem. Assim a assinatura ocupa a imagem inteira e não sai miúda
- * no documento. Devolve null se o canvas estiver em branco.
+ * no documento. Devolve null se o canvas estiver em branco. O resultado é
+ * reduzido a `maxWidth`: um quadro grande (tela cheia) não vira um PNG pesado.
  */
-export function cropInk(canvas: HTMLCanvasElement, margin = 8): string | null {
+export function cropInk(canvas: HTMLCanvasElement, margin = 8, maxWidth = 720): string | null {
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
   const { width, height } = canvas
@@ -70,10 +71,14 @@ export function cropInk(canvas: HTMLCanvasElement, margin = 8): string | null {
   const y0 = Math.max(0, minY - margin)
   const w = Math.min(width, maxX + margin + 1) - x0
   const h = Math.min(height, maxY + margin + 1) - y0
+  const scale = Math.min(1, maxWidth / w)
   const out = document.createElement('canvas')
-  out.width = w
-  out.height = h
-  out.getContext('2d')?.drawImage(canvas, x0, y0, w, h, 0, 0, w, h)
+  out.width = Math.max(1, Math.round(w * scale))
+  out.height = Math.max(1, Math.round(h * scale))
+  const outCtx = out.getContext('2d')
+  if (!outCtx) return null
+  outCtx.imageSmoothingQuality = 'high'
+  outCtx.drawImage(canvas, x0, y0, w, h, 0, 0, out.width, out.height)
   return out.toDataURL('image/png')
 }
 

@@ -100,6 +100,7 @@ export default function Proposals() {
     { header: 'Nº', cell: (p) => <span className="tabular font-medium text-slate-500 dark:text-slate-400">{formatProposalNumber(p.proposal_number)}</span> },
     {
       header: 'Proposta',
+      primary: true,
       cell: (p) => (
         <div className="min-w-0">
           <Link to={`/propostas/${p.id}`} className="truncate font-medium hover:text-brand-600 dark:hover:text-brand-400">

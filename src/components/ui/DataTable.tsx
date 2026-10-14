@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useNarrowScreen } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { PAGE_SIZE, Pager, usePagination } from './Pagination'
 import { Skeleton } from './primitives'
@@ -7,6 +8,8 @@ export interface Column<T> {
   header: string
   cell: (row: T) => React.ReactNode
   className?: string
+  /** No celular, a coluna que vira o título do cartão. Sem marcação, é a primeira. */
+  primary?: boolean
 }
 
 interface DataTableProps<T> {
@@ -28,8 +31,56 @@ export function DataTable<T extends { id: string }>({
   onRowClick,
 }: DataTableProps<T>) {
   const pagination = usePagination(rows, pageSize)
+  const narrow = useNarrowScreen()
 
   if (!loading && pagination.total === 0) return <>{empty}</>
+
+  if (narrow) {
+    // no celular cada linha vira um cartão: título, pares "rótulo: valor" e as ações no rodapé
+    const primary = columns.find((c) => c.primary) ?? columns[0]
+    const details = columns.filter((c) => c !== primary && c.header)
+    const actions = columns.filter((c) => c !== primary && !c.header)
+    return (
+      <div>
+        <ul>
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <li key={i} className="space-y-2 border-b px-4 py-4 last:border-0">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3 w-1/2" />
+                </li>
+              ))
+            : pagination.visible.map((row) => (
+                <li
+                  key={row.id}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={cn('border-b px-4 py-3.5 text-sm last:border-0', onRowClick && 'cursor-pointer active:bg-slate-50 dark:active:bg-slate-800/50')}
+                >
+                  <div className="min-w-0">{primary.cell(row)}</div>
+                  {details.length > 0 && (
+                    <dl className="mt-3 space-y-2">
+                      {details.map((c) => (
+                        <div key={c.header} className="flex items-center justify-between gap-4">
+                          <dt className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{c.header}</dt>
+                          <dd className="min-w-0 text-right">{c.cell(row)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  {actions.length > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                      {actions.map((c, i) => (
+                        <React.Fragment key={i}>{c.cell(row)}</React.Fragment>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              ))}
+        </ul>
+        {!loading && <Pager {...pagination} />}
+      </div>
+    )
+  }
 
   return (
     <div>

@@ -10,14 +10,16 @@ import { TopBar } from './TopBar'
 
 export function AppLayout() {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen min-h-[100dvh]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 md:px-6">
-          <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <Outlet />
-          </Suspense>
+        <main className="safe-x safe-bottom mx-auto w-full max-w-[1400px] flex-1">
+          <div className="px-4 py-5 md:px-6 md:py-6">
+            <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+              <Outlet />
+            </Suspense>
+          </div>
         </main>
       </div>
       <CommandPalette />

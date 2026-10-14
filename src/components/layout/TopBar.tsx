@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { addHours, isBefore, startOfDay } from 'date-fns'
-import { ArrowDownUp, Bell, FilePlus, Kanban, Moon, Plus, Search, Sun, UserPlus } from 'lucide-react'
+import { ArrowDownUp, Bell, FilePlus, Kanban, Menu, Moon, Plus, Search, Sun, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/primitives'
 import { Dropdown, DropdownContent, DropdownItem, DropdownLabel, DropdownTrigger, Tip } from '@/components/ui/overlays'
 import { useTable } from '@/hooks/useData'
@@ -68,7 +68,7 @@ function Notifications() {
           {items.length > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900" />}
         </Button>
       </DropdownTrigger>
-      <DropdownContent className="w-80">
+      <DropdownContent className="w-80 max-w-[calc(100vw-1.5rem)]">
         <DropdownLabel>Notificações</DropdownLabel>
         {items.length === 0 && <p className="px-2.5 pb-3 pt-1 text-sm text-slate-500">Tudo em dia por aqui.</p>}
         {items.slice(0, 10).map((n) => (
@@ -86,41 +86,54 @@ function Notifications() {
 
 export function TopBar() {
   const navigate = useNavigate()
-  const { theme, toggleTheme, openModal, setCommandOpen } = useUI()
+  const { theme, toggleTheme, openModal, setCommandOpen, mobileNavOpen, setMobileNavOpen } = useUI()
 
   return (
-    <header className="no-print sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-white/80 px-4 backdrop-blur md:px-6 dark:bg-slate-900/80">
-      <button
-        type="button"
-        onClick={() => setCommandOpen(true)}
-        className="flex h-9 min-w-0 flex-1 items-center sm:max-w-sm gap-2 rounded-lg border bg-slate-50 px-3 text-sm text-slate-400 transition-colors hover:border-slate-300 dark:bg-slate-950/50 dark:hover:border-slate-700"
-      >
-        <Search className="h-4 w-4" />
-        <span className="flex-1 truncate text-left">Buscar clientes, propostas, demandas…</span>
-        <kbd className="hidden rounded border bg-white px-1.5 text-[10px] font-medium text-slate-500 sm:inline dark:bg-slate-900">Ctrl K</kbd>
-      </button>
+    <header className="safe-top safe-x no-print sticky top-0 z-30 border-b bg-white/80 backdrop-blur dark:bg-slate-900/80">
+      <div className="flex h-14 items-center gap-2 px-3 md:gap-3 md:px-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={() => setMobileNavOpen(true)}
+          aria-label="Abrir menu"
+          aria-controls="menu-principal"
+          aria-expanded={mobileNavOpen}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <button
+          type="button"
+          onClick={() => setCommandOpen(true)}
+          className="flex h-9 min-w-0 flex-1 items-center sm:max-w-sm gap-2 rounded-lg border bg-slate-50 px-3 text-sm text-slate-400 transition-colors hover:border-slate-300 dark:bg-slate-950/50 dark:hover:border-slate-700"
+        >
+          <Search className="h-4 w-4" />
+          <span className="flex-1 truncate text-left"><span className="sm:hidden">Buscar…</span><span className="hidden sm:inline">Buscar clientes, propostas, demandas…</span></span>
+          <kbd className="hidden rounded border bg-white px-1.5 text-[10px] font-medium text-slate-500 sm:inline dark:bg-slate-900">Ctrl K</kbd>
+        </button>
 
-      <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        <SupabaseStatus />
-        <Tip label={theme === 'dark' ? 'Tema claro' : 'Tema escuro'} side="bottom">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Alternar tema">
-            {theme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-          </Button>
-        </Tip>
-        <Notifications />
-        <Dropdown>
-          <DropdownTrigger asChild>
-            <Button className="ml-1">
-              <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Novo</span>
+        <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5">
+          <SupabaseStatus />
+          <Tip label={theme === 'dark' ? 'Tema claro' : 'Tema escuro'} side="bottom">
+            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Alternar tema">
+              {theme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
             </Button>
-          </DropdownTrigger>
-          <DropdownContent>
-            <DropdownItem icon={FilePlus} onSelect={() => navigate('/ferramentas/proposta')}>Nova proposta</DropdownItem>
-            <DropdownItem icon={Kanban} onSelect={() => openModal({ type: 'task' })}>Nova demanda</DropdownItem>
-            <DropdownItem icon={UserPlus} onSelect={() => openModal({ type: 'client' })}>Novo cliente</DropdownItem>
-            <DropdownItem icon={ArrowDownUp} onSelect={() => openModal({ type: 'transaction' })}>Nova transação</DropdownItem>
-          </DropdownContent>
-        </Dropdown>
+          </Tip>
+          <Notifications />
+          <Dropdown>
+            <DropdownTrigger asChild>
+              <Button className="ml-1">
+                <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Novo</span>
+              </Button>
+            </DropdownTrigger>
+            <DropdownContent>
+              <DropdownItem icon={FilePlus} onSelect={() => navigate('/ferramentas/proposta')}>Nova proposta</DropdownItem>
+              <DropdownItem icon={Kanban} onSelect={() => openModal({ type: 'task' })}>Nova demanda</DropdownItem>
+              <DropdownItem icon={UserPlus} onSelect={() => openModal({ type: 'client' })}>Novo cliente</DropdownItem>
+              <DropdownItem icon={ArrowDownUp} onSelect={() => openModal({ type: 'transaction' })}>Nova transação</DropdownItem>
+            </DropdownContent>
+          </Dropdown>
+        </div>
       </div>
     </header>
   )

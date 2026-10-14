@@ -133,7 +133,7 @@ function SignatureField({ field, value, error, onChange }: { field: FieldDef; va
         {field.hint && <p className="text-xs text-slate-500 dark:text-slate-400">{field.hint}</p>}
         {drawing ? (
           <>
-            <SignaturePad onChange={setDraft} />
+            <SignaturePad onChange={setDraft} autoOpen />
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"

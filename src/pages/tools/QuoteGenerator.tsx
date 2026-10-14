@@ -226,6 +226,7 @@ export default function QuoteGenerator() {
     { header: 'Nº', cell: (q) => <span className="tabular font-medium text-slate-500 dark:text-slate-400">{formatQuoteNumber(q.quote_number)}</span> },
     {
       header: 'Orçamento',
+      primary: true,
       cell: (q) => {
         const c = clientOf(q.client_id)
         return (
@@ -317,7 +318,7 @@ export default function QuoteGenerator() {
         </div>
       )}
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
           <Card className="grid gap-4 p-5 sm:grid-cols-2">
             <h2 className="text-sm font-semibold sm:col-span-2">Cliente e identificação</h2>
@@ -361,13 +362,13 @@ export default function QuoteGenerator() {
             </div>
             <div className="space-y-2">
               {items.fields.map((f, i) => (
-                <div key={f.id} className="flex items-start gap-2">
-                  <div className="flex-1">
+                <div key={f.id} className="flex flex-wrap items-start gap-2 border-b pb-3 last:border-0 last:pb-0 sm:flex-nowrap sm:border-0 sm:pb-0">
+                  <div className="min-w-0 flex-1 basis-full sm:basis-0">
                     <Input placeholder="Descrição do serviço" aria-label={`Item ${i + 1}`} {...register(`items.${i}.description`)} />
                     {errors.items?.[i]?.description && <span className="mt-1 block text-xs text-red-600 dark:text-red-400">{errors.items[i]?.description?.message}</span>}
                   </div>
-                  <Input type="number" min={0} step="0.5" aria-label="Quantidade" title="Quantidade" className="w-20" {...register(`items.${i}.quantity`)} />
-                  <Input type="number" min={0} step="0.01" aria-label="Valor unitário" title="Valor unitário (R$)" className="w-32" {...register(`items.${i}.unit_price`)} />
+                  <Input type="number" min={0} step="0.5" aria-label="Quantidade" title="Quantidade" className="w-20 flex-1 sm:flex-none" {...register(`items.${i}.quantity`)} />
+                  <Input type="number" min={0} step="0.01" aria-label="Valor unitário" title="Valor unitário (R$)" className="w-32 flex-1 sm:flex-none" {...register(`items.${i}.unit_price`)} />
                   <Button variant="ghost" size="icon" aria-label="Remover item" onClick={() => items.remove(i)} className="shrink-0">
                     <Trash2 className="h-4 w-4" />
                   </Button>

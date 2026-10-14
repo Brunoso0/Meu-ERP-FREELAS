@@ -163,7 +163,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="p-5 xl:col-span-2">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -221,7 +221,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <div className="flex items-center justify-between border-b px-5 py-3.5">
             <h2 className="text-sm font-semibold">Demandas críticas (48h)</h2>

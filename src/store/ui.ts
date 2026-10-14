@@ -16,11 +16,14 @@ interface UIState {
   sidebarCollapsed: boolean
   modal: ModalState | null
   commandOpen: boolean
+  /** Menu lateral aberto no celular (gaveta). */
+  mobileNavOpen: boolean
   toggleTheme: () => void
   toggleSidebar: () => void
   openModal: (modal: ModalState) => void
   closeModal: () => void
   setCommandOpen: (open: boolean) => void
+  setMobileNavOpen: (open: boolean) => void
 }
 
 const prefersDark = () =>
@@ -33,11 +36,13 @@ export const useUI = create<UIState>()(
       sidebarCollapsed: false,
       modal: null,
       commandOpen: false,
+      mobileNavOpen: false,
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       openModal: (modal) => set({ modal }),
       closeModal: () => set({ modal: null }),
       setCommandOpen: (commandOpen) => set({ commandOpen }),
+      setMobileNavOpen: (mobileNavOpen) => set({ mobileNavOpen }),
     }),
     {
       name: 'meu-erp-freelas:ui',

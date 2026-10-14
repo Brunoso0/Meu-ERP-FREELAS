@@ -151,11 +151,11 @@ export default function Tasks() {
           </div>
 
           <DragDropContext onDragEnd={onDragEnd}>
-            <div className="grid auto-cols-[minmax(230px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-3">
+            <div className="grid snap-x snap-mandatory auto-cols-[85%] grid-flow-col gap-3 overflow-x-auto pb-3 sm:snap-none sm:auto-cols-[minmax(230px,1fr)]">
               {columns.map((col) => {
                 const items = tasksOf(col.id)
                 return (
-                  <div key={col.id} className="flex min-h-[420px] flex-col rounded-xl border bg-slate-100/60 dark:bg-slate-900/50">
+                  <div key={col.id} className="flex min-h-[420px] snap-start flex-col rounded-xl border bg-slate-100/60 dark:bg-slate-900/50">
                     <div className="flex items-center justify-between px-3 pb-2 pt-3">
                       <div>
                         <p className={cn('text-sm font-semibold', col.id === today && 'text-brand-600 dark:text-brand-400')}>

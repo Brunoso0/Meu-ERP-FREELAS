@@ -56,7 +56,7 @@ export default function BudgetCalculator() {
   return (
     <>
       <PageHeader title="Calculadora de preço" description="Some suas horas e custos, escolha a margem e veja quanto cobrar." />
-      <div className="grid items-start gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-5">
         <div className="space-y-4 lg:col-span-3">
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between">
