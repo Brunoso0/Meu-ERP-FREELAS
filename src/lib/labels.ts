@@ -65,6 +65,7 @@ export const transactionStatus: LabelMap<TransactionStatus> = {
 
 export const contractStatus: LabelMap<ContractStatus> = {
   draft: { label: 'Rascunho', tone: 'slate' },
+  awaiting_signature: { label: 'Assinatura pendente', tone: 'amber' },
   signed: { label: 'Assinado', tone: 'blue' },
   active: { label: 'Vigente', tone: 'green' },
   terminated: { label: 'Encerrado', tone: 'red' },

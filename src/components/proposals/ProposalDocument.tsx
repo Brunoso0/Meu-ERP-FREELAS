@@ -310,7 +310,8 @@ export function ProposalDocument({ doc, className }: { doc: ProposalDoc; classNa
             )}
 
             <div className="pd-signatures">
-              <div className="pd-sign-line">
+              <div className="pd-sign-line pd-signed">
+                {doc.issuer.signature && <img src={doc.issuer.signature} alt="Assinatura do emitente" className="pd-sign-image" />}
                 <strong>{doc.issuer.name}</strong>
                 {doc.issuer.document ? `CPF/CNPJ: ${doc.issuer.document}` : 'Contratada'}
               </div>

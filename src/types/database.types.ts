@@ -9,7 +9,7 @@ export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
 export type EventType = 'meeting' | 'deadline' | 'review'
 export type TransactionType = 'income' | 'expense'
 export type TransactionStatus = 'pending' | 'paid' | 'overdue'
-export type ContractStatus = 'draft' | 'signed' | 'active' | 'terminated'
+export type ContractStatus = 'draft' | 'awaiting_signature' | 'signed' | 'active' | 'terminated'
 export type GoalCategory = 'revenue' | 'clients' | 'projects'
 
 export interface Profile {
@@ -24,6 +24,8 @@ export interface Profile {
   pix_key: string | null
   /** QR Code Pix, guardado como data URL de imagem. */
   pix_qr_image: string | null
+  /** Sua assinatura (PNG em data URL), usada nas propostas e nos contratos. */
+  signature_image?: string | null
   created_at: string
 }
 
@@ -209,6 +211,18 @@ export interface Contract {
   term_months?: number | null
   /** Vencimento da primeira mensalidade; vazio = um mês após a assinatura. */
   first_due_date?: string | null
+  /** Token do link público de assinatura; vazio enquanto o link não foi gerado. */
+  share_token?: string | null
+  signed_at?: string | null
+  signer_name?: string | null
+  signer_document?: string | null
+  /** Assinatura desenhada pelo cliente (PNG em data URL), quando assinou pelo link. */
+  signature_image?: string | null
+  /** `link` = assinou pela página pública; `manual` = cópia assinada recebida por fora. */
+  signature_method?: 'link' | 'manual' | null
+  signature_ip?: string | null
+  signature_user_agent?: string | null
+  signature_hash?: string | null
   created_at: string
 }
 

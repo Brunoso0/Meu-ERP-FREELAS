@@ -102,6 +102,7 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
     phone,
     pix_key: text.max(140, 'Chave muito longa'),
     pix_qr_image: text.refine((v) => v === '' || v.startsWith('data:image/'), 'Imagem inválida'),
+    signature_image: text.refine((v) => v === '' || (v.startsWith('data:image/png;base64,') && v.length <= 200000), 'Assinatura inválida'),
   }),
 }
 
@@ -195,6 +196,7 @@ export function GlobalModals() {
       { name: 'email', label: 'E-mail de contato', type: 'email', full: true },
       { name: 'pix_key', label: 'Chave Pix (para receber)', placeholder: 'CPF/CNPJ, e-mail, telefone ou chave aleatória', full: true },
       { name: 'pix_qr_image', label: 'QR Code Pix', type: 'image', hint: 'Imagem do QR Code gerado no app do seu banco. Aparece nos orçamentos.' },
+      { name: 'signature_image', label: 'Sua assinatura', type: 'signature', hint: 'Sai no campo do emitente das propostas e dos contratos, inclusive nos links enviados para o cliente assinar.' },
     ],
   }
 

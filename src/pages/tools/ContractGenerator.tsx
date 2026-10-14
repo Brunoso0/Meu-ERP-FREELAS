@@ -1,17 +1,21 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useForm, type UseFormRegisterReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Download, Lock, Repeat, Save, ScrollText } from 'lucide-react'
+import { Copy, Download, Eye, Lock, MessageCircle, PenLine, Repeat, Save, ScrollText } from 'lucide-react'
+import { ContractMarkdown } from '@/components/contracts/ContractMarkdown'
 import { confirm } from '@/components/ui/confirm'
+import { Sheet } from '@/components/ui/overlays'
 import { Pager, usePagination } from '@/components/ui/Pagination'
-import { Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from '@/components/ui/primitives'
+import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from '@/components/ui/primitives'
 import { useInsert, useRemove, useTable, useUpdate } from '@/hooks/useData'
-import { buildContractMarkdown, contractClauses, defaultClauses, serviceKinds } from '@/lib/contract'
+import { buildContractMarkdown, contractClauses, contractSignatures, defaultClauses, serviceKinds } from '@/lib/contract'
 import { contractStatus, proposalStatus, toOptions } from '@/lib/labels'
+import { whatsappUrl } from '@/lib/leads'
 import { downloadContractPdf } from '@/lib/pdf'
+import { signatureLink } from '@/lib/proposal-share'
 import { MAX_INSTALLMENTS } from '@/lib/recurrence'
 import { cn, formatCurrency, formatDate, formatProposalNumber, isoDay } from '@/lib/utils'
 import type { Contract, ContractStatus } from '@/types/database.types'
@@ -73,23 +77,6 @@ const accepted = (status: string) => status === 'approved' || status === 'signed
 // prazo único e vigência mensal descrevem modelos de contrato diferentes
 const exclusive: Record<string, string> = { term: 'recurring', recurring: 'term' }
 
-/** Renderiza o markdown simples do contrato (#, ##, parágrafos, **negrito**). */
-function Markdown({ source }: { source: string }) {
-  const bold = (text: string) =>
-    text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : <Fragment key={i}>{part}</Fragment>))
-  return (
-    <>
-      {source.split('\n').map((raw, i) => {
-        const line = raw.trim()
-        if (!line) return null
-        if (line.startsWith('# ')) return <h2 key={i} className="mb-6 text-center text-xl font-semibold tracking-tight">{line.slice(2)}</h2>
-        if (line.startsWith('## ')) return <h3 key={i} className="mb-1.5 mt-6 text-sm font-semibold">{line.slice(3)}</h3>
-        return <p key={i} className="mb-2.5 text-justify">{bold(line)}</p>
-      })}
-    </>
-  )
-}
-
 function Check({ checked, disabled, onChange, label }: { checked: boolean; disabled?: boolean; onChange: () => void; label: string }) {
   return (
     <input
@@ -117,6 +104,8 @@ export default function ContractGenerator() {
   const [clauses, setClauses] = useState<string[]>(defaultClauses)
   const [services, setServices] = useState<string[]>(['maintenance', 'data'])
   const saved = usePagination(contracts.data)
+  // contrato cujo link de assinatura está aberto no diálogo
+  const [sharing, setSharing] = useState<Contract | null>(null)
 
   const {
     register,
@@ -236,7 +225,7 @@ export default function ContractGenerator() {
   })
 
   const download = guard((v) => {
-    if (recurrenceReady(v)) downloadContractPdf(v.title, markdown, issuer)
+    if (recurrenceReady(v)) downloadContractPdf(v.title, markdown, issuer, contractSignatures(null, profile))
   })
 
   /**
@@ -245,7 +234,12 @@ export default function ContractGenerator() {
    */
   const changeStatus = async (contract: Contract, status: ContractStatus) => {
     try {
-      await update.mutateAsync({ id: contract.id, patch: { status } })
+      // marcado como assinado por aqui = o cliente devolveu a cópia assinada por fora do sistema
+      const manual: Partial<Contract> =
+        status === 'signed' && !contract.signed_at
+          ? { signed_at: new Date().toISOString(), signature_method: 'manual', signer_name: clients.data?.find((c) => c.id === contract.client_id)?.name ?? null }
+          : {}
+      await update.mutateAsync({ id: contract.id, patch: { status, ...manual } })
     } catch {
       return // toast de erro já exibido pelo hook
     }
@@ -267,6 +261,33 @@ export default function ContractGenerator() {
       // toast de erro já exibido pelo hook
     }
   }
+
+  /** Gera o link (uma vez) e deixa o contrato aguardando a assinatura do cliente. */
+  const openSignature = async (contract: Contract) => {
+    if (contract.share_token && contract.status !== 'draft') return setSharing(contract)
+    try {
+      setSharing(await update.mutateAsync({ id: contract.id, patch: { share_token: contract.share_token ?? crypto.randomUUID(), status: 'awaiting_signature' } }))
+    } catch {
+      // toast de erro já exibido pelo hook
+    }
+  }
+
+  const copyLink = async (link: string) => {
+    try {
+      await navigator.clipboard.writeText(link)
+      toast.success('Link copiado')
+    } catch {
+      toast.error('Não foi possível copiar', { description: 'Selecione o link e copie manualmente.' })
+    }
+  }
+
+  // dados sempre atuais do contrato do diálogo (o status muda quando o cliente assina)
+  const shared = sharing ? contracts.data?.find((c) => c.id === sharing.id) ?? sharing : null
+  const sharedLink = shared?.share_token ? signatureLink(shared.share_token, 'contract') : ''
+  const sharedClient = clients.data?.find((c) => c.id === shared?.client_id)
+  const sharedWhatsapp = shared
+    ? whatsappUrl(sharedClient?.phone ?? null, `Olá${sharedClient?.name ? `, ${sharedClient.name.split(' ')[0]}` : ''}! Segue o contrato (${shared.title}) para leitura e assinatura: ${sharedLink}`)
+    : null
 
   const paramInput = (reg: UseFormRegisterReturn, label: string, error: string | undefined, step?: string) => (
     <Field key={reg.name} label={label} error={error} className="w-full sm:w-44">
@@ -437,6 +458,7 @@ export default function ContractGenerator() {
                         <p className="truncate text-sm font-medium">{c.title}</p>
                         <p className="tabular flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                           {formatDate(c.created_at)}
+                          {c.signed_at && <span>· assinado em {formatDate(c.signed_at)}{c.signature_method === 'link' ? ' pelo link' : ''}</span>}
                           {c.monthly_amount && c.term_months ? (
                             <>
                               <Repeat className="h-3 w-3" aria-hidden />
@@ -449,15 +471,21 @@ export default function ContractGenerator() {
                         aria-label="Alterar status"
                         value={c.status}
                         onChange={(e) => changeStatus(c, e.target.value as ContractStatus)}
-                        className="h-8 w-28 text-xs"
+                        className="h-8 w-40 text-xs"
                       >
-                        {toOptions(contractStatus).map((o) => (
+                        {/* "assinatura pendente" só entra pelo botão de assinatura, que gera o link */}
+                        {toOptions(contractStatus).filter((o) => o.value !== 'awaiting_signature' || c.status === 'awaiting_signature').map((o) => (
                           <option key={o.value} value={o.value}>
                             {o.label}
                           </option>
                         ))}
                       </Select>
-                      <Button variant="ghost" size="icon" aria-label="Baixar PDF" className="h-8 w-8" onClick={() => downloadContractPdf(c.title, c.content_markdown, issuer)}>
+                      {(c.status === 'draft' || c.status === 'awaiting_signature' || c.signature_method === 'link') && (
+                        <Button variant="ghost" size="icon" aria-label={c.status === 'draft' ? 'Enviar para assinatura' : 'Link de assinatura'} title={c.status === 'draft' ? 'Enviar para assinatura' : 'Link de assinatura'} className="h-8 w-8" onClick={() => openSignature(c)}>
+                          <PenLine className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="icon" aria-label="Baixar PDF" className="h-8 w-8" onClick={() => downloadContractPdf(c.title, c.content_markdown, issuer, contractSignatures(c, profile))}>
                         <Download className="h-4 w-4" />
                       </Button>
                       <Button
@@ -485,11 +513,56 @@ export default function ContractGenerator() {
           <div className="max-h-[calc(100vh-8rem)] overflow-auto rounded-xl border bg-slate-100 p-4 dark:bg-slate-950">
             {/* folha sempre clara: é o documento que vai para impressão */}
             <article className="mx-auto aspect-[210/297] w-full max-w-[794px] bg-white px-[8%] py-[7%] text-[13px] leading-relaxed text-slate-900 shadow-sm">
-              <Markdown source={markdown} />
+              <ContractMarkdown source={markdown} signatures={contractSignatures(null, profile)} />
             </article>
           </div>
         </div>
       </div>
+
+      <Sheet open={sharing !== null} onClose={() => setSharing(null)} variant="modal" title="Link de assinatura" description={shared?.title}>
+        {shared && (
+          <div className="space-y-4 px-5 py-5">
+            <div className="flex items-center gap-2">
+              <Badge tone={contractStatus[shared.status].tone}>{contractStatus[shared.status].label}</Badge>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {shared.signed_at ? `Assinado em ${formatDate(shared.signed_at)}` : 'O cliente abre o link, lê o contrato e assina na própria página, sem precisar de cadastro.'}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <Input readOnly value={sharedLink} aria-label="Link de assinatura" onFocus={(e) => e.target.select()} className="tabular text-xs" />
+              <Button variant="secondary" onClick={() => copyLink(sharedLink)} className="shrink-0">
+                <Copy className="h-4 w-4" /> Copiar
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {sharedWhatsapp ? (
+                <a
+                  href={sharedWhatsapp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <MessageCircle className="h-4 w-4" /> Enviar pelo WhatsApp
+                </a>
+              ) : (
+                <span className="text-xs text-slate-500 dark:text-slate-400">Cadastre o WhatsApp do cliente para enviar o link direto por lá.</span>
+              )}
+              <a
+                href={sharedLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+              >
+                <Eye className="h-4 w-4" /> Ver como o cliente
+              </a>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Quem tiver este link consegue ler o contrato. Envie só para o cliente. Voltar o contrato para rascunho ou encerrá-lo desativa o link.
+              {shared.monthly_amount ? ' Ao ser assinado, as mensalidades entram sozinhas no financeiro.' : ''}
+            </p>
+          </div>
+        )}
+      </Sheet>
     </>
   )
 }

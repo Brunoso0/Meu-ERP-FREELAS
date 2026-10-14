@@ -23,6 +23,7 @@ const ProposalGenerator = lazy(() => import('@/pages/tools/ProposalGenerator'))
 const ContractGenerator = lazy(() => import('@/pages/tools/ContractGenerator'))
 const LeadFinder = lazy(() => import('@/pages/tools/LeadFinder'))
 const PublicProposal = lazy(() => import('@/pages/PublicProposal'))
+const PublicContract = lazy(() => import('@/pages/PublicContract'))
 
 export default function App() {
   const theme = useUI((s) => s.theme)
@@ -53,6 +54,7 @@ export default function App() {
       {isPublicPage ? (
         <Suspense fallback={null}>
           <Routes>
+            <Route path="assinar/contrato/:token" element={<PublicContract />} />
             <Route path="assinar/:token" element={<PublicProposal />} />
           </Routes>
         </Suspense>

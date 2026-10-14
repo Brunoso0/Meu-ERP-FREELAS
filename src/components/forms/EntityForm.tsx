@@ -1,22 +1,23 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import type { ZodTypeAny } from 'zod'
-import { ImagePlus, Trash2 } from 'lucide-react'
+import { ImagePlus, PenLine, Trash2, Upload } from 'lucide-react'
 import { confirm } from '@/components/ui/confirm'
 import { Sheet } from '@/components/ui/overlays'
 import { Button, Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import { useInsert, useInsertMany, useRemove, useUpdate } from '@/hooks/useData'
-import { imageToDataUrl } from '@/lib/image'
+import { SignaturePad } from '@/components/proposals/SignaturePad'
+import { imageToDataUrl, signatureFromImage } from '@/lib/image'
 import type { TableName } from '@/types/database.types'
 
 export interface FieldDef {
   name: string
   label: string
   /** `image` guarda a imagem como data URL no próprio registro. */
-  type?: 'text' | 'email' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'image'
+  type?: 'text' | 'email' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'image' | 'signature'
   /** Texto de ajuda abaixo do campo. */
   hint?: string
   options?: Array<{ value: string; label: string }>
@@ -107,6 +108,88 @@ function ImageField({ field, value, error, onChange }: { field: FieldDef; value:
   )
 }
 
+/** Assinatura do usuário: desenhada no quadro ou tirada de uma foto da assinatura em papel. */
+function SignatureField({ field, value, error, onChange }: { field: FieldDef; value: string; error?: string; onChange: (value: string) => void }) {
+  const input = useRef<HTMLInputElement>(null)
+  const [drawing, setDrawing] = useState(false)
+  const [draft, setDraft] = useState<string | null>(null)
+
+  const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      onChange(await signatureFromImage(file))
+      setDrawing(false)
+    } catch (err) {
+      toast.error('Imagem não aceita', { description: err instanceof Error ? err.message : undefined })
+    }
+  }
+
+  return (
+    <div className="col-span-2">
+      <span className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">{field.label}</span>
+      <div className="space-y-3 rounded-lg border p-3">
+        {field.hint && <p className="text-xs text-slate-500 dark:text-slate-400">{field.hint}</p>}
+        {drawing ? (
+          <>
+            <SignaturePad onChange={setDraft} />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={!draft}
+                onClick={() => {
+                  if (draft) onChange(draft)
+                  setDrawing(false)
+                  setDraft(null)
+                }}
+              >
+                Usar esta assinatura
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setDrawing(false)
+                  setDraft(null)
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            {value ? (
+              // sempre sobre branco: é como ela aparece no documento
+              <div className="flex h-24 items-center justify-center rounded-md border bg-white p-2">
+                <img src={value} alt="Sua assinatura" className="max-h-full max-w-full object-contain" />
+              </div>
+            ) : (
+              <div className="flex h-24 items-center justify-center rounded-md border border-dashed text-sm text-slate-400">Nenhuma assinatura cadastrada</div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setDrawing(true)}>
+                <PenLine className="h-3.5 w-3.5" /> {value ? 'Desenhar outra' : 'Desenhar assinatura'}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => input.current?.click()}>
+                <Upload className="h-3.5 w-3.5" /> Enviar foto da assinatura
+              </Button>
+              {value && (
+                <Button variant="danger" size="sm" onClick={() => onChange('')}>
+                  Remover
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={pick} aria-label={`${field.label} (arquivo)`} />
+      {error && <span className="mt-1 block text-xs text-red-600 dark:text-red-400">{error}</span>}
+    </div>
+  )
+}
+
 /**
  * Formulário de criação/edição dirigido por configuração: cada entidade
  * declara campos + schema Zod em GlobalModals e este componente cuida de
@@ -172,6 +255,9 @@ export function EntityForm({ open, onClose, noun, title, table, fields: allField
           {fields.map((f) => {
             if (f.showWhen && !f.showWhen(watch())) return null
             const error = errors[f.name]?.message as string | undefined
+            if (f.type === 'signature') {
+              return <SignatureField key={f.name} field={f} value={watch(f.name) ?? ''} error={error} onChange={(v) => setValue(f.name, v, { shouldDirty: true })} />
+            }
             if (f.type === 'image') {
               return <ImageField key={f.name} field={f} value={watch(f.name) ?? ''} error={error} onChange={(v) => setValue(f.name, v, { shouldDirty: true })} />
             }

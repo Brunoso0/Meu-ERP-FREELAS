@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Eraser } from 'lucide-react'
 import { Button } from '@/components/ui/primitives'
+import { cropInk } from '@/lib/image'
 
 const WIDTH = 600
 const HEIGHT = 200
@@ -55,7 +56,8 @@ export function SignaturePad({ onChange }: { onChange: (png: string | null) => v
     if (!drawing.current || !canvas.current) return
     drawing.current = false
     setEmpty(false)
-    onChange(canvas.current.toDataURL('image/png'))
+    // recortada no traço: a assinatura ocupa a imagem toda e não sai miúda no documento
+    onChange(cropInk(canvas.current))
   }
 
   const clear = () => {

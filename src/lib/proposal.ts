@@ -9,7 +9,7 @@ export interface ProposalDoc {
   date: Date
   validUntil: Date
   validityDays: number
-  issuer: { name: string; document: string; email: string; phone: string }
+  issuer: { name: string; document: string; email: string; phone: string; signature: string | null }
   client: { name: string; company: string; document: string; email: string; phone: string }
   scope: string
   deliverables: string[]
@@ -51,6 +51,8 @@ export function buildProposalDoc(
       document: profile?.document ?? '',
       email: profile?.email ?? '',
       phone: profile?.phone ?? '',
+      // só data URL de PNG vira <img>: o valor vem do banco e não pode apontar para outro lugar
+      signature: profile?.signature_image?.startsWith('data:image/png;base64,') ? profile.signature_image : null,
     },
     client: {
       name: client?.name ?? '',

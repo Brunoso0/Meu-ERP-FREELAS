@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf'
+import { signatureEvidence, type ContractSignatures } from '@/components/contracts/ContractMarkdown'
 import { formatDate } from './utils'
 
 const MARGIN = 20
@@ -84,17 +85,54 @@ const fileName = (base: string) =>
     .replace(/[^\w-]+/g, '_')
     .replace(/^_+|_+$/g, '') + '.pdf'
 
-/** Converte o markdown simples dos contratos (#, ##, parágrafos, **negrito**) em PDF. */
-export function downloadContractPdf(title: string, markdown: string, issuer: string) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+const SIGN_HEIGHT = 16
+const SIGN_MAX_WIDTH = 70
+
+/** Desenha a assinatura apoiada na linha, mantendo a proporção da imagem. */
+function drawSignature(doc: jsPDF, image: string | null | undefined, x: number, baseline: number) {
+  if (!image?.startsWith('data:image/png;base64,')) return
+  try {
+    const { width, height } = doc.getImageProperties(image)
+    const scale = Math.min(SIGN_HEIGHT / height, SIGN_MAX_WIDTH / width)
+    doc.addImage(image, 'PNG', x, baseline - height * scale, width * scale, height * scale)
+  } catch {
+    // imagem ilegível: o contrato sai só com a linha, como se fosse assinar à mão
+  }
+}
+
+/**
+ * Converte o markdown simples dos contratos (#, ##, parágrafos, **negrito**) em PDF.
+ * Com `signatures`, as linhas de assinatura do fim recebem a do emitente e a do contratante.
+ */
+export function downloadContractPdf(title: string, markdown: string, issuer: string, signatures?: ContractSignatures) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
   header(doc, issuer, 'CONTRATO', `Gerado em ${formatDate(new Date())}`)
   const w = new Writer(doc)
   w.y = 38
 
-  for (const raw of markdown.split('\n')) {
-    const line = raw.trim()
+  const lines = markdown.split('\n').map((l) => l.trim())
+  for (const [i, line] of lines.entries()) {
     if (!line) continue
     const plain = line.replace(/\*\*/g, '')
+
+    // linha de assinatura: reserva a altura, encaixa a imagem (se houver) e traça a linha
+    if (/^_{5,}$/.test(line)) {
+      const owner = lines.slice(i + 1).find((l) => l) ?? ''
+      // as duas assinaturas ficam juntas: se não couberem, vão as duas para a página seguinte
+      const isFirst = !lines.slice(0, i).some((l) => /^_{5,}$/.test(l))
+      w.ensure(isFirst ? (SIGN_HEIGHT + 22) * 2 : SIGN_HEIGHT + 14)
+      w.y += SIGN_HEIGHT + 4
+      drawSignature(doc, owner.endsWith('(CONTRATADA)') ? signatures?.contractor : owner.endsWith('(CONTRATANTE)') ? signatures?.customer?.image : null, MARGIN, w.y)
+      doc.setDrawColor(100, 116, 139)
+      doc.line(MARGIN, w.y, MARGIN + SIGN_MAX_WIDTH, w.y)
+      w.y += 1
+      continue
+    }
+    if (signatures?.customer && line.endsWith('(CONTRATANTE)') && /^_{5,}$/.test(lines[i - 1] ?? '')) {
+      w.text(plain, { size: 10, gap: 1 })
+      w.text(signatureEvidence(signatures.customer), { size: 7.5, color: SOFT, gap: 2.5 })
+      continue
+    }
     if (line.startsWith('# ')) w.text(plain.slice(2), { size: 15, bold: true, gap: 3 })
     else if (line.startsWith('## ')) {
       w.y += 3

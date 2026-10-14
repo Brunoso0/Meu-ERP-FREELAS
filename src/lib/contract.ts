@@ -1,4 +1,5 @@
-import type { Client, Profile, Proposal } from '@/types/database.types'
+import type { ContractSignatures } from '@/components/contracts/ContractMarkdown'
+import type { Client, Contract, Profile, Proposal } from '@/types/database.types'
 import { formatCurrency, formatDate, formatProposalNumber } from './utils'
 
 export interface ContractParams {
@@ -295,6 +296,27 @@ export const contractClauses: ClauseDef[] = [
 ]
 
 export const defaultClauses = contractClauses.filter((c) => c.recommended).map((c) => c.id)
+
+/** Assinaturas que entram no fim do contrato: a do emitente (perfil) e, se já assinou, a do contratante. */
+export function contractSignatures(
+  contract: Pick<Contract, 'signed_at' | 'signer_name' | 'signer_document' | 'signature_image' | 'signature_method' | 'signature_ip' | 'signature_hash'> | null | undefined,
+  profile: Pick<Profile, 'signature_image'> | null | undefined,
+): ContractSignatures {
+  return {
+    contractor: profile?.signature_image ?? null,
+    customer: contract?.signed_at
+      ? {
+          name: contract.signer_name ?? '',
+          document: contract.signer_document ?? '',
+          signedAt: contract.signed_at,
+          method: contract.signature_method === 'link' ? 'link' : 'manual',
+          image: contract.signature_image ?? null,
+          ip: contract.signature_ip ?? '',
+          hash: contract.signature_hash ?? '',
+        }
+      : null,
+  }
+}
 
 /** Monta o contrato em markdown simples (#, ##, parágrafos, **negrito**). */
 export function buildContractMarkdown(
