@@ -3,14 +3,20 @@ import * as Tabs from '@radix-ui/react-tabs'
 import { addMonths, addQuarters, addYears, endOfMonth, endOfQuarter, endOfYear, format, isBefore, startOfDay, startOfMonth, startOfQuarter, startOfYear } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
-import { Check, ChevronLeft, ChevronRight, Eye, FileText, MoreHorizontal, Paperclip, Pencil, Plus, Wallet } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Ban, Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Eye, FileCheck2, FileText, FileX2, MessageCircle, MoreHorizontal, Paperclip, Pencil, Plus, RefreshCw, Send, Wallet } from 'lucide-react'
 import { FinanceCharts } from '@/components/finance/FinanceCharts'
 import { RecurrenceList } from '@/components/finance/RecurrenceList'
 import { DataTable, type Column } from '@/components/ui/DataTable'
-import { Dropdown, DropdownContent, DropdownItem, DropdownTrigger } from '@/components/ui/overlays'
+import { confirm } from '@/components/ui/confirm'
+import { Dropdown, DropdownContent, DropdownItem, DropdownSeparator, DropdownTrigger } from '@/components/ui/overlays'
 import { Badge, Button, Card, EmptyState, PageHeader, Segmented, Skeleton } from '@/components/ui/primitives'
 import { useTable, useUpdate } from '@/hooks/useData'
-import { resolveProofUrl, uploadProof } from '@/lib/db'
+import { useNavigate } from 'react-router-dom'
+import { cancelCharge, cancelInvoice, chargeMessage, createCharge, gatewayStatusOf, hasOpenCharge, overdueSuggestion, refreshCharge, refreshInvoice, usesGateway } from '@/lib/billing'
+import { canIssueInvoice, nfseStatus } from '@/lib/nfse'
+import { resolveProofUrl, updateRow, uploadProof } from '@/lib/db'
+import { whatsappUrl } from '@/lib/leads'
 import { transactionStatus } from '@/lib/labels'
 import { cn, formatCurrency, formatDate, isoDay, sum, toDate } from '@/lib/utils'
 import { useUI } from '@/store/ui'
@@ -58,6 +64,11 @@ export default function Finance() {
   const clients = useTable('clients')
   const projects = useTable('projects')
   const update = useUpdate('financial_transactions')
+  const profile = useTable('profiles').data?.[0]
+  const gateway = usesGateway(profile)
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+  const openInvoice = (t: FinancialTransaction) => navigate('/ferramentas/nota-fiscal', { state: { transactionId: t.id } })
   const [tab, setTab] = useState<Tab>('income')
   const [period, setPeriod] = useState<Period>('month')
   const [cursor, setCursor] = useState(() => new Date())
@@ -100,6 +111,67 @@ export default function Finance() {
 
   const markPaid = (t: FinancialTransaction) =>
     update.mutate({ id: t.id, patch: { status: 'paid', payment_date: isoDay(new Date()) } }, { onSuccess: () => toast.success('Marcado como pago') })
+
+  /** Ação de cobrança no gateway com aviso de andamento, sucesso e erro. */
+  const charge = async (label: string, run: () => Promise<unknown>, done: string) => {
+    const id = toast.loading(label)
+    try {
+      const result = (await run()) as { pixWarning?: string | null } | undefined
+      if (result?.pixWarning) toast.warning(`${done}, sem o QR Code Pix`, { id, description: result.pixWarning, duration: 15000 })
+      else toast.success(done, { id })
+    } catch (error) {
+      toast.error('Não deu certo', { id, description: error instanceof Error ? error.message : undefined })
+    }
+    await qc.invalidateQueries({ queryKey: ['financial_transactions'] })
+    await qc.invalidateQueries({ queryKey: ['quotes'] })
+  }
+
+  const copy = async (text: string, done: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(done)
+    } catch {
+      toast.error('Não foi possível copiar')
+    }
+  }
+
+  const clientOf = (t: FinancialTransaction) => clients.data?.find((x) => x.id === t.client_id)
+  const issuer = profile?.company_name || profile?.full_name || ''
+
+  const generate = async (t: FinancialTransaction) => {
+    const newDue = overdueSuggestion(t)
+    if (newDue) {
+      const ok = await confirm({
+        title: 'O vencimento já passou',
+        description: `Este lançamento vencia em ${formatDate(t.due_date)}, e o Asaas não aceita cobrança com data no passado. Gerar a cobrança com vencimento em ${formatDate(newDue)}? A data do lançamento também muda.`,
+        confirmLabel: 'Gerar com a nova data',
+        tone: 'default',
+      })
+      if (!ok) return
+      await updateRow('financial_transactions', t.id, { due_date: newDue })
+    }
+    charge('Gerando a cobrança no Asaas…', () => createCharge(t.id), 'Cobrança gerada no Asaas')
+  }
+
+  const cancelNfse = async (t: FinancialTransaction) => {
+    const ok = await confirm({
+      title: `Cancelar a nota fiscal${t.nfse_number ? ` nº ${t.nfse_number}` : ''}?`,
+      description: 'O pedido de cancelamento vai para o Portal Nacional da NFS-e, que pode recusar (por exemplo, fora do prazo de cancelamento). O recebimento continua pago.',
+      confirmLabel: 'Cancelar nota',
+      cancelLabel: 'Voltar',
+    })
+    if (ok) charge('Pedindo o cancelamento da nota…', () => cancelInvoice(t.id), 'Cancelamento da nota solicitado')
+  }
+
+  const cancel = async (t: FinancialTransaction) => {
+    const ok = await confirm({
+      title: 'Cancelar a cobrança no Asaas?',
+      description: 'O link de pagamento deixa de funcionar e o cliente não consegue mais pagar por ele. O lançamento continua aqui, pendente, e você pode gerar outra cobrança depois.',
+      confirmLabel: 'Cancelar cobrança',
+      cancelLabel: 'Voltar',
+    })
+    if (ok) charge('Cancelando a cobrança…', () => cancelCharge(t.id), 'Cobrança cancelada no Asaas')
+  }
 
   const pickFile = (id: string, field: Attachment) => {
     uploadTarget.current = { id, field }
@@ -150,9 +222,13 @@ export default function Finance() {
   const invoiceColumn: Column<FinancialTransaction> = {
     header: 'Nota fiscal',
     cell: (t) =>
-      t.invoice_url ? (
+      t.nfse_status && t.nfse_status !== 'AUTHORIZED' && t.nfse_status !== 'CANCELED' ? (
+        <span className={cn('text-xs font-medium', t.nfse_status === 'ERROR' || t.nfse_status === 'CANCELLATION_DENIED' ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400')} title={t.nfse_error ?? undefined}>
+          {nfseStatus[t.nfse_status]?.label ?? t.nfse_status}
+        </span>
+      ) : t.invoice_url ? (
         <button type="button" onClick={() => viewFile(t.invoice_url)} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
-          <FileText className="h-3.5 w-3.5" /> Ver
+          <FileText className="h-3.5 w-3.5" /> {t.nfse_number ? `nº ${t.nfse_number}` : 'Ver'}
         </button>
       ) : (
         <button type="button" onClick={() => pickFile(t.id, 'invoice_url')} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
@@ -186,7 +262,17 @@ export default function Finance() {
       header: 'Situação',
       cell: (t) => {
         const s = effectiveStatus(t)
-        return <Badge tone={transactionStatus[s].tone}>{transactionStatus[s].label}</Badge>
+        const g = gatewayStatusOf(t.gateway_status)
+        return (
+          <div className="flex flex-col items-end gap-1 md:items-start">
+            <Badge tone={transactionStatus[s].tone}>{transactionStatus[s].label}</Badge>
+            {t.gateway_charge_id && g && (
+              <span className="text-[11px] leading-tight text-slate-500 dark:text-slate-400" title={`Cobrança ${t.gateway_charge_id} no Asaas`}>
+                Asaas{t.gateway_env === 'sandbox' ? ' (teste)' : ''}: {g.label}
+              </span>
+            )}
+          </div>
+        )
       },
     },
     {
@@ -214,12 +300,31 @@ export default function Finance() {
             </Button>
           </DropdownTrigger>
           <DropdownContent>
-            {t.status !== 'paid' && <DropdownItem icon={Check} onSelect={() => markPaid(t)}>Marcar como pago</DropdownItem>}
+            {t.type === 'income' && gateway && t.status !== 'paid' && !t.gateway_charge_id && (
+              <DropdownItem icon={Send} onSelect={() => generate(t)}>Gerar cobrança no Asaas</DropdownItem>
+            )}
+            {t.gateway_invoice_url && (
+              <>
+                <DropdownItem icon={ExternalLink} onSelect={() => window.open(t.gateway_invoice_url!, '_blank', 'noopener')}>Abrir página de pagamento</DropdownItem>
+                {hasOpenCharge(t) && <DropdownItem icon={Copy} onSelect={() => copy(t.gateway_invoice_url!, 'Link de pagamento copiado')}>Copiar link de pagamento</DropdownItem>}
+                {hasOpenCharge(t) && t.gateway_pix_payload && <DropdownItem icon={Copy} onSelect={() => copy(t.gateway_pix_payload!, 'Pix copia e cola copiado')}>Copiar Pix copia e cola</DropdownItem>}
+                {hasOpenCharge(t) && clientOf(t)?.phone && (
+                  <DropdownItem icon={MessageCircle} onSelect={() => window.open(whatsappUrl(clientOf(t)!.phone, chargeMessage(t, issuer)) ?? undefined, '_blank', 'noopener')}>Enviar link pelo WhatsApp</DropdownItem>
+                )}
+              </>
+            )}
+            {t.gateway_charge_id && <DropdownItem icon={RefreshCw} onSelect={() => charge('Consultando o Asaas…', () => refreshCharge(t.id), 'Situação atualizada')}>Atualizar situação</DropdownItem>}
+            {hasOpenCharge(t) && <DropdownItem icon={Ban} danger onSelect={() => cancel(t)}>Cancelar cobrança</DropdownItem>}
+            {(t.gateway_charge_id || (t.type === 'income' && gateway && t.status !== 'paid')) && <DropdownSeparator />}
+            {t.status !== 'paid' && <DropdownItem icon={Check} onSelect={() => markPaid(t)}>{hasOpenCharge(t) ? 'Marcar como pago (recebido por fora)' : 'Marcar como pago'}</DropdownItem>}
             <DropdownItem icon={Paperclip} onSelect={() => pickFile(t.id, 'proof_url')}>{t.proof_url ? 'Trocar comprovante' : 'Anexar comprovante'}</DropdownItem>
             {t.proof_url && <DropdownItem icon={Eye} onSelect={() => viewFile(t.proof_url)}>Ver comprovante</DropdownItem>}
-            {t.type === 'income' && <DropdownItem icon={FileText} onSelect={() => pickFile(t.id, 'invoice_url')}>{t.invoice_url ? 'Trocar nota fiscal' : 'Anexar nota fiscal'}</DropdownItem>}
+            {gateway && canIssueInvoice(t) && <DropdownItem icon={FileCheck2} onSelect={() => openInvoice(t)}>{t.nfse_status === 'ERROR' ? 'Emitir nota fiscal de novo' : 'Emitir nota fiscal'}</DropdownItem>}
+            {t.nfse_id && <DropdownItem icon={RefreshCw} onSelect={() => charge('Consultando a nota no Asaas…', () => refreshInvoice(t.id), 'Nota fiscal atualizada')}>Atualizar nota fiscal</DropdownItem>}
+            {t.nfse_status === 'AUTHORIZED' && <DropdownItem icon={FileX2} danger onSelect={() => cancelNfse(t)}>Cancelar nota fiscal</DropdownItem>}
+            {t.type === 'income' && !t.nfse_id && <DropdownItem icon={FileText} onSelect={() => pickFile(t.id, 'invoice_url')}>{t.invoice_url ? 'Trocar nota fiscal' : 'Anexar nota fiscal'}</DropdownItem>}
             {t.type === 'income' && t.invoice_url && <DropdownItem icon={Eye} onSelect={() => viewFile(t.invoice_url)}>Ver nota fiscal</DropdownItem>}
-            {t.type === 'income' && t.invoice_url && <DropdownItem icon={FileText} onSelect={() => update.mutate({ id: t.id, patch: { invoice_url: null } }, { onSuccess: () => toast.success('Nota fiscal removida') })}>Remover nota fiscal</DropdownItem>}
+            {t.type === 'income' && t.invoice_url && !t.nfse_id && <DropdownItem icon={FileText} onSelect={() => update.mutate({ id: t.id, patch: { invoice_url: null } }, { onSuccess: () => toast.success('Nota fiscal removida') })}>Remover nota fiscal</DropdownItem>}
             <DropdownItem icon={Pencil} onSelect={() => openModal({ type: 'transaction', record: t })}>Editar</DropdownItem>
           </DropdownContent>
         </Dropdown>

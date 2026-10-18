@@ -73,6 +73,9 @@ No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase
 8. `008_quote_deposit.sql` permite orçamento com entrada + saldo e a situação "parcialmente pago".
 9. `009_proposal_signature.sql` cria o link público de assinatura da proposta e os status "assinatura pendente" e "assinado".
 10. `010_contract_signature.sql` cria o link de assinatura do contrato e guarda a sua assinatura no perfil.
+11. `011_billing_gateway.sql` adiciona a forma de cobrança (Pix simples ou Asaas) e guarda a chave do gateway cifrada no Vault.
+12. `012_nfse.sql` adiciona a nota fiscal de serviço (NFS-e) emitida pelo Asaas e o catálogo de serviços do MEI.
+13. `013_nfse_regime.sql` guarda o regime tributário da nota (MEI, Simples Nacional ou fora dele) e as alíquotas da última nota.
 
 #### Busca de leads (opcional)
 
@@ -83,6 +86,16 @@ A Busca de Leads usa o Gemini por meio de uma função do Supabase, para a chave
 3. Em **Edge Functions → Secrets**, cadastre `GEMINI_API_KEY` com a sua chave. Opcional: `GEMINI_MODEL` para trocar o modelo (padrão `gemini-2.5-flash`).
 
 A função só responde a quem está logado no app. A busca no Google Maps pelo Gemini é cobrada pelo Google conforme o plano da sua chave; se ela não estiver disponível, a função cai para a busca comum do Google, menos precisa. Os dados vêm de uma IA: confira o perfil da empresa antes de entrar em contato.
+
+#### Cobrança pelo Asaas (opcional)
+
+Com o Asaas, cada recebimento vira uma cobrança com vencimento, multa e juros, e o lançamento é baixado sozinho quando o cliente paga.
+
+1. Rode a migração `011_billing_gateway.sql` (ela usa o Vault do Supabase para guardar a chave cifrada).
+2. Em **Edge Functions**, crie uma função chamada `billing` com o conteúdo de [`supabase/functions/billing/index.ts`](supabase/functions/billing/index.ts) e **desligue "Verify JWT"** (o Asaas não manda JWT; a função confere o usuário e o token do webhook por conta própria). Não precisa cadastrar segredo.
+3. No Asaas, em **Integrações → Chaves de API**, gere uma chave. No app, abra **Minha empresa → Forma de cobrança**, escolha Asaas, cole a chave e clique em Conectar. O app confere a chave e cria sozinho o webhook que avisa os pagamentos.
+
+Para testar sem dinheiro de verdade, crie uma conta no Sandbox do Asaas e conecte com o ambiente "Sandbox (testes)". Não ative a lista de IPs permitidos em Integrações → Segurança: as funções do Supabase não têm IP fixo.
 
 O editor vai avisar que a consulta tem "operações destrutivas". Num projeto novo pode confirmar: os scripts só removem versões anteriores dos próprios objetos que criam.
 
@@ -175,6 +188,24 @@ Algumas regras que ajudam a entender os números:
 - A **margem do projeto** é o valor cobrado nas demandas menos as despesas que você lançou no financeiro ligadas àquele projeto.
 - O progresso das **metas** é medido pelo sistema (recebimentos pagos, clientes ou projetos criados no período) somado ao valor manual que você informar.
 - Todas as listas mostram **10 itens por página**.
+
+### Cobrança pelo Asaas
+
+- Em **Minha empresa → Forma de cobrança**, escolha entre **Simples** (chave Pix e QR Code fixo, baixa manual) e **Asaas** (cobrança com vencimento, multa, juros, desconto e baixa automática). Dá para voltar para o simples quando quiser.
+- No Asaas, defina a multa (para pessoa física a lei limita a 2%), os juros ao mês, o desconto para pagamento antecipado, as formas aceitas (Pix, boleto, cartão ou o cliente escolhe) e se o Asaas avisa o cliente por e-mail e SMS.
+- **Gerar cobrança:** no Financeiro (menu ⋯ de um recebimento) ou no Gerador de Orçamentos. O cliente precisa ter CPF/CNPJ cadastrado e o vencimento não pode estar no passado. Depois dá para copiar o link, copiar o Pix copia e cola, mandar pelo WhatsApp, atualizar a situação ou cancelar.
+- O PDF do orçamento passa a trazer o QR Code Pix da própria cobrança (que já calcula multa e juros se pago com atraso), o link de pagamento e as regras de atraso.
+- Quando o cliente paga, o lançamento vira **pago** sozinho (e o orçamento junto). Se você marcar como pago à mão (dinheiro, transferência), o app dá baixa no Asaas como "recebido por fora", para o cliente não pagar de novo; desfazer reabre a cobrança. Pagamento recebido pelo Asaas só pode ser estornado no painel do Asaas.
+- Mudar o valor ou o vencimento de um lançamento atualiza a cobrança. Excluir um lançamento (ou encerrar a recorrência, ou excluir o orçamento) cancela a cobrança aberta antes; se o Asaas recusar, nada é excluído.
+- As taxas são as do seu plano no Asaas; o valor líquido de cada cobrança fica registrado.
+
+### Nota fiscal (NFS-e) pelo Asaas
+
+- **Antes da primeira nota:** no Asaas, em **Notas Fiscais → Configurações → Informações Fiscais**, ative "Emito NFS-e pelo Portal Nacional", informe se a empresa é optante pelo Simples Nacional e faça o cadastro pedido. No app, em **Minha empresa → Nota fiscal**, use "Usar os serviços dos meus CNAEs" (o código de tributação nacional de cada serviço pode ser buscado na tabela dentro do próprio gerador).
+- **Emitir:** em **Ferramentas → Gerador de Notas Fiscais**, nas mesmas etapas do Emissor Nacional: **Pessoas** (o recebimento pago de origem, emitente com a situação no Simples lida do Asaas, tomador), **Serviço** (serviço do catálogo, código de tributação nacional com busca na tabela, NBS se a prefeitura exigir, descrição montada pelas opções ou escrita à mão), **Valores** (regime: MEI, ME/EPP do Simples ou fora do Simples; alíquota do ISS, ISS retido, deduções e retenções federais conforme o regime) e **Emitir NFS-e**. A prévia ao lado mostra a nota como vai sair. Se o regime escolhido não bater com o cadastrado no Asaas, a emissão fica bloqueada até corrigir. Embaixo fica a lista das notas emitidas, com PDF, atualização e cancelamento. No Financeiro e no Gerador de Orçamentos, "Emitir nota fiscal" abre o gerador com aquele recebimento já escolhido.
+- Descreva só o serviço que a empresa prestou, dentro dos seus CNAEs; trabalho feito como pessoa física não entra. No MEI, o ISS já vai no DAS e a nota sai sem retenções; nos outros regimes, o ISS e as retenções saem na nota.
+- Quando a nota é autorizada, o PDF entra sozinho no campo "Nota fiscal" do lançamento. Se for recusada, o motivo aparece no lançamento e dá para emitir de novo. Dá para cancelar pelo menu (o Portal pode recusar fora do prazo). Recebimento com nota emitida não pode ser excluído antes de cancelar a nota.
+- O Asaas cobra por nota emitida, conforme o seu plano.
 
 ### No celular
 

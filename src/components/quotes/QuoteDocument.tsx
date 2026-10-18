@@ -123,8 +123,45 @@ export function QuoteDocument({ doc, className }: { doc: QuoteDoc; className?: s
               </div>
             )}
 
+            {/* cobrança pelo Asaas: QR e link da própria cobrança, com as regras de atraso */}
+            {doc.gateway && (
+              <div className="pd-pix-card">
+                {doc.gateway.pixImage && (
+                  <div className="pd-pix-qr">
+                    <img src={doc.gateway.pixImage} alt="QR Code Pix para pagamento" />
+                  </div>
+                )}
+                <div className="pd-pix-info">
+                  <h3>Pagamento</h3>
+                  {doc.split.length > 0 && <p className="pd-pix-due">{doc.due.label}</p>}
+                  <p className="pd-pix-total">{formatCurrency(doc.due.amount)}</p>
+                  {doc.gateway.dueDate && <p className="pd-pix-key">Vencimento: <strong>{formatDate(doc.gateway.dueDate)}</strong></p>}
+                  {doc.gateway.url ? (
+                    <ol>
+                      {doc.gateway.pixImage && <li>Pague por Pix lendo o QR Code ao lado no app do seu banco.</li>}
+                      <li>
+                        Ou acesse <strong className="pd-pay-link">{doc.gateway.url}</strong> e escolha como pagar.
+                      </li>
+                      <li>A confirmação é automática: não precisa enviar comprovante.</li>
+                    </ol>
+                  ) : (
+                    <p className="pd-pix-key">O link de pagamento (Pix, boleto ou cartão) é enviado junto com este orçamento.</p>
+                  )}
+                  <p className="pd-pay-rules">
+                    {[
+                      doc.gateway.discount && `Desconto de ${doc.gateway.discount.pct}% para pagamento ${doc.gateway.discount.days ? `até ${doc.gateway.discount.days} dia(s) antes do vencimento` : 'até o vencimento'}.`,
+                      (doc.gateway.fine > 0 || doc.gateway.interest > 0) &&
+                        `Após o vencimento: ${[doc.gateway.fine > 0 && `multa de ${doc.gateway.fine}%`, doc.gateway.interest > 0 && `juros de ${doc.gateway.interest}% ao mês`].filter(Boolean).join(' e ')}.`,
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Pix vem do perfil (Minha empresa): com QR, com chave, ou os dois */}
-            {(doc.pix.qr || doc.pix.key) && (
+            {!doc.gateway && (doc.pix.qr || doc.pix.key) && (
               <div className="pd-pix-card">
                 {doc.pix.qr && (
                   // QR sempre sobre branco, com margem: é o que garante a leitura pela câmera

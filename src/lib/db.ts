@@ -140,8 +140,29 @@ export async function deleteRow<T extends TableName>(table: T, id: string): Prom
     persist()
     return
   }
+  if (table === 'financial_transactions') await cancelOpenCharge(id)
   const { error } = await supabase.from(table).delete().eq('id', id)
   fail(error)
+}
+
+/**
+ * Lançamento com cobrança aberta no gateway não pode sumir daqui deixando a
+ * cobrança valendo lá (o cliente ainda conseguiria pagar). Todo caminho de
+ * exclusão passa por deleteRow, então a trava fica aqui: cancela no gateway
+ * primeiro e, se não der, não exclui.
+ */
+async function cancelOpenCharge(id: string) {
+  if (!supabase) return
+  const { data } = await supabase.from('financial_transactions').select('gateway_charge_id, status, nfse_status').eq('id', id).maybeSingle()
+  if (data?.nfse_status === 'AUTHORIZED' || data?.nfse_status === 'SCHEDULED' || data?.nfse_status === 'SYNCHRONIZED') {
+    throw new Error('Este recebimento tem nota fiscal emitida. Cancele a nota antes de excluir o lançamento.')
+  }
+  if (!data?.gateway_charge_id || data.status === 'paid') return
+  const { error } = await supabase.functions.invoke('billing', { body: { action: 'cancel-charge', transactionId: id } })
+  if (error) {
+    const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
+    throw new Error(`A cobrança no Asaas não foi cancelada, então o lançamento não foi excluído. ${detail?.message ?? error.message}`)
+  }
 }
 
 /** Envia o comprovante e devolve o valor a gravar em `proof_url`. */

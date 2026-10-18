@@ -4,7 +4,10 @@ import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Check, Download, MoreHorizontal, Pencil, Plus, QrCode, Save, Trash2, Undo2 } from 'lucide-react'
+import { Check, Copy, Download, FileCheck2, MoreHorizontal, Pencil, Plus, QrCode, Save, Send, Trash2, Undo2 } from 'lucide-react'
+import { useBillingConnection } from '@/components/billing/GatewayConnection'
+import { useNavigate } from 'react-router-dom'
+import { canIssueInvoice, nfseStatus } from '@/lib/nfse'
 import { PrintPortal } from '@/components/proposals/PrintPortal'
 import { QuoteDocument } from '@/components/quotes/QuoteDocument'
 import { confirm } from '@/components/ui/confirm'
@@ -13,6 +16,8 @@ import { Dropdown, DropdownContent, DropdownItem, DropdownSeparator, DropdownTri
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from '@/components/ui/primitives'
 import { useInsert, useRemove, useTable, useUpdate } from '@/hooks/useData'
 import { itemsTotal } from '@/lib/proposal'
+import { createCharge, overdueSuggestion, refreshPix, usesGateway } from '@/lib/billing'
+import { listRows, updateRow } from '@/lib/db'
 import { buildQuoteDoc, type QuoteDoc, type QuoteDraft } from '@/lib/quote'
 import { DEFAULT_DEPOSIT_PCT, depositAmount, quoteProgress, registerQuotePayment, undoQuotePayment } from '@/lib/quote-finance'
 import { formatCurrency, formatDate, formatProposalNumber, formatQuoteNumber } from '@/lib/utils'
@@ -63,7 +68,7 @@ const blank: Values = {
 }
 
 const quoteStatus = {
-  pending: { label: 'Aguardando Pix', tone: 'amber' },
+  pending: { label: 'Aguardando pagamento', tone: 'amber' },
   partial: { label: 'Parcialmente pago', tone: 'blue' },
   paid: { label: 'Pago', tone: 'green' },
 } as const
@@ -79,6 +84,10 @@ export default function QuoteGenerator() {
   const update = useUpdate('quotes')
   const remove = useRemove('quotes')
   const openModal = useUI((s) => s.openModal)
+  const gateway = usesGateway(profile)
+  const connection = useBillingConnection()
+  const navigate = useNavigate()
+  const openInvoice = (t: { id: string }) => navigate('/ferramentas/nota-fiscal', { state: { transactionId: t.id } })
   const [editing, setEditing] = useState<Quote | null>(null)
   // orçamento que está sendo mandado para a impressão (PDF)
   const [printing, setPrinting] = useState<QuoteDoc | null>(null)
@@ -132,7 +141,7 @@ export default function QuoteGenerator() {
   const editingProgress = editing ? progressOf(editing) : null
   // com pagamento registrado, a forma de cobrança fica travada
   const billingLocked = (editingProgress?.received ?? 0) > 0
-  const doc = buildQuoteDoc(draft, clientOf(draft.client_id), profile, editingProgress?.received ?? 0)
+  const doc = buildQuoteDoc(draft, clientOf(draft.client_id), profile, editingProgress?.received ?? 0, editingProgress?.next)
 
   // propostas que podem originar este orçamento: as que ainda não têm orçamento (ou a deste)
   const linkedProposals = new Set((quotes.data ?? []).filter((q) => q.proposal_id && q.id !== editing?.id).map((q) => q.proposal_id))
@@ -159,6 +168,71 @@ export default function QuoteGenerator() {
       if (paid) toast.success('Pagamento registrado', { description: `${formatCurrency(paid.amount)} · ${formatQuoteNumber(q.quote_number)}` })
     } catch (error) {
       toast.error('Não foi possível registrar o pagamento', { description: error instanceof Error ? error.message : undefined })
+    }
+  }
+
+  /** Gera no Asaas a cobrança do que o cliente deve pagar agora (o total, a entrada ou o saldo). */
+  const chargeQuote = async (q: Pick<Quote, 'id' | 'quote_number' | 'validity_days'>) => {
+    const { next } = quoteProgress(await listRows('financial_transactions'), q.id)
+    if (!next) {
+      toast.error('Este orçamento não tem valor a receber.')
+      return false
+    }
+    // orçamento antigo: o vencimento original já passou e o Asaas não aceita data no passado
+    const newDue = overdueSuggestion(next, Number(q.validity_days) || 3)
+    if (newDue) {
+      const ok = await confirm({
+        title: 'O vencimento deste orçamento já passou',
+        description: `O valor vencia em ${formatDate(next.due_date)}, e o Asaas não aceita cobrança com data no passado. Gerar a cobrança com vencimento em ${formatDate(newDue)}? A data também muda no Financeiro.`,
+        confirmLabel: 'Gerar com a nova data',
+        tone: 'default',
+      })
+      if (!ok) return false
+      await updateRow('financial_transactions', next.id, { due_date: newDue })
+    }
+    const id = toast.loading('Gerando a cobrança no Asaas…')
+    try {
+      const { pixWarning } = await createCharge(next.id)
+      await refreshLinked()
+      if (pixWarning) toast.warning('Cobrança gerada, sem o QR Code Pix', { id, description: pixWarning, duration: 15000 })
+      else toast.success('Cobrança gerada no Asaas', { id, description: `${formatCurrency(next.amount)} · ${formatQuoteNumber(q.quote_number)}. O PDF sai com o QR Code Pix e o link de pagamento.` })
+      return true
+    } catch (error) {
+      toast.error('Não foi possível gerar a cobrança', { id, description: error instanceof Error ? error.message : undefined })
+      return false
+    }
+  }
+
+  /**
+   * PDF do orçamento. No modo Asaas, se o valor a pagar agora ainda não tem
+   * cobrança, ela é gerada antes: é dela que vêm o QR Code Pix e o link.
+   */
+  const printQuote = async (q: Quote) => {
+    let progress = quoteProgress(await listRows('financial_transactions'), q.id)
+    if (gateway && connection.data && progress.next && !progress.next.gateway_charge_id) {
+      if (await chargeQuote(q)) progress = quoteProgress(await listRows('financial_transactions'), q.id)
+    }
+    setPrinting(buildQuoteDoc(q, clientOf(q.client_id), profile, progress.received, progress.next))
+  }
+
+  const updatePix = async (transactionId: string) => {
+    const id = toast.loading('Buscando o QR Code Pix no Asaas…')
+    try {
+      const { pixWarning } = await refreshPix(transactionId)
+      await refreshLinked()
+      if (pixWarning) toast.warning('QR Code Pix indisponível', { id, description: pixWarning, duration: 15000 })
+      else toast.success('QR Code Pix atualizado', { id })
+    } catch (error) {
+      toast.error('Não foi possível atualizar', { id, description: error instanceof Error ? error.message : undefined })
+    }
+  }
+
+  const copyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Link de pagamento copiado')
+    } catch {
+      toast.error('Não foi possível copiar')
     }
   }
 
@@ -202,8 +276,10 @@ export default function QuoteGenerator() {
         const saved = editing
           ? await update.mutateAsync({ id: editing.id, patch: payload })
           : await insert.mutateAsync({ ...payload, status: 'pending' })
-        toast.success(`Orçamento ${formatQuoteNumber(saved.quote_number)} salvo`)
-        if (thenDownload) setPrinting(buildQuoteDoc(saved, clientOf(saved.client_id), profile, editingProgress?.received ?? 0))
+        const hasCharge = !!editingProgress?.next?.gateway_charge_id
+        // "Salvar e gerar PDF" já gera a cobrança (no modo Asaas); só salvar oferece gerar depois
+        toast.success(`Orçamento ${formatQuoteNumber(saved.quote_number)} salvo`, gateway && !hasCharge && connection.data && !thenDownload ? { action: { label: 'Gerar cobrança', onClick: () => chargeQuote(saved) }, duration: 10000 } : undefined)
+        if (thenDownload) await printQuote(saved)
         startNew()
       } catch {
         // toast de erro já exibido pelo hook
@@ -247,6 +323,15 @@ export default function QuoteGenerator() {
               {formatCurrency(progressOf(q).received)} de {formatCurrency(q.total_amount)}
             </p>
           ) : null}
+          {progressOf(q)
+            .parts.filter((t) => t.nfse_status)
+            .map((t) => (
+              <p key={t.id} className="mt-0.5 whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400" title={t.nfse_error ?? undefined}>
+                {nfseStatus[t.nfse_status!]?.label ?? t.nfse_status}
+                {t.nfse_number ? ` nº ${t.nfse_number}` : ''}
+                {q.deposit_pct ? ` · ${t.installment === 1 ? 'entrada' : 'saldo'}` : ''}
+              </p>
+            ))}
         </div>
       ),
     },
@@ -266,7 +351,25 @@ export default function QuoteGenerator() {
             </Button>
           </DropdownTrigger>
           <DropdownContent>
-            <DropdownItem icon={Download} onSelect={() => setPrinting(buildQuoteDoc(q, clientOf(q.client_id), profile, received))}>Salvar em PDF / Imprimir</DropdownItem>
+            <DropdownItem icon={Download} onSelect={() => printQuote(q)}>{gateway && connection.data && next && !next.gateway_charge_id ? 'Gerar cobrança e PDF' : 'Salvar em PDF / Imprimir'}</DropdownItem>
+            {gateway && next && !next.gateway_charge_id && (
+              <DropdownItem icon={Send} onSelect={() => chargeQuote(q)}>
+                {q.deposit_pct ? `Gerar cobrança da ${next.installment === 1 ? 'entrada' : 'parte final'} no Asaas` : 'Gerar cobrança no Asaas'}
+              </DropdownItem>
+            )}
+            {next?.gateway_invoice_url && <DropdownItem icon={Copy} onSelect={() => copyLink(next.gateway_invoice_url!)}>Copiar link de pagamento</DropdownItem>}
+            {gateway &&
+              progressOf(q)
+                .parts.filter(canIssueInvoice)
+                .map((t) => {
+                  const part = q.deposit_pct ? (t.installment === 1 ? 'entrada' : 'saldo') : null
+                  return (
+                    <DropdownItem key={t.id} icon={FileCheck2} onSelect={() => openInvoice(t)}>
+                      {part ? `Emitir nota fiscal ${part === 'entrada' ? 'da entrada' : 'do saldo'} (${formatCurrency(t.amount)})` : 'Emitir nota fiscal'}
+                    </DropdownItem>
+                  )
+                })}
+            {next?.gateway_charge_id && !next.gateway_pix_image && <DropdownItem icon={QrCode} onSelect={() => updatePix(next.id)}>Atualizar QR Code Pix</DropdownItem>}
             <DropdownItem icon={Pencil} onSelect={() => edit(q)}>Editar</DropdownItem>
             {payLabel && (
               <DropdownItem icon={Check} onSelect={() => pay(q)}>
@@ -291,7 +394,7 @@ export default function QuoteGenerator() {
     <>
       <PageHeader
         title="Gerador de orçamentos"
-        description={editing ? `Editando ${formatQuoteNumber(editing.quote_number)}` : `Próxima numeração: ${formatQuoteNumber(nextNumber)} · pagamento via Pix`}
+        description={editing ? `Editando ${formatQuoteNumber(editing.quote_number)}` : `Próxima numeração: ${formatQuoteNumber(nextNumber)} · ${gateway ? 'cobrança pelo Asaas' : 'pagamento via Pix'}`}
         actions={
           <>
             {editing && (
@@ -309,7 +412,16 @@ export default function QuoteGenerator() {
         }
       />
 
-      {profile && !profile.pix_key && !profile.pix_qr_image && (
+      {profile && gateway && !connection.isLoading && !connection.data && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+          <span>A forma de cobrança é o Asaas, mas a conta ainda não está conectada. Sem ela, não dá para gerar as cobranças.</span>
+          <Button variant="secondary" size="sm" onClick={() => openModal({ type: 'profile', record: profile })}>
+            Conectar o Asaas
+          </Button>
+        </div>
+      )}
+
+      {profile && !gateway && !profile.pix_key && !profile.pix_qr_image && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           <span>Você ainda não cadastrou sua chave Pix nem o QR Code. Sem eles, o orçamento sai sem o bloco de pagamento.</span>
           <Button variant="secondary" size="sm" onClick={() => openModal({ type: 'profile', record: profile })}>

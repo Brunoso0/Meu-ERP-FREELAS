@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { deleteRow, insertRow, insertRows, listRows, updateRow } from '@/lib/db'
+import { hasOpenCharge, receiveInCash, undoReceiveInCash, updateCharge } from '@/lib/billing'
 import { registerProjectPayment } from '@/lib/project-payment'
 import { createQuoteFromProposal, quoteOfProposal, removeQuoteTransaction, syncQuoteFromTransaction, syncQuoteTransaction } from '@/lib/quote-finance'
 import { registerContractInstallments } from '@/lib/recurrence'
-import { formatCurrency, formatQuoteNumber } from '@/lib/utils'
+import { formatCurrency, formatQuoteNumber, isoDay } from '@/lib/utils'
 import type { Contract, FinancialTransaction, Project, Proposal, Quote, TableName, Tables } from '@/types/database.types'
 
 const describe = (error: unknown) => (error instanceof Error ? error.message : 'Erro inesperado.')
@@ -60,13 +61,54 @@ async function settleSignedContract(qc: QueryClient, table: TableName, row: unkn
 async function settleQuoteLinks(qc: QueryClient, table: TableName, row: unknown) {
   try {
     if (table === 'quotes') {
-      if (await syncQuoteTransaction(row as Quote)) await qc.invalidateQueries({ queryKey: ['financial_transactions'] })
+      if (await syncQuoteTransaction(row as Quote)) {
+        // valores do orçamento mudaram: as cobranças abertas dele acompanham
+        const parts = (await listRows('financial_transactions')).filter((t) => t.quote_id === (row as Quote).id && hasOpenCharge(t))
+        for (const t of parts) {
+          await updateCharge(t.id)
+            .then(({ notice }) => notice && toast.info('Cobrança no Asaas', { description: notice, duration: 12000 }))
+            .catch((error) => toast.error('A cobrança no Asaas não foi atualizada', { description: describe(error) }))
+        }
+        await qc.invalidateQueries({ queryKey: ['financial_transactions'] })
+      }
     } else if (table === 'financial_transactions') {
       if (await syncQuoteFromTransaction(row as FinancialTransaction)) await qc.invalidateQueries({ queryKey: ['quotes'] })
     }
   } catch (error) {
     toast.error('Salvo, mas o orçamento e o financeiro não foram sincronizados', { description: describe(error) })
   }
+}
+
+/**
+ * Lançamento com cobrança no gateway (Asaas) acompanha o que muda aqui:
+ * - marcado como pago à mão: dá baixa "recebido por fora" no Asaas, para o cliente não pagar de novo;
+ * - reaberto: desfaz essa baixa (pagamento recebido pelo Asaas só se estorna lá);
+ * - valor, vencimento ou descrição alterados: a cobrança é atualizada.
+ */
+async function settleGatewayCharge(qc: QueryClient, table: TableName, row: unknown, before: unknown) {
+  if (table !== 'financial_transactions') return
+  const t = row as FinancialTransaction
+  const b = before as FinancialTransaction | undefined
+  if (!t.gateway_charge_id || !b) return
+  try {
+    if (b.status !== 'paid' && t.status === 'paid') {
+      await receiveInCash(t.id, t.payment_date ?? isoDay(new Date()))
+      toast.success('Baixa registrada no Asaas', { description: 'A cobrança foi marcada como recebida por fora; o cliente não paga de novo.' })
+    } else if (b.status === 'paid' && t.status !== 'paid') {
+      await undoReceiveInCash(t.id)
+      toast.success('Baixa desfeita no Asaas', { description: 'A cobrança voltou a aguardar pagamento.' })
+    } else if (hasOpenCharge(t) && (Number(b.amount) !== Number(t.amount) || b.due_date !== t.due_date || b.description !== t.description || b.client_id !== t.client_id)) {
+      const { notice } = await updateCharge(t.id)
+      if (notice) toast.info('Cobrança no Asaas', { description: notice, duration: 12000 })
+      else toast.success('Cobrança atualizada no Asaas')
+    } else return
+  } catch (error) {
+    // o que vale é o que está no Asaas: volta o lançamento para o estado anterior
+    if (b.status !== t.status) await updateRow('financial_transactions', t.id, { status: b.status, payment_date: b.payment_date }).catch(() => null)
+    toast.error(b.status !== t.status ? 'Situação não alterada' : 'Salvo aqui, mas a cobrança no Asaas não foi atualizada', { description: describe(error) })
+  }
+  await qc.invalidateQueries({ queryKey: ['financial_transactions'] })
+  await qc.invalidateQueries({ queryKey: ['quotes'] })
 }
 
 export function useTable<T extends TableName>(table: T) {
@@ -122,6 +164,7 @@ export function useUpdate<T extends TableName>(table: T) {
       const before = context?.previous?.find((r) => r.id === id) as { status?: string } | undefined
       await settleCompletedProject(qc, table, row, before?.status, false)
       await settleSignedContract(qc, table, row, before?.status)
+      await settleGatewayCharge(qc, table, row, before)
       await settleQuoteLinks(qc, table, row)
     },
     onSettled: () => qc.invalidateQueries({ queryKey: [table] }),

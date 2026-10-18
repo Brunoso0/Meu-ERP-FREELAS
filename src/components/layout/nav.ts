@@ -7,6 +7,7 @@ import {
   Kanban,
   QrCode,
   Radar,
+  ReceiptText,
   LayoutDashboard,
   ScrollText,
   Target,
@@ -38,4 +39,5 @@ export const toolsNav: NavItem[] = [
   { to: '/ferramentas/orcamento', label: 'Gerador de Orçamentos', icon: QrCode },
   { to: '/ferramentas/proposta', label: 'Gerador de Propostas', icon: FilePlus },
   { to: '/ferramentas/contrato', label: 'Gerador de Contratos', icon: ScrollText },
+  { to: '/ferramentas/nota-fiscal', label: 'Gerador de Notas Fiscais', icon: ReceiptText },
 ]

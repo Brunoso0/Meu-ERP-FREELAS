@@ -22,6 +22,7 @@ const QuoteGenerator = lazy(() => import('@/pages/tools/QuoteGenerator'))
 const ProposalGenerator = lazy(() => import('@/pages/tools/ProposalGenerator'))
 const ContractGenerator = lazy(() => import('@/pages/tools/ContractGenerator'))
 const LeadFinder = lazy(() => import('@/pages/tools/LeadFinder'))
+const InvoiceGenerator = lazy(() => import('@/pages/tools/InvoiceGenerator'))
 const PublicProposal = lazy(() => import('@/pages/PublicProposal'))
 const PublicContract = lazy(() => import('@/pages/PublicContract'))
 
@@ -81,6 +82,7 @@ export default function App() {
             <Route path="ferramentas/proposta" element={<ProposalGenerator />} />
             <Route path="ferramentas/contrato" element={<ContractGenerator />} />
             <Route path="ferramentas/leads" element={<LeadFinder />} />
+            <Route path="ferramentas/nota-fiscal" element={<InvoiceGenerator />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

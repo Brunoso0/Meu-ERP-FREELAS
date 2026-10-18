@@ -11,6 +11,37 @@ export type TransactionType = 'income' | 'expense'
 export type TransactionStatus = 'pending' | 'paid' | 'overdue'
 export type ContractStatus = 'draft' | 'awaiting_signature' | 'signed' | 'active' | 'terminated'
 export type GoalCategory = 'revenue' | 'clients' | 'projects'
+/** Forma de cobrança: Pix fixo do perfil ou um gateway de pagamento. */
+export type BillingProvider = 'simple' | 'asaas'
+export type BillingType = 'UNDEFINED' | 'PIX' | 'BOLETO' | 'CREDIT_CARD'
+
+/** Um serviço que o MEI presta e descreve na nota fiscal (um por CNAE). */
+export interface NfseService {
+  id: string
+  label: string
+  /** CNAE do MEI a que o serviço corresponde (só para referência). */
+  cnae: string
+  /** Código de serviço (tributação nacional) usado no Portal Nacional da NFS-e. */
+  code: string
+  /** Texto padrão da descrição da nota. */
+  description: string
+  /** Código NBS, quando a prefeitura exige (opcional). */
+  nbs?: string
+}
+
+/** Regime tributário da nota: MEI (SIMEI), ME/EPP no Simples Nacional ou regime normal. */
+export type NfseRegime = 'mei' | 'simples' | 'normal'
+
+/** Alíquotas da nota, em %. */
+export interface NfseTaxes {
+  iss?: number
+  retainIss?: boolean
+  pis?: number
+  cofins?: number
+  csll?: number
+  inss?: number
+  ir?: number
+}
 
 export interface Profile {
   id: string
@@ -26,6 +57,26 @@ export interface Profile {
   pix_qr_image: string | null
   /** Sua assinatura (PNG em data URL), usada nas propostas e nos contratos. */
   signature_image?: string | null
+  /** Como os recebimentos são cobrados (migração 011). */
+  billing_provider?: BillingProvider
+  /** Multa após o vencimento, em %. */
+  billing_fine_pct?: number
+  /** Juros ao mês após o vencimento, em %. */
+  billing_interest_pct?: number
+  /** Desconto para pagamento antecipado, em % (0 = sem desconto). */
+  billing_discount_pct?: number
+  /** Até quantos dias antes do vencimento vale o desconto (0 = até o dia). */
+  billing_discount_days?: number
+  billing_types?: BillingType
+  /** O gateway avisa o cliente por e-mail/SMS sobre a cobrança. */
+  billing_notify?: boolean
+  /** Serviços que podem ir na nota fiscal (migração 012). */
+  nfse_services?: NfseService[]
+  /** Observações que saem em toda nota. */
+  nfse_observations?: string | null
+  /** Regime e alíquotas da última nota (migração 013). */
+  nfse_regime?: NfseRegime
+  nfse_taxes?: NfseTaxes
   created_at: string
 }
 
@@ -194,6 +245,31 @@ export interface FinancialTransaction {
   contract_id?: string | null
   /** Orçamento a que o lançamento pertence; os dois mudam de situação juntos. */
   quote_id?: string | null
+  /** Gateway em que a cobrança foi criada (vazio = sem cobrança). */
+  gateway?: 'asaas' | null
+  gateway_env?: 'sandbox' | 'production' | null
+  gateway_charge_id?: string | null
+  /** Situação da cobrança no gateway (PENDING, RECEIVED, OVERDUE...). */
+  gateway_status?: string | null
+  /** Página de pagamento do cliente (Pix, boleto ou cartão). */
+  gateway_invoice_url?: string | null
+  gateway_bank_slip_url?: string | null
+  /** Pix copia e cola da cobrança. */
+  gateway_pix_payload?: string | null
+  /** QR Code Pix da cobrança (data URL). */
+  gateway_pix_image?: string | null
+  /** Valor líquido, já descontada a taxa do gateway. */
+  gateway_net_value?: number | null
+  gateway_synced_at?: string | null
+  /** NFS-e emitida pelo Asaas para este recebimento (migração 012). */
+  nfse_id?: string | null
+  nfse_status?: string | null
+  nfse_number?: string | null
+  /** Serviço do catálogo usado na nota. */
+  nfse_service?: string | null
+  /** Motivo, quando a prefeitura ou o Portal recusou a nota. */
+  nfse_error?: string | null
+  nfse_synced_at?: string | null
   created_at: string
 }
 

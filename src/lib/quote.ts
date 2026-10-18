@@ -1,5 +1,5 @@
 import { addDays } from 'date-fns'
-import type { Client, Profile, Quote } from '@/types/database.types'
+import type { Client, FinancialTransaction, Profile, Quote } from '@/types/database.types'
 import { depositAmount } from './quote-finance'
 import { formatQuoteNumber } from './utils'
 
@@ -21,6 +21,19 @@ export interface QuoteDoc {
   due: { label: string; amount: number }
   /** Dados de pagamento cadastrados no perfil (Minha empresa). */
   pix: { key: string; qr: string | null }
+  /**
+   * Cobrança por gateway (Asaas), quando é a forma de cobrança do perfil.
+   * Sem cobrança gerada ainda, os campos da cobrança vêm vazios.
+   */
+  gateway: {
+    url: string | null
+    pixImage: string | null
+    pixPayload: string | null
+    dueDate: string | null
+    fine: number
+    interest: number
+    discount: { pct: number; days: number } | null
+  } | null
 }
 
 export type QuoteDraft = Pick<Quote, 'quote_number' | 'client_id' | 'customer_name' | 'title' | 'items' | 'notes' | 'total_amount' | 'validity_days'> & {
@@ -28,8 +41,11 @@ export type QuoteDraft = Pick<Quote, 'quote_number' | 'client_id' | 'customer_na
   deposit_pct?: number | null
 }
 
-/** `received` é o que já foi pago do orçamento (soma dos lançamentos pagos). */
-export function buildQuoteDoc(quote: QuoteDraft, client: Client | undefined, profile: Profile | undefined, received = 0): QuoteDoc {
+/**
+ * `received` é o que já foi pago do orçamento (soma dos lançamentos pagos).
+ * `charge` é o lançamento que o cliente deve pagar agora, com a cobrança do gateway, se houver.
+ */
+export function buildQuoteDoc(quote: QuoteDraft, client: Client | undefined, profile: Profile | undefined, received = 0, charge?: FinancialTransaction | null): QuoteDoc {
   const date = quote.created_at ? new Date(quote.created_at) : new Date()
   const validityDays = Number(quote.validity_days) || 0
   const total = Number(quote.total_amount) || 0
@@ -71,5 +87,17 @@ export function buildQuoteDoc(quote: QuoteDraft, client: Client | undefined, pro
         : { label: `Entrada (${pct}%) a pagar agora`, amount: deposit },
     // só data URL de imagem vira <img>: o valor vem do banco e não pode apontar para outro lugar
     pix: { key: profile?.pix_key?.trim() ?? '', qr: profile?.pix_qr_image?.startsWith('data:image/') ? profile.pix_qr_image : null },
+    gateway:
+      profile?.billing_provider === 'asaas'
+        ? {
+            url: charge?.gateway_charge_id && /^https:\/\//.test(charge.gateway_invoice_url ?? '') ? charge.gateway_invoice_url! : null,
+            pixImage: charge?.gateway_charge_id && charge.gateway_pix_image?.startsWith('data:image/') ? charge.gateway_pix_image : null,
+            pixPayload: charge?.gateway_charge_id ? charge.gateway_pix_payload ?? null : null,
+            dueDate: charge?.gateway_charge_id ? charge.due_date : null,
+            fine: Number(profile.billing_fine_pct) || 0,
+            interest: Number(profile.billing_interest_pct) || 0,
+            discount: Number(profile.billing_discount_pct) > 0 ? { pct: Number(profile.billing_discount_pct), days: Number(profile.billing_discount_days) || 0 } : null,
+          }
+        : null,
   }
 }

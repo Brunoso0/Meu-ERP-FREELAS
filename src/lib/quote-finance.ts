@@ -1,5 +1,6 @@
 import { addDays } from 'date-fns'
 import type { FinancialTransaction, Proposal, Quote, QuoteStatus } from '@/types/database.types'
+import { receiveInCash, undoReceiveInCash } from './billing'
 import { deleteRow, insertRow, listRows, updateRow } from './db'
 import { formatProposalNumber, formatQuoteNumber, isoDay, sum, toDate } from './utils'
 
@@ -146,7 +147,10 @@ async function refreshQuoteStatus(quote: Pick<Quote, 'id' | 'status'>): Promise<
 export async function registerQuotePayment(quote: Quote): Promise<FinancialTransaction | null> {
   const { next } = quoteProgress(await listRows('financial_transactions'), quote.id)
   if (!next) return null
-  const paid = await updateRow('financial_transactions', next.id, { status: 'paid', payment_date: isoDay(new Date()) })
+  // com cobrança no Asaas, a baixa é feita lá (recebido por fora) e volta para cá pela função
+  const paid = next.gateway_charge_id
+    ? (await receiveInCash(next.id, isoDay(new Date()))).transaction
+    : await updateRow('financial_transactions', next.id, { status: 'paid', payment_date: isoDay(new Date()) })
   await refreshQuoteStatus(quote)
   return paid
 }
@@ -155,7 +159,9 @@ export async function registerQuotePayment(quote: Quote): Promise<FinancialTrans
 export async function undoQuotePayment(quote: Quote): Promise<FinancialTransaction | null> {
   const { lastPaid } = quoteProgress(await listRows('financial_transactions'), quote.id)
   if (!lastPaid) return null
-  const reopened = await updateRow('financial_transactions', lastPaid.id, { status: 'pending', payment_date: null })
+  const reopened = lastPaid.gateway_charge_id
+    ? (await undoReceiveInCash(lastPaid.id)).transaction
+    : await updateRow('financial_transactions', lastPaid.id, { status: 'pending', payment_date: null })
   await refreshQuoteStatus(quote)
   return reopened
 }

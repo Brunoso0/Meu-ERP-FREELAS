@@ -940,3 +940,19 @@
   line-height: 1.5;
   opacity: 0.95;
 }
+
+.pdoc .pd-pay-link {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.pdoc .pd-pay-rules {
+  margin-top: 10px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  opacity: 0.85;
+}
+
+.pdoc .pd-pay-rules:empty {
+  display: none;
+}

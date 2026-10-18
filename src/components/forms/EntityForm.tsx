@@ -17,7 +17,7 @@ export interface FieldDef {
   name: string
   label: string
   /** `image` guarda a imagem como data URL no próprio registro. */
-  type?: 'text' | 'email' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'image' | 'signature'
+  type?: 'text' | 'email' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'image' | 'signature' | 'custom' | 'section'
   /** Texto de ajuda abaixo do campo. */
   hint?: string
   options?: Array<{ value: string; label: string }>
@@ -32,7 +32,16 @@ export interface FieldDef {
   createOnly?: boolean
   /** Mostra o campo só quando a condição vale para os valores atuais. */
   showWhen?: (values: Record<string, any>) => boolean
+  /** `custom`: bloco próprio, que não é coluna do registro (ex.: conexão com o gateway). */
+  render?: (ctx: { values: Record<string, any>; setValue: (name: string, value: unknown) => void }) => React.ReactNode
+  /** `custom` que é coluna do registro (ex.: lista em JSON): entra no que é salvo. */
+  persist?: boolean
+  /** Valor quando o registro ainda não tem a coluna preenchida. */
+  initial?: unknown
 }
+
+/** Campos que só desenham algo na tela e não vão para o banco. */
+const isDisplayOnly = (f: FieldDef) => (f.type === 'custom' && !f.persist) || f.type === 'section'
 
 interface EntityFormProps {
   open: boolean
@@ -55,8 +64,10 @@ interface EntityFormProps {
 function initialValues(fields: FieldDef[], source: Record<string, any> | undefined) {
   const values: Record<string, any> = {}
   for (const f of fields) {
+    if (isDisplayOnly(f)) continue
     const raw = source?.[f.name]
-    if (raw === null || raw === undefined) values[f.name] = f.type === 'select' && !f.emptyOption ? f.options?.[0]?.value ?? '' : ''
+    if (f.type === 'custom') values[f.name] = raw ?? f.initial ?? null
+    else if (raw === null || raw === undefined) values[f.name] = f.type === 'select' && !f.emptyOption ? f.options?.[0]?.value ?? '' : ''
     else if (f.type === 'datetime') values[f.name] = format(parseISO(raw), "yyyy-MM-dd'T'HH:mm")
     else values[f.name] = raw
   }
@@ -220,7 +231,12 @@ export function EntityForm({ open, onClose, noun, title, table, fields: allField
   const submit = handleSubmit(async (values) => {
     const payload: Record<string, any> = {}
     for (const f of fields) {
+      if (isDisplayOnly(f)) continue
       let v = values[f.name]
+      if (f.type === 'custom') {
+        payload[f.name] = v ?? f.initial ?? null
+        continue
+      }
       if (v === '' || v === undefined) v = null
       else if (f.type === 'datetime') v = new Date(v).toISOString()
       payload[f.name] = v
@@ -255,6 +271,17 @@ export function EntityForm({ open, onClose, noun, title, table, fields: allField
           {fields.map((f) => {
             if (f.showWhen && !f.showWhen(watch())) return null
             const error = errors[f.name]?.message as string | undefined
+            if (f.type === 'section') {
+              return (
+                <div key={f.name} className="col-span-2 border-t pt-4 first:border-0 first:pt-0">
+                  <p className="text-sm font-semibold">{f.label}</p>
+                  {f.hint && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{f.hint}</p>}
+                </div>
+              )
+            }
+            if (f.type === 'custom') {
+              return <div key={f.name} className="col-span-2 grid grid-cols-2">{f.render?.({ values: watch(), setValue: (name, value) => setValue(name, value, { shouldDirty: true }) })}</div>
+            }
             if (f.type === 'signature') {
               return <SignatureField key={f.name} field={f} value={watch(f.name) ?? ''} error={error} onChange={(v) => setValue(f.name, v, { shouldDirty: true })} />
             }

@@ -1,5 +1,8 @@
 import { z } from 'zod'
 import { EntityForm, type FieldDef } from './EntityForm'
+import { GatewayConnection } from '@/components/billing/GatewayConnection'
+import { NfseServicesEditor } from '@/components/billing/NfseServicesEditor'
+import { billingProviders, billingTypes } from '@/lib/billing'
 import { useTable } from '@/hooks/useData'
 import { useUI, type ModalType } from '@/store/ui'
 import {
@@ -103,6 +106,28 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
     pix_key: text.max(140, 'Chave muito longa'),
     pix_qr_image: text.refine((v) => v === '' || v.startsWith('data:image/'), 'Imagem inválida'),
     signature_image: text.refine((v) => v === '' || (v.startsWith('data:image/png;base64,') && v.length <= 200000), 'Assinatura inválida'),
+    billing_provider: z.enum(['simple', 'asaas']),
+    billing_types: z.enum(['UNDEFINED', 'PIX', 'BOLETO', 'CREDIT_CARD']),
+    billing_fine_pct: z.coerce.number({ invalid_type_error: 'Informe um número' }).min(0, 'Não pode ser negativo').max(10, 'Até 10%'),
+    billing_interest_pct: z.coerce.number({ invalid_type_error: 'Informe um número' }).min(0, 'Não pode ser negativo').max(10, 'Até 10% ao mês'),
+    billing_discount_pct: z.coerce.number({ invalid_type_error: 'Informe um número' }).min(0, 'Não pode ser negativo').max(50, 'Até 50%'),
+    billing_discount_days: z.coerce.number({ invalid_type_error: 'Informe um número' }).int('Dias inteiros').min(0, 'Não pode ser negativo').max(60, 'Até 60 dias'),
+    billing_notify: z.union([z.boolean(), z.enum(['true', 'false'])]).transform((v) => v === true || v === 'true'),
+    nfse_services: z
+      .array(
+        z.object({
+          id: z.string(),
+          label: z.string().trim().min(2, 'Dê um nome a cada serviço'),
+          cnae: z.string(),
+          code: z.string().max(20),
+          description: z.string().max(1000),
+          nbs: z.string().max(20).optional(),
+        }),
+      )
+      .max(20)
+      .nullable()
+      .transform((v) => v ?? []),
+    nfse_observations: text.max(1000, 'Até 1.000 caracteres'),
   }),
 }
 
@@ -194,9 +219,23 @@ export function GlobalModals() {
       { name: 'document', label: 'CPF / CNPJ', mask: maskCpfCnpj, placeholder: '00.000.000/0000-00' },
       { name: 'phone', label: 'WhatsApp', mask: maskPhone, placeholder: '(00) 00000-0000' },
       { name: 'email', label: 'E-mail de contato', type: 'email', full: true },
-      { name: 'pix_key', label: 'Chave Pix (para receber)', placeholder: 'CPF/CNPJ, e-mail, telefone ou chave aleatória', full: true },
-      { name: 'pix_qr_image', label: 'QR Code Pix', type: 'image', hint: 'Imagem do QR Code gerado no app do seu banco. Aparece nos orçamentos.' },
       { name: 'signature_image', label: 'Sua assinatura', type: 'signature', hint: 'Sai no campo do emitente das propostas e dos contratos, inclusive nos links enviados para o cliente assinar.' },
+      { name: 'billing_section', label: 'Forma de cobrança', type: 'section', hint: 'Como os seus clientes pagam os orçamentos e as parcelas do financeiro.' },
+      { name: 'billing_provider', label: 'Cobrar por', type: 'select', options: (Object.keys(billingProviders) as Array<keyof typeof billingProviders>).map((value) => ({ value, label: billingProviders[value].label })), full: true },
+      { name: 'billing_simple_hint', label: '', type: 'custom', showWhen: (v) => v.billing_provider !== 'asaas', render: () => <p className="col-span-2 -mt-2 text-xs text-slate-500 dark:text-slate-400">{billingProviders.simple.hint} Para aplicar multa e juros por atraso, use um gateway.</p> },
+      { name: 'pix_key', label: 'Chave Pix (para receber)', placeholder: 'CPF/CNPJ, e-mail, telefone ou chave aleatória', full: true, showWhen: (v) => v.billing_provider !== 'asaas' },
+      { name: 'pix_qr_image', label: 'QR Code Pix', type: 'image', hint: 'Imagem do QR Code gerado no app do seu banco. Aparece nos orçamentos.', showWhen: (v) => v.billing_provider !== 'asaas' },
+      { name: 'billing_asaas_hint', label: '', type: 'custom', showWhen: (v) => v.billing_provider === 'asaas', render: () => <p className="col-span-2 -mt-2 text-xs text-slate-500 dark:text-slate-400">{billingProviders.asaas.hint}</p> },
+      { name: 'billing_gateway', label: 'Conexão', type: 'custom', showWhen: (v) => v.billing_provider === 'asaas', render: ({ setValue }) => <GatewayConnection onProviderChange={(provider) => setValue('billing_provider', provider)} /> },
+      { name: 'billing_types', label: 'Formas de pagamento aceitas', type: 'select', options: billingTypes, full: true, showWhen: (v) => v.billing_provider === 'asaas' },
+      { name: 'billing_fine_pct', label: 'Multa por atraso (%)', type: 'number', hint: 'Cobrada uma vez, logo após o vencimento. Para pessoa física (consumidor), a lei limita a 2%.', showWhen: (v) => v.billing_provider === 'asaas' },
+      { name: 'billing_interest_pct', label: 'Juros ao mês (%)', type: 'number', hint: 'Proporcionais aos dias de atraso. Comum: 1% ao mês.', showWhen: (v) => v.billing_provider === 'asaas' },
+      { name: 'billing_discount_pct', label: 'Desconto para pagar antes (%)', type: 'number', hint: '0 = sem desconto.', showWhen: (v) => v.billing_provider === 'asaas' },
+      { name: 'billing_discount_days', label: 'Desconto vale até (dias antes)', type: 'number', step: '1', hint: '0 = até o dia do vencimento.', showWhen: (v) => v.billing_provider === 'asaas' },
+      { name: 'nfse_section', label: 'Nota fiscal', type: 'section', hint: 'Emitida pelo Asaas, no Portal Nacional da NFS-e, em Ferramentas → Gerador de Notas Fiscais.', showWhen: (v) => v.billing_provider === 'asaas' },
+      { name: 'nfse_services', label: 'Serviços', type: 'custom', persist: true, initial: [], showWhen: (v) => v.billing_provider === 'asaas', render: ({ values, setValue }) => <NfseServicesEditor value={values.nfse_services} onChange={(services) => setValue('nfse_services', services)} /> },
+      { name: 'nfse_observations', label: 'Observações em toda nota (opcional)', type: 'textarea', showWhen: (v) => v.billing_provider === 'asaas' },
+      { name: 'billing_notify', label: 'Avisos ao cliente', type: 'select', options: [{ value: 'true', label: 'O Asaas avisa o cliente por e-mail e SMS' }, { value: 'false', label: 'Não avisar (eu mando o link)' }], full: true, hint: 'Vale para os clientes cadastrados no Asaas a partir de agora.', showWhen: (v) => v.billing_provider === 'asaas' },
     ],
   }
 
