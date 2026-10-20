@@ -24,16 +24,19 @@ const email = z.string().email('E-mail inválido').or(z.literal(''))
 const phone = z.string().refine((v) => v === '' || v.replace(/\D/g, '').length >= 10, 'Telefone incompleto')
 const document = z.string().refine((v) => [0, 11, 14].includes(v.replace(/\D/g, '').length), 'CPF ou CNPJ incompleto')
 
+/** Cadastro do cliente; também usado na edição pela tela do cliente. */
+export const clientSchema = z.object({
+  name: text.min(2, 'Informe o nome'),
+  company_name: text,
+  email,
+  phone,
+  document,
+  status: z.enum(['active', 'inactive', 'lead']),
+  notes: text,
+})
+
 const schemas: Record<ModalType, z.ZodTypeAny> = {
-  client: z.object({
-    name: text.min(2, 'Informe o nome'),
-    company_name: text,
-    email,
-    phone,
-    document,
-    status: z.enum(['active', 'inactive', 'lead']),
-    notes: text,
-  }),
+  client: clientSchema,
   project: z.object({
     title: text.min(2, 'Informe o título'),
     client_id: text,

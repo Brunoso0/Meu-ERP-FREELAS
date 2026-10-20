@@ -21,6 +21,7 @@ import { listRows, updateRow } from '@/lib/db'
 import { buildQuoteDoc, type QuoteDoc, type QuoteDraft } from '@/lib/quote'
 import { DEFAULT_DEPOSIT_PCT, depositAmount, quoteProgress, registerQuotePayment, undoQuotePayment } from '@/lib/quote-finance'
 import { formatCurrency, formatDate, formatProposalNumber, formatQuoteNumber } from '@/lib/utils'
+import { quoteStatus } from '@/lib/labels'
 import { useUI } from '@/store/ui'
 import type { Quote } from '@/types/database.types'
 
@@ -66,12 +67,6 @@ const blank: Values = {
   billing: 'full',
   deposit_pct: DEFAULT_DEPOSIT_PCT,
 }
-
-const quoteStatus = {
-  pending: { label: 'Aguardando pagamento', tone: 'amber' },
-  partial: { label: 'Parcialmente pago', tone: 'blue' },
-  paid: { label: 'Pago', tone: 'green' },
-} as const
 
 export default function QuoteGenerator() {
   const quotes = useTable('quotes')

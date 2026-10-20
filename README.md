@@ -36,7 +36,8 @@ Para zerar os dados de exemplo, apague a chave `meu-erp-freelas:demo-db:v1` no a
 | Tela | Para que serve |
 |---|---|
 | **Dashboard** | Faturamento do mês, demandas ativas, propostas em aberto, fluxo de caixa e o que vence em 48 horas. |
-| **Clientes** | Cadastro com busca e filtro. O LTV (quanto cada cliente já pagou) é calculado sozinho. |
+| **Projetos e propostas** | Andam juntos: toda proposta nova cria o seu projeto (aprovar põe em andamento, recusar cancela) e todo projeto criado na tela de Projetos ganha a sua proposta. Excluir um exclui o outro, a não ser que já haja histórico (demandas, recebimentos, orçamento ou contrato). |
+| **Clientes** | Cadastro com busca e filtro. O LTV (quanto cada cliente já pagou) é calculado sozinho. Clicar no cliente abre o cadastro; o ícone de olho abre a tela geral dele: números (recebido, a receber, projetos, notas), informações editáveis com "Habilitar edição", projetos com os orçamentos de cada um (entrada, saldo, situação, comprovante e nota fiscal para anexar), todos os pagamentos, notas fiscais, propostas e contratos. |
 | **Propostas** | Lista com status e a proposta em páginas A4 (capa, escopo, cronograma, investimento), pronta para "Salvar em PDF / Imprimir". |
 | **Projetos** | Agrupa as demandas, os recebimentos e as despesas de um trabalho para um cliente. |
 | **Demandas** | Tabela ou kanban semanal (Backlog, Segunda a Sexta). Arraste os cards entre os dias. |
@@ -76,6 +77,7 @@ No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase
 11. `011_billing_gateway.sql` adiciona a forma de cobrança (Pix simples ou Asaas) e guarda a chave do gateway cifrada no Vault.
 12. `012_nfse.sql` adiciona a nota fiscal de serviço (NFS-e) emitida pelo Asaas e o catálogo de serviços do MEI.
 13. `013_nfse_regime.sql` guarda o regime tributário da nota (MEI, Simples Nacional ou fora dele) e as alíquotas da última nota.
+14. `014_project_proposal.sql` liga projeto e proposta um para um (no máximo um projeto por proposta) e cria o par que falta nos registros antigos. Antes de rodar, ligue à mão os pares que já existem.
 
 #### Busca de leads (opcional)
 

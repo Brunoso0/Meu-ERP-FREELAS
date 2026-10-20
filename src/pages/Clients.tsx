@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { MessageCircle, Plus, Search, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Eye, MessageCircle, Plus, Search, Users } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Avatar, Badge, Button, Card, EmptyState, Input, PageHeader, Select } from '@/components/ui/primitives'
 import { useTable } from '@/hooks/useData'
@@ -66,7 +67,7 @@ export default function Clients() {
       className: 'text-right',
       cell: (c) => {
         const wa = whatsappUrl(c.phone)
-        return wa ? (
+        const contact = wa ? (
           <a
             href={wa}
             target="_blank"
@@ -81,6 +82,20 @@ export default function Clients() {
           <span className="whitespace-nowrap text-xs text-slate-400" title="Cadastre o WhatsApp do cliente para entrar em contato">
             Sem WhatsApp
           </span>
+        )
+        return (
+          <div className="inline-flex items-center gap-2">
+            {contact}
+            <Link
+              to={`/clientes/${c.id}`}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Abrir a tela de ${c.name}`}
+              title="Ver tudo sobre o cliente"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Eye className="h-4 w-4" />
+            </Link>
+          </div>
         )
       },
     },

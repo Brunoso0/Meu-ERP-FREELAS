@@ -254,7 +254,7 @@ export function EntityForm({ open, onClose, noun, title, table, fields: allField
   })
 
   const handleDelete = async () => {
-    if (!record || !(await confirm({ title: `Excluir ${noun}?` }))) return
+    if (!record || !(await confirm({ title: `Excluir ${noun}?`, description: table === 'projects' ? 'A proposta ligada a ele também é excluída.' : undefined }))) return
     try {
       await remove.mutateAsync(record.id)
       toast.success('Registro excluído')

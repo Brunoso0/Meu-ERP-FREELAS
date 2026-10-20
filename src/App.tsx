@@ -10,6 +10,7 @@ import { useUI } from '@/store/ui'
 import Login from '@/pages/Login'
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Clients = lazy(() => import('@/pages/Clients'))
+const ClientView = lazy(() => import('@/pages/ClientView'))
 const Projects = lazy(() => import('@/pages/Projects'))
 const Proposals = lazy(() => import('@/pages/Proposals'))
 const ProposalView = lazy(() => import('@/pages/ProposalView'))
@@ -70,6 +71,7 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="clientes" element={<Clients />} />
+            <Route path="clientes/:id" element={<ClientView />} />
             <Route path="projetos" element={<Projects />} />
             <Route path="propostas" element={<Proposals />} />
             <Route path="propostas/:id" element={<ProposalView />} />

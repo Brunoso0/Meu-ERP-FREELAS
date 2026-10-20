@@ -1,10 +1,14 @@
+import { isBefore, startOfDay } from 'date-fns'
+import { toDate } from './utils'
 import type {
   ClientStatus,
+  FinancialTransaction,
   ContractStatus,
   EventType,
   GoalCategory,
   ProjectStatus,
   ProposalStatus,
+  QuoteStatus,
   TaskPriority,
   TaskStatus,
   TransactionStatus,
@@ -18,6 +22,12 @@ export const clientStatus: LabelMap<ClientStatus> = {
   active: { label: 'Ativo', tone: 'green' },
   inactive: { label: 'Inativo', tone: 'slate' },
   lead: { label: 'Lead', tone: 'blue' },
+}
+
+export const quoteStatus: LabelMap<QuoteStatus> = {
+  pending: { label: 'Aguardando pagamento', tone: 'amber' },
+  partial: { label: 'Parcialmente pago', tone: 'blue' },
+  paid: { label: 'Pago', tone: 'green' },
 }
 
 export const proposalStatus: LabelMap<ProposalStatus> = {
@@ -62,6 +72,10 @@ export const transactionStatus: LabelMap<TransactionStatus> = {
   paid: { label: 'Pago', tone: 'green' },
   overdue: { label: 'Atrasado', tone: 'red' },
 }
+
+/** "Atrasado" é derivado: pendente com vencimento antes de hoje. */
+export const effectiveStatus = (t: Pick<FinancialTransaction, 'status' | 'due_date'>): TransactionStatus =>
+  t.status !== 'paid' && isBefore(toDate(t.due_date), startOfDay(new Date())) ? 'overdue' : t.status
 
 export const contractStatus: LabelMap<ContractStatus> = {
   draft: { label: 'Rascunho', tone: 'slate' },

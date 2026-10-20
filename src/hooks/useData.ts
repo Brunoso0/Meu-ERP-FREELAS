@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { deleteRow, insertRow, insertRows, listRows, updateRow } from '@/lib/db'
 import { hasOpenCharge, receiveInCash, undoReceiveInCash, updateCharge } from '@/lib/billing'
 import { registerProjectPayment } from '@/lib/project-payment'
+import { ensureProposalForProject, projectToRemoveWithProposal, proposalProjectIsBilled, proposalToRemoveWithProject, removeLinked, syncProjectFromProposal } from '@/lib/project-proposal'
 import { createQuoteFromProposal, quoteOfProposal, removeQuoteTransaction, syncQuoteFromTransaction, syncQuoteTransaction } from '@/lib/quote-finance'
 import { registerContractInstallments } from '@/lib/recurrence'
 import { formatCurrency, formatQuoteNumber, isoDay } from '@/lib/utils'
@@ -111,6 +112,25 @@ async function settleGatewayCharge(qc: QueryClient, table: TableName, row: unkno
   await qc.invalidateQueries({ queryKey: ['quotes'] })
 }
 
+/**
+ * Projeto e proposta andam juntos: proposta criada ou alterada garante o seu
+ * projeto (e o mantém em dia); projeto criado sem proposta ganha uma.
+ */
+async function settleProjectProposal(qc: QueryClient, table: TableName, row: unknown) {
+  try {
+    if (table === 'proposals') {
+      if (await syncProjectFromProposal(row as Proposal)) await qc.invalidateQueries({ queryKey: ['projects'] })
+    } else if (table === 'projects') {
+      if (await ensureProposalForProject(row as Project)) {
+        await qc.invalidateQueries({ queryKey: ['projects'] })
+        await qc.invalidateQueries({ queryKey: ['proposals'] })
+      }
+    }
+  } catch (error) {
+    toast.error(table === 'proposals' ? 'Proposta salva, mas o projeto dela não foi atualizado' : 'Projeto salvo, mas a proposta dele não foi criada', { description: describe(error) })
+  }
+}
+
 export function useTable<T extends TableName>(table: T) {
   return useQuery<Tables[T][]>({ queryKey: [table], queryFn: () => listRows(table) })
 }
@@ -124,6 +144,7 @@ export function useInsert<T extends TableName>(table: T) {
       await settleCompletedProject(qc, table, row, undefined, true)
       await settleSignedContract(qc, table, row, undefined)
       await settleQuoteLinks(qc, table, row)
+      await settleProjectProposal(qc, table, row)
     },
     onError: (error) => toast.error('Não foi possível salvar', { description: describe(error) }),
   })
@@ -166,6 +187,7 @@ export function useUpdate<T extends TableName>(table: T) {
       await settleSignedContract(qc, table, row, before?.status)
       await settleGatewayCharge(qc, table, row, before)
       await settleQuoteLinks(qc, table, row)
+      await settleProjectProposal(qc, table, row)
     },
     onSettled: () => qc.invalidateQueries({ queryKey: [table] }),
   })
@@ -182,8 +204,16 @@ export function useApproveProposal() {
     try {
       const existing = await quoteOfProposal(proposal.id)
       if (!keepStatus) await updateRow('proposals', proposal.id, { status: 'approved' })
-      const quote = existing ? null : await createQuoteFromProposal(proposal, depositPct)
-      await Promise.all(['proposals', 'quotes', 'financial_transactions'].map((key) => qc.invalidateQueries({ queryKey: [key] })))
+      // projeto que já tem recebimentos lançados não ganha orçamento (cobraria duas vezes)
+      const billed = !existing && (await proposalProjectIsBilled(proposal.id))
+      const quote = existing || billed ? null : await createQuoteFromProposal(proposal, depositPct)
+      // aprovar tira o projeto do planejamento
+      if (!keepStatus) await syncProjectFromProposal({ ...proposal, status: 'approved' })
+      await Promise.all(['proposals', 'projects', 'quotes', 'financial_transactions'].map((key) => qc.invalidateQueries({ queryKey: [key] })))
+      if (billed) {
+        toast.success(keepStatus ? 'Orçamento não gerado' : 'Proposta marcada como aprovada', { description: 'O projeto dela já tem recebimentos no financeiro, então nenhum orçamento novo foi criado.' })
+        return
+      }
       if (quote) {
         const first = depositPct ? `entrada de ${formatCurrency(Math.round(Number(quote.total_amount) * depositPct) / 100)} (${depositPct}%)` : formatCurrency(quote.total_amount)
         toast.success(`${keepStatus ? 'Orçamento' : 'Proposta aprovada · orçamento'} ${formatQuoteNumber(quote.quote_number)} criado`, { description: `Aguardando ${first}, já no financeiro` })
@@ -202,11 +232,18 @@ export function useRemove<T extends TableName>(table: T) {
     mutationFn: async (id: string) => {
       // orçamento excluído não deixa cobrança pendente no financeiro
       if (table === 'quotes') await removeQuoteTransaction(id)
+      // projeto e proposta saem juntos (ou nenhum dos dois, se já há histórico)
+      const linkedProposal = table === 'projects' ? await proposalToRemoveWithProject(id) : null
+      const linkedProject = table === 'proposals' ? await projectToRemoveWithProposal(id) : null
       await deleteRow(table, id)
+      await removeLinked('proposals', linkedProposal)
+      await removeLinked('projects', linkedProject)
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: [table] })
       if (table === 'quotes') await qc.invalidateQueries({ queryKey: ['financial_transactions'] })
+      if (table === 'projects') await qc.invalidateQueries({ queryKey: ['proposals'] })
+      if (table === 'proposals') await qc.invalidateQueries({ queryKey: ['projects'] })
     },
     onError: (error) => toast.error('Não foi possível excluir', { description: describe(error) }),
   })

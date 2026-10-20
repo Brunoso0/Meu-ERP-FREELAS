@@ -92,7 +92,7 @@ export default function Proposals() {
   }
 
   const handleDelete = async (p: Proposal) => {
-    if (!(await confirm({ title: `Excluir a proposta ${formatProposalNumber(p.proposal_number)}?`, description: `"${p.title}" será apagada. Esta ação não pode ser desfeita.` }))) return
+    if (!(await confirm({ title: `Excluir a proposta ${formatProposalNumber(p.proposal_number)}?`, description: `"${p.title}" será apagada, junto com o projeto ligado a ela. Esta ação não pode ser desfeita.` }))) return
     remove.mutate(p.id, { onSuccess: () => toast.success('Proposta excluída') })
   }
 

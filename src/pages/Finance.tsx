@@ -1,12 +1,13 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
-import { addMonths, addQuarters, addYears, endOfMonth, endOfQuarter, endOfYear, format, isBefore, startOfDay, startOfMonth, startOfQuarter, startOfYear } from 'date-fns'
+import { addMonths, addQuarters, addYears, endOfMonth, endOfQuarter, endOfYear, format, startOfMonth, startOfQuarter, startOfYear } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { Ban, Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Eye, FileCheck2, FileText, FileX2, MessageCircle, MoreHorizontal, Paperclip, Pencil, Plus, RefreshCw, Send, Wallet } from 'lucide-react'
 import { FinanceCharts } from '@/components/finance/FinanceCharts'
 import { RecurrenceList } from '@/components/finance/RecurrenceList'
+import { InvoiceCell, ProofCell, useTransactionFiles } from '@/components/finance/useTransactionFiles'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { confirm } from '@/components/ui/confirm'
 import { Dropdown, DropdownContent, DropdownItem, DropdownSeparator, DropdownTrigger } from '@/components/ui/overlays'
@@ -14,33 +15,22 @@ import { Badge, Button, Card, EmptyState, PageHeader, Segmented, Skeleton } from
 import { useTable, useUpdate } from '@/hooks/useData'
 import { useNavigate } from 'react-router-dom'
 import { cancelCharge, cancelInvoice, chargeMessage, createCharge, gatewayStatusOf, hasOpenCharge, overdueSuggestion, refreshCharge, refreshInvoice, usesGateway } from '@/lib/billing'
-import { canIssueInvoice, nfseStatus } from '@/lib/nfse'
-import { resolveProofUrl, updateRow, uploadProof } from '@/lib/db'
+import { canIssueInvoice } from '@/lib/nfse'
+import { updateRow } from '@/lib/db'
 import { whatsappUrl } from '@/lib/leads'
-import { transactionStatus } from '@/lib/labels'
+import { effectiveStatus, transactionStatus } from '@/lib/labels'
 import { cn, formatCurrency, formatDate, isoDay, sum, toDate } from '@/lib/utils'
 import { useUI } from '@/store/ui'
-import type { FinancialTransaction, TransactionStatus } from '@/types/database.types'
+import type { FinancialTransaction } from '@/types/database.types'
 
 type Tab = 'income' | 'expenses'
 type Period = 'month' | 'quarter' | 'year' | 'all'
-
-/** Arquivos que um lançamento pode guardar: o comprovante do pagamento e a nota fiscal emitida. */
-type Attachment = 'proof_url' | 'invoice_url'
-const attachments: Record<Attachment, { noun: string; accept: string; types: RegExp; formats: string; attached: string }> = {
-  proof_url: { noun: 'O comprovante', accept: 'image/png,image/jpeg,image/webp,application/pdf', types: /^image\/(png|jpe?g|webp)$|^application\/pdf$/, formats: 'PNG, JPG, WEBP ou PDF', attached: 'Comprovante anexado' },
-  invoice_url: { noun: 'A nota fiscal', accept: 'application/pdf', types: /^application\/pdf$/, formats: 'PDF', attached: 'Nota fiscal anexada' },
-}
 
 const periods: Record<Exclude<Period, 'all'>, { start: (d: Date) => Date; end: (d: Date) => Date; move: (d: Date, step: number) => Date; label: (d: Date) => string }> = {
   month: { start: startOfMonth, end: endOfMonth, move: addMonths, label: (d) => format(d, "MMMM 'de' yyyy", { locale: ptBR }) },
   quarter: { start: startOfQuarter, end: endOfQuarter, move: addQuarters, label: (d) => `${format(d, 'Qº')} trimestre de ${format(d, 'yyyy')}` },
   year: { start: startOfYear, end: endOfYear, move: addYears, label: (d) => format(d, 'yyyy') },
 }
-
-/** "Atrasado" é derivado: pendente com vencimento antes de hoje. */
-const effectiveStatus = (t: FinancialTransaction): TransactionStatus =>
-  t.status !== 'paid' && isBefore(toDate(t.due_date), startOfDay(new Date())) ? 'overdue' : t.status
 
 function Summary({ label, value, hint, tone, loading }: { label: string; value: number; hint: string; tone?: 'good' | 'bad'; loading: boolean }) {
   return (
@@ -72,8 +62,7 @@ export default function Finance() {
   const [tab, setTab] = useState<Tab>('income')
   const [period, setPeriod] = useState<Period>('month')
   const [cursor, setCursor] = useState(() => new Date())
-  const fileInput = useRef<HTMLInputElement>(null)
-  const uploadTarget = useRef<{ id: string; field: Attachment } | null>(null)
+  const files = useTransactionFiles()
 
   const all = transactions.data ?? []
 
@@ -95,13 +84,25 @@ export default function Finance() {
   }, [all, range])
 
   const rowsByTab: Record<Tab, FinancialTransaction[]> = useMemo(() => {
-    const byDue = (a: FinancialTransaction, b: FinancialTransaction) => b.due_date.localeCompare(a.due_date)
-    const due = all.filter((t) => !range || (toDate(t.due_date) >= range.start && toDate(t.due_date) <= range.end))
+    const inRange = (day: string | null) => !!day && (!range || (toDate(day) >= range.start && toDate(day) <= range.end))
+    const shown = all.filter((t) => inRange(t.due_date) || (t.status === 'paid' && inRange(t.payment_date)))
+    // entrada e saldo andam juntos: se uma parte do orçamento aparece, as outras aparecem ao lado
+    const quoteIds = new Set(shown.map((t) => t.quote_id).filter(Boolean))
+    const rows = [...shown, ...all.filter((t) => t.quote_id && quoteIds.has(t.quote_id) && !shown.includes(t))]
+    // ordem: vencimento mais recente primeiro, com as partes de um orçamento juntas (1/2 antes de 2/2)
+    const anchor = new Map<string, string>()
+    for (const t of rows) if (t.quote_id && (anchor.get(t.quote_id) ?? '') < t.due_date) anchor.set(t.quote_id, t.due_date)
+    const key = (t: FinancialTransaction) => (t.quote_id ? anchor.get(t.quote_id)! : t.due_date)
+    const order = (a: FinancialTransaction, b: FinancialTransaction) =>
+      key(b).localeCompare(key(a)) || (a.quote_id ?? a.id).localeCompare(b.quote_id ?? b.id) || (a.installment ?? 0) - (b.installment ?? 0)
     return {
-      income: due.filter((t) => t.type === 'income').sort(byDue),
-      expenses: due.filter((t) => t.type === 'expense').sort(byDue),
+      income: rows.filter((t) => t.type === 'income').sort(order),
+      expenses: rows.filter((t) => t.type === 'expense').sort(order),
     }
   }, [all, range])
+
+  /** A linha está na lista por outro motivo que não o vencimento no período (pago nele ou parte do mesmo orçamento). */
+  const outsideDue = (t: FinancialTransaction) => !!range && (toDate(t.due_date) < range.start || toDate(t.due_date) > range.end)
 
   const counterpart = (t: FinancialTransaction) => {
     const c = clients.data?.find((x) => x.id === t.client_id)
@@ -173,69 +174,7 @@ export default function Finance() {
     if (ok) charge('Cancelando a cobrança…', () => cancelCharge(t.id), 'Cobrança cancelada no Asaas')
   }
 
-  const pickFile = (id: string, field: Attachment) => {
-    uploadTarget.current = { id, field }
-    if (fileInput.current) {
-      fileInput.current.accept = attachments[field].accept
-      fileInput.current.click()
-    }
-  }
-
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    const target = uploadTarget.current
-    e.target.value = ''
-    if (!file || !target) return
-    const kind = attachments[target.field]
-    // o `accept` do input é só sugestão do navegador; a checagem de verdade é esta
-    if (!kind.types.test(file.type)) {
-      toast.error('Formato não aceito', { description: `${kind.noun} precisa estar em ${kind.formats}.` })
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Arquivo muito grande', { description: `${kind.noun} pode ter até 5 MB.` })
-      return
-    }
-    try {
-      const path = await uploadProof(file)
-      await update.mutateAsync({ id: target.id, patch: { [target.field]: path } })
-      toast.success(kind.attached)
-    } catch (error) {
-      toast.error('Não foi possível anexar', { description: error instanceof Error ? error.message : undefined })
-    }
-  }
-
-  const viewFile = async (path: string | null | undefined) => {
-    if (!path) return
-    try {
-      const url = await resolveProofUrl(path)
-      if (url.startsWith('data:')) {
-        // navegadores bloqueiam abrir data: direto na barra; mostra dentro de uma página em branco
-        const win = window.open('')
-        win?.document.write(`<iframe src="${url}" style="border:0;position:fixed;inset:0;width:100%;height:100%"></iframe>`)
-      } else window.open(url, '_blank', 'noopener')
-    } catch (error) {
-      toast.error('Não foi possível abrir o arquivo', { description: error instanceof Error ? error.message : undefined })
-    }
-  }
-
-  const invoiceColumn: Column<FinancialTransaction> = {
-    header: 'Nota fiscal',
-    cell: (t) =>
-      t.nfse_status && t.nfse_status !== 'AUTHORIZED' && t.nfse_status !== 'CANCELED' ? (
-        <span className={cn('text-xs font-medium', t.nfse_status === 'ERROR' || t.nfse_status === 'CANCELLATION_DENIED' ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400')} title={t.nfse_error ?? undefined}>
-          {nfseStatus[t.nfse_status]?.label ?? t.nfse_status}
-        </span>
-      ) : t.invoice_url ? (
-        <button type="button" onClick={() => viewFile(t.invoice_url)} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
-          <FileText className="h-3.5 w-3.5" /> {t.nfse_number ? `nº ${t.nfse_number}` : 'Ver'}
-        </button>
-      ) : (
-        <button type="button" onClick={() => pickFile(t.id, 'invoice_url')} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
-          <Paperclip className="h-3.5 w-3.5" /> Anexar
-        </button>
-      ),
-  }
+  const invoiceColumn: Column<FinancialTransaction> = { header: 'Nota fiscal', cell: (t) => <InvoiceCell t={t} files={files} /> }
 
   const columns: Column<FinancialTransaction>[] = [
     {
@@ -256,7 +195,15 @@ export default function Finance() {
         </div>
       ),
     },
-    { header: 'Vencimento', cell: (t) => <span className="tabular text-slate-600 dark:text-slate-300">{formatDate(t.due_date)}</span> },
+    {
+      header: 'Vencimento',
+      cell: (t) => (
+        <span className="tabular text-slate-600 dark:text-slate-300">
+          {formatDate(t.due_date)}
+          {outsideDue(t) && <span className="block text-[11px] text-slate-400 dark:text-slate-500">fora do período</span>}
+        </span>
+      ),
+    },
     { header: 'Pagamento', cell: (t) => <span className="tabular text-slate-600 dark:text-slate-300">{formatDate(t.payment_date)}</span> },
     {
       header: 'Situação',
@@ -277,16 +224,7 @@ export default function Finance() {
     },
     {
       header: 'Comprovante',
-      cell: (t) =>
-        t.proof_url ? (
-          <button type="button" onClick={() => viewFile(t.proof_url)} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
-            <Eye className="h-3.5 w-3.5" /> Ver
-          </button>
-        ) : (
-          <button type="button" onClick={() => pickFile(t.id, 'proof_url')} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
-            <Paperclip className="h-3.5 w-3.5" /> Anexar
-          </button>
-        ),
+      cell: (t) => <ProofCell t={t} files={files} />,
     },
     { header: 'Valor', className: 'text-right', cell: (t) => <span className="tabular font-medium">{formatCurrency(t.amount)}</span> },
     {
@@ -317,13 +255,13 @@ export default function Finance() {
             {hasOpenCharge(t) && <DropdownItem icon={Ban} danger onSelect={() => cancel(t)}>Cancelar cobrança</DropdownItem>}
             {(t.gateway_charge_id || (t.type === 'income' && gateway && t.status !== 'paid')) && <DropdownSeparator />}
             {t.status !== 'paid' && <DropdownItem icon={Check} onSelect={() => markPaid(t)}>{hasOpenCharge(t) ? 'Marcar como pago (recebido por fora)' : 'Marcar como pago'}</DropdownItem>}
-            <DropdownItem icon={Paperclip} onSelect={() => pickFile(t.id, 'proof_url')}>{t.proof_url ? 'Trocar comprovante' : 'Anexar comprovante'}</DropdownItem>
-            {t.proof_url && <DropdownItem icon={Eye} onSelect={() => viewFile(t.proof_url)}>Ver comprovante</DropdownItem>}
+            <DropdownItem icon={Paperclip} onSelect={() => files.pick(t.id, 'proof_url')}>{t.proof_url ? 'Trocar comprovante' : 'Anexar comprovante'}</DropdownItem>
+            {t.proof_url && <DropdownItem icon={Eye} onSelect={() => files.view(t.proof_url)}>Ver comprovante</DropdownItem>}
             {gateway && canIssueInvoice(t) && <DropdownItem icon={FileCheck2} onSelect={() => openInvoice(t)}>{t.nfse_status === 'ERROR' ? 'Emitir nota fiscal de novo' : 'Emitir nota fiscal'}</DropdownItem>}
             {t.nfse_id && <DropdownItem icon={RefreshCw} onSelect={() => charge('Consultando a nota no Asaas…', () => refreshInvoice(t.id), 'Nota fiscal atualizada')}>Atualizar nota fiscal</DropdownItem>}
             {t.nfse_status === 'AUTHORIZED' && <DropdownItem icon={FileX2} danger onSelect={() => cancelNfse(t)}>Cancelar nota fiscal</DropdownItem>}
-            {t.type === 'income' && !t.nfse_id && <DropdownItem icon={FileText} onSelect={() => pickFile(t.id, 'invoice_url')}>{t.invoice_url ? 'Trocar nota fiscal' : 'Anexar nota fiscal'}</DropdownItem>}
-            {t.type === 'income' && t.invoice_url && <DropdownItem icon={Eye} onSelect={() => viewFile(t.invoice_url)}>Ver nota fiscal</DropdownItem>}
+            {t.type === 'income' && !t.nfse_id && <DropdownItem icon={FileText} onSelect={() => files.pick(t.id, 'invoice_url')}>{t.invoice_url ? 'Trocar nota fiscal' : 'Anexar nota fiscal'}</DropdownItem>}
+            {t.type === 'income' && t.invoice_url && <DropdownItem icon={Eye} onSelect={() => files.view(t.invoice_url)}>Ver nota fiscal</DropdownItem>}
             {t.type === 'income' && t.invoice_url && !t.nfse_id && <DropdownItem icon={FileText} onSelect={() => update.mutate({ id: t.id, patch: { invoice_url: null } }, { onSuccess: () => toast.success('Nota fiscal removida') })}>Remover nota fiscal</DropdownItem>}
             <DropdownItem icon={Pencil} onSelect={() => openModal({ type: 'transaction', record: t })}>Editar</DropdownItem>
           </DropdownContent>
@@ -395,7 +333,7 @@ export default function Finance() {
 
       <RecurrenceList transactions={all} clients={clients.data ?? []} />
 
-      <input ref={fileInput} type="file" className="hidden" onChange={onFile} aria-label="Arquivo do lançamento" />
+      {files.input}
 
       <Tabs.Root value={tab} onValueChange={(v) => setTab(v as Tab)} className="mt-4">
         <Card>
