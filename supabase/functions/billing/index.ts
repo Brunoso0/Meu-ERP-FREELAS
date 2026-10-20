@@ -1,11 +1,13 @@
 // =====================================================================
 // billing: cobrança por gateway (hoje, o Asaas).
 //
-// Duas portas de entrada na mesma função:
+// Três portas de entrada na mesma função:
 //   1. O app (usuário logado) pede uma ação: conectar, gerar, atualizar,
 //      cancelar ou dar baixa numa cobrança.
 //   2. O Asaas avisa mudanças de pagamento e de nota fiscal (webhook),
 //      identificado pelo token no cabeçalho `asaas-access-token`.
+//   3. O pg_cron, uma vez por dia, gera as mensalidades do gerador de
+//      orçamentos (token do Vault no cabeçalho `x-cron-token`).
 //
 // A chave de API do Asaas fica cifrada no Vault do banco (migração 011) e só
 // é lida aqui. Nenhum segredo precisa ser cadastrado na função: ela usa as
@@ -652,6 +654,133 @@ async function webhook(req: Request) {
   return json(200, { ok: true })
 }
 
+// ---------- mensalidades (pg_cron) ----------
+
+/**
+ * Todo dia o pg_cron chama a função com o token do Vault (migração 015).
+ * Cada série de mensalidade que chegou na data (vencimento menos a
+ * antecedência) ganha o orçamento do mês: réplica do último da série, com o
+ * vencimento novo, o lançamento no financeiro e, no Asaas, a cobrança.
+ * O próximo vencimento é trocado antes de gerar e só se ainda for o mesmo,
+ * então o app (que também confere ao abrir) e a função nunca geram o mesmo mês.
+ */
+const MAX_CATCH_UP = 3
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const daysIn = (year: number, month: number) => new Date(Date.UTC(year, month, 0)).getUTCDate()
+const onDay = (year: number, month: number, day: number) => `${year}-${pad2(month)}-${pad2(Math.min(day, daysIn(year, month)))}`
+
+function nextMonthly(due: string, day: number) {
+  const [y, m] = due.split('-').map(Number)
+  return m === 12 ? onDay(y + 1, 1, day) : onDay(y, m + 1, day)
+}
+
+function shiftDays(date: string, days: number) {
+  const d = new Date(`${date}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+const quoteNumber = (n: number) => `#ORC-${String(n ?? 0).padStart(4, '0')}`
+
+async function generateMonthly(rec: Record<string, any>, due: string) {
+  const query = admin.from('quotes').select('*').eq('user_id', rec.user_id)
+  const { data: source } = rec.last_quote_id
+    ? await query.eq('id', rec.last_quote_id).maybeSingle()
+    : await query.eq('recurrence_id', rec.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (!source) throw new Problem('A série não tem orçamento para replicar.')
+
+  const { data: quote, error } = await admin
+    .from('quotes')
+    .insert({
+      user_id: rec.user_id,
+      client_id: source.client_id,
+      customer_name: source.customer_name,
+      title: source.title,
+      items: source.items,
+      notes: source.notes,
+      total_amount: source.total_amount,
+      validity_days: source.validity_days,
+      status: 'pending',
+      proposal_id: null,
+      deposit_pct: null,
+      due_date: due,
+      recurrence_id: rec.id,
+    })
+    .select()
+    .single()
+  if (error) throw new Problem(`Não foi possível criar o orçamento: ${error.message}`, 500)
+
+  const { data: tx, error: txError } = await admin
+    .from('financial_transactions')
+    .insert({
+      user_id: rec.user_id,
+      type: 'income',
+      category: 'Mensalidade',
+      description: `Orçamento ${quoteNumber(quote.quote_number)} — ${quote.title}`,
+      amount: quote.total_amount,
+      due_date: due,
+      payment_date: null,
+      status: 'pending',
+      client_id: quote.client_id,
+      quote_id: quote.id,
+    })
+    .select()
+    .single()
+  if (txError) throw new Problem(`Orçamento ${quoteNumber(quote.quote_number)} criado, mas o lançamento não: ${txError.message}`, 500)
+
+  let lastError: string | null = null
+  const { data: profile } = await admin.from('profiles').select('billing_provider').eq('id', rec.user_id).maybeSingle()
+  if (profile?.billing_provider === 'asaas' && tx.client_id) {
+    try {
+      await createCharge(rec.user_id, { transactionId: tx.id })
+    } catch (e) {
+      lastError = `Mensalidade gerada, mas a cobrança no Asaas não: ${e instanceof Error ? e.message : 'erro desconhecido'}`
+    }
+  }
+  await admin.from('quote_recurrences').update({ last_quote_id: quote.id, last_error: lastError }).eq('id', rec.id)
+  return quote.id as string
+}
+
+async function runRecurrences() {
+  const day = today()
+  const { data: series } = await admin.from('quote_recurrences').select('*').eq('active', true)
+  const created: string[] = []
+  for (const rec of series ?? []) {
+    let current = rec
+    for (let i = 0; i < MAX_CATCH_UP; i++) {
+      const due = current.next_due_date as string
+      if (current.ends_on && due > current.ends_on) {
+        await admin.from('quote_recurrences').update({ active: false }).eq('id', current.id)
+        break
+      }
+      if (shiftDays(due, -Number(current.lead_days)) > day) break
+      const next = nextMonthly(due, Number(current.day_of_month))
+      const { data: claimed } = await admin
+        .from('quote_recurrences')
+        .update({ next_due_date: next, last_run_at: new Date().toISOString() })
+        .eq('id', current.id)
+        .eq('next_due_date', due)
+        .eq('active', true)
+        .select('id')
+      if (!claimed?.length) break
+      try {
+        created.push(await generateMonthly(current, due))
+      } catch (e) {
+        await admin.from('quote_recurrences').update({ last_error: (e instanceof Error ? e.message : 'Não foi possível gerar a mensalidade.').slice(0, 1000) }).eq('id', current.id)
+        break
+      }
+      current = { ...current, next_due_date: next }
+    }
+  }
+  return { created: created.length }
+}
+
+async function cron(req: Request) {
+  const { data: ok } = await admin.rpc('billing_cron_token_ok', { p_token: req.headers.get('x-cron-token') ?? '' })
+  if (ok !== true) return json(401, { error: 'unauthorized' })
+  return json(200, await runRecurrences())
+}
+
 // ---------- entrada ----------
 
 const actions: Record<string, (userId: string, body: Record<string, unknown>) => Promise<unknown>> = {
@@ -677,6 +806,7 @@ Deno.serve(async (req) => {
 
   try {
     if (req.headers.has('asaas-access-token')) return await webhook(req)
+    if (req.headers.has('x-cron-token')) return await cron(req)
 
     const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
     const { data: auth } = await admin.auth.getUser(jwt)

@@ -10,6 +10,9 @@ export interface QuoteDoc {
   date: Date
   validUntil: Date
   validityDays: number
+  /** Vencimento fixo (mensalidade): o documento mostra a data no lugar da validade. */
+  dueDate: Date | null
+  monthly: boolean
   issuer: { name: string; document: string; email: string; phone: string }
   customer: { name: string; document: string; contact: string }
   items: Array<{ description: string; quantity: number; unit_price: number }>
@@ -39,6 +42,10 @@ export interface QuoteDoc {
 export type QuoteDraft = Pick<Quote, 'quote_number' | 'client_id' | 'customer_name' | 'title' | 'items' | 'notes' | 'total_amount' | 'validity_days'> & {
   created_at?: string
   deposit_pct?: number | null
+  due_date?: string | null
+  recurrence_id?: string | null
+  /** O orçamento vai virar mensalidade ao salvar. */
+  monthly?: boolean
 }
 
 /**
@@ -58,6 +65,8 @@ export function buildQuoteDoc(quote: QuoteDraft, client: Client | undefined, pro
     date,
     validUntil: addDays(date, validityDays),
     validityDays,
+    dueDate: quote.due_date ? new Date(`${quote.due_date}T12:00:00`) : null,
+    monthly: !!(quote.monthly || quote.recurrence_id),
     issuer: {
       name: profile?.company_name || profile?.full_name || 'Sua empresa',
       document: profile?.document ?? '',

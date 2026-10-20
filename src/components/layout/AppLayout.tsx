@@ -4,11 +4,13 @@ import { Skeleton } from '@/components/ui/primitives'
 import { GlobalModals } from '@/components/forms/GlobalModals'
 import { PaymentChoiceDialog } from '@/components/quotes/PaymentChoice'
 import { ConfirmDialog } from '@/components/ui/confirm'
+import { useRecurrenceCatchUp } from '@/hooks/useRecurrenceCatchUp'
 import { CommandPalette } from './CommandPalette'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 
 export function AppLayout() {
+  useRecurrenceCatchUp()
   return (
     <div className="flex min-h-screen min-h-[100dvh]">
       <Sidebar />

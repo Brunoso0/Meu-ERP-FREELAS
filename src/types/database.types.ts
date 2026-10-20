@@ -174,6 +174,34 @@ export interface Quote {
   proposal_id?: string | null
   /** Percentual pago de entrada (ex.: 50); vazio = cobrança integral. */
   deposit_pct?: number | null
+  /** Vencimento fixo (mensalidades); vazio = emissão + validade. Migração 015. */
+  due_date?: string | null
+  /** Série de mensalidade a que o orçamento pertence. */
+  recurrence_id?: string | null
+  created_at: string
+}
+
+/**
+ * Mensalidade do gerador de orçamentos: todo mês nasce um orçamento novo,
+ * réplica do último da série, com o vencimento do mês seguinte.
+ */
+export interface QuoteRecurrence {
+  id: string
+  user_id: string
+  client_id: string | null
+  active: boolean
+  /** Dia do vencimento (1 a 31; meses curtos usam o último dia). */
+  day_of_month: number
+  /** Com quantos dias de antecedência o orçamento do mês é gerado. */
+  lead_days: number
+  /** Vencimento da próxima mensalidade a ser gerada. */
+  next_due_date: string
+  /** Última mensalidade com vencimento até esta data; vazio = sem prazo. */
+  ends_on: string | null
+  last_quote_id: string | null
+  last_run_at: string | null
+  /** O que deu errado na última geração (ex.: a cobrança no Asaas). */
+  last_error: string | null
   created_at: string
 }
 
@@ -320,6 +348,7 @@ export interface Tables {
   freelancers: Freelancer
   proposals: Proposal
   quotes: Quote
+  quote_recurrences: QuoteRecurrence
   projects: Project
   tasks: Task
   calendar_events: CalendarEvent

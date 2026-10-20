@@ -4,7 +4,7 @@ import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Check, Copy, Download, FileCheck2, MoreHorizontal, Pencil, Plus, QrCode, Save, Send, Trash2, Undo2 } from 'lucide-react'
+import { Ban, Check, Copy, Download, FileCheck2, MoreHorizontal, Pause, Pencil, Play, Plus, QrCode, Repeat, Save, Send, Trash2, Undo2 } from 'lucide-react'
 import { useBillingConnection } from '@/components/billing/GatewayConnection'
 import { useNavigate } from 'react-router-dom'
 import { canIssueInvoice, nfseStatus } from '@/lib/nfse'
@@ -20,10 +20,11 @@ import { createCharge, overdueSuggestion, refreshPix, usesGateway } from '@/lib/
 import { listRows, updateRow } from '@/lib/db'
 import { buildQuoteDoc, type QuoteDoc, type QuoteDraft } from '@/lib/quote'
 import { DEFAULT_DEPOSIT_PCT, depositAmount, quoteProgress, registerQuotePayment, undoQuotePayment } from '@/lib/quote-finance'
-import { formatCurrency, formatDate, formatProposalNumber, formatQuoteNumber } from '@/lib/utils'
+import { endRecurrence, generationDate, lastQuoteOf, recurrenceState, runRecurrences, setRecurrenceActive, shiftDays, startRecurrence, updateRecurrence } from '@/lib/quote-recurrence'
+import { formatCurrency, formatDate, formatProposalNumber, formatQuoteNumber, isoDay } from '@/lib/utils'
 import { quoteStatus } from '@/lib/labels'
 import { useUI } from '@/store/ui'
-import type { Quote } from '@/types/database.types'
+import type { Quote, QuoteRecurrence } from '@/types/database.types'
 
 const schema = z
   .object({
@@ -74,6 +75,7 @@ export default function QuoteGenerator() {
   const profile = useTable('profiles').data?.[0]
   const transactions = useTable('financial_transactions').data ?? []
   const proposals = useTable('proposals')
+  const recurrences = useTable('quote_recurrences')
   const qc = useQueryClient()
   const insert = useInsert('quotes')
   const update = useUpdate('quotes')
@@ -86,6 +88,11 @@ export default function QuoteGenerator() {
   const [editing, setEditing] = useState<Quote | null>(null)
   // orçamento que está sendo mandado para a impressão (PDF)
   const [printing, setPrinting] = useState<QuoteDoc | null>(null)
+  // mensalidade: o orçamento salvo vira o primeiro mês e o sistema gera os seguintes
+  const [monthly, setMonthly] = useState(false)
+  const [firstDue, setFirstDue] = useState('')
+  const [leadDays, setLeadDays] = useState(7)
+  const [endsOn, setEndsOn] = useState('')
 
   useEffect(() => {
     if (!printing) return
@@ -130,8 +137,12 @@ export default function QuoteGenerator() {
     total_amount: itemsTotal(cleanItems),
     validity_days: Number(values.validity_days) || 0,
     created_at: editing?.created_at,
-    deposit_pct: values.billing === 'deposit' ? Number(values.deposit_pct) || null : null,
+    deposit_pct: !monthly && values.billing === 'deposit' ? Number(values.deposit_pct) || null : null,
+    due_date: monthly ? firstDue || null : editing?.due_date ?? null,
+    recurrence_id: editing?.recurrence_id ?? null,
+    monthly,
   }
+  const editingSeries = recurrences.data?.find((r) => r.id === editing?.recurrence_id) ?? null
   const progressOf = (q: Quote) => quoteProgress(transactions, q.id)
   const editingProgress = editing ? progressOf(editing) : null
   // com pagamento registrado, a forma de cobrança fica travada
@@ -244,6 +255,21 @@ export default function QuoteGenerator() {
   const startNew = () => {
     setEditing(null)
     reset(blank)
+    setMonthly(false)
+    setFirstDue('')
+    setLeadDays(7)
+    setEndsOn('')
+  }
+
+  /** Ligar a mensalidade: vencimento sugerido é o do orçamento (ou emissão + validade), sempre integral. */
+  const toggleMonthly = (on: boolean) => {
+    setMonthly(on)
+    if (!on) return
+    setValue('billing', 'full')
+    if (!firstDue) {
+      const open = editing ? progressOf(editing).next : null
+      setFirstDue(editing?.due_date ?? open?.due_date ?? shiftDays(isoDay(new Date()), Number(values.validity_days) || 7))
+    }
   }
 
   const edit = (q: Quote) => {
@@ -259,18 +285,35 @@ export default function QuoteGenerator() {
       billing: q.deposit_pct ? 'deposit' : 'full',
       deposit_pct: q.deposit_pct ?? DEFAULT_DEPOSIT_PCT,
     })
+    const series = recurrences.data?.find((r) => r.id === q.recurrence_id)
+    setMonthly(!!series && recurrenceState(series) !== 'ended')
+    setFirstDue(q.due_date ?? progressOf(q).parts[0]?.due_date ?? '')
+    setLeadDays(series?.lead_days ?? 7)
+    setEndsOn(series?.ends_on ?? '')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const save = (thenDownload: boolean) =>
     handleSubmit(async () => {
+      if (monthly && !firstDue) {
+        toast.error('Informe o vencimento da mensalidade')
+        return
+      }
       // o número exibido é só uma prévia: quem numera é o banco (trigger) ou o repositório demo
       const { quote_number: _preview, created_at: _created, ...rest } = draft
-      const payload = { ...rest, proposal_id: values.proposal_id || null }
+      const { monthly: _monthly, recurrence_id: _series, ...fields } = rest
+      const payload = { ...fields, proposal_id: values.proposal_id || null }
       try {
         const saved = editing
           ? await update.mutateAsync({ id: editing.id, patch: payload })
           : await insert.mutateAsync({ ...payload, status: 'pending' })
+        // mensalidade: liga a série (ou ajusta a existente); desmarcar encerra a série
+        if (monthly) {
+          const settings = { firstDue, leadDays: Math.min(25, Math.max(0, Number(leadDays) || 0)), endsOn: endsOn || null }
+          if (!editingSeries || recurrenceState(editingSeries) === 'ended') await startRecurrence(saved, settings)
+          else await updateRecurrence(editingSeries, settings)
+        } else if (editingSeries && recurrenceState(editingSeries) !== 'ended') await endRecurrence(editingSeries)
+        await Promise.all(['quotes', 'quote_recurrences', 'financial_transactions'].map((key) => qc.invalidateQueries({ queryKey: [key] })))
         const hasCharge = !!editingProgress?.next?.gateway_charge_id
         // "Salvar e gerar PDF" já gera a cobrança (no modo Asaas); só salvar oferece gerar depois
         toast.success(`Orçamento ${formatQuoteNumber(saved.quote_number)} salvo`, gateway && !hasCharge && connection.data && !thenDownload ? { action: { label: 'Gerar cobrança', onClick: () => chargeQuote(saved) }, duration: 10000 } : undefined)
@@ -293,6 +336,114 @@ export default function QuoteGenerator() {
     if (editing?.id === q.id) startNew()
   }
 
+  const refreshSeries = () => Promise.all(['quotes', 'quote_recurrences', 'financial_transactions'].map((key) => qc.invalidateQueries({ queryKey: [key] })))
+
+  const generateNow = async (r: QuoteRecurrence) => {
+    const id = toast.loading('Gerando a mensalidade…')
+    try {
+      const [created] = await runRecurrences({ onlyId: r.id, force: true })
+      await refreshSeries()
+      const fresh = (await listRows('quote_recurrences')).find((x) => x.id === r.id)
+      if (!created) toast.error('Nada foi gerado', { id, description: fresh?.last_error ?? 'A mensalidade deste mês já tinha sido gerada.' })
+      else if (fresh?.last_error) toast.warning(`Orçamento ${formatQuoteNumber(created.quote_number)} gerado`, { id, description: fresh.last_error, duration: 15000 })
+      else toast.success(`Orçamento ${formatQuoteNumber(created.quote_number)} gerado`, { id, description: `Vence em ${formatDate(created.due_date)}${gateway ? ', com a cobrança no Asaas' : ''}.` })
+    } catch (error) {
+      toast.error('Não foi possível gerar', { id, description: error instanceof Error ? error.message : undefined })
+    }
+  }
+
+  const toggleSeries = async (r: QuoteRecurrence, active: boolean) => {
+    await setRecurrenceActive(r, active)
+    await refreshSeries()
+    toast.success(active ? 'Mensalidade retomada' : 'Mensalidade pausada')
+  }
+
+  const endSeries = async (r: QuoteRecurrence) => {
+    const ok = await confirm({
+      title: 'Encerrar a mensalidade?',
+      description: 'Nenhum orçamento novo será gerado. Os que já foram gerados (e as cobranças deles) continuam como estão.',
+      confirmLabel: 'Encerrar',
+      cancelLabel: 'Voltar',
+    })
+    if (!ok) return
+    await endRecurrence(r)
+    await refreshSeries()
+    toast.success('Mensalidade encerrada')
+  }
+
+  const editLast = async (r: QuoteRecurrence) => {
+    const last = await lastQuoteOf(r)
+    if (last) edit(last)
+  }
+
+  const seriesRows = (recurrences.data ?? [])
+    .map((r) => ({ ...r, last: (quotes.data ?? []).find((q) => q.id === r.last_quote_id) ?? (quotes.data ?? []).find((q) => q.recurrence_id === r.id), state: recurrenceState(r) }))
+    .sort((a, b) => (a.state === 'ended' ? 1 : 0) - (b.state === 'ended' ? 1 : 0) || a.next_due_date.localeCompare(b.next_due_date))
+
+  const seriesColumns: Column<(typeof seriesRows)[number]>[] = [
+    {
+      header: 'Mensalidade',
+      primary: true,
+      cell: (r) => {
+        const c = clientOf(r.client_id)
+        return (
+          <div className="min-w-0">
+            <p className="truncate font-medium">{r.last?.title ?? '—'}</p>
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{c ? c.company_name ?? c.name : r.last?.customer_name ?? '—'}</p>
+          </div>
+        )
+      },
+    },
+    { header: 'Valor', cell: (r) => <span className="tabular font-medium">{formatCurrency(r.last?.total_amount)}</span> },
+    { header: 'Vencimento', cell: (r) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300">todo dia {r.day_of_month}</span> },
+    {
+      header: 'Próxima',
+      cell: (r) =>
+        r.state === 'ended' ? (
+          <span className="text-xs text-slate-500 dark:text-slate-400">—</span>
+        ) : (
+          <div className="tabular whitespace-nowrap text-xs">
+            <p className="text-slate-700 dark:text-slate-200">vence {formatDate(r.next_due_date)}</p>
+            <p className="text-slate-500 dark:text-slate-400">{r.state === 'paused' ? 'pausada' : `gerada em ${formatDate(generationDate(r))}`}</p>
+          </div>
+        ),
+    },
+    {
+      header: 'Situação',
+      cell: (r) => (
+        <div className="max-w-[260px]">
+          <Badge tone={r.state === 'active' ? 'green' : r.state === 'paused' ? 'amber' : 'slate'}>{r.state === 'active' ? 'Ativa' : r.state === 'paused' ? 'Pausada' : 'Encerrada'}</Badge>
+          {r.last_error && <p className="mt-1 text-[11px] leading-snug text-red-600 dark:text-red-400">{r.last_error}</p>}
+        </div>
+      ),
+    },
+    {
+      header: '',
+      className: 'w-12 text-right',
+      cell: (r) => (
+        <Dropdown>
+          <DropdownTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Ações da mensalidade" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownTrigger>
+          <DropdownContent>
+            {r.state === 'active' && <DropdownItem icon={Repeat} onSelect={() => generateNow(r)}>Gerar a próxima agora</DropdownItem>}
+            <DropdownItem icon={Pencil} onSelect={() => editLast(r)}>Editar o último orçamento</DropdownItem>
+            {r.state === 'active' && <DropdownItem icon={Pause} onSelect={() => toggleSeries(r, false)}>Pausar</DropdownItem>}
+            {r.state === 'paused' && <DropdownItem icon={Play} onSelect={() => toggleSeries(r, true)}>Retomar</DropdownItem>}
+            {r.state !== 'ended' && (
+              <>
+                <DropdownSeparator />
+                <DropdownItem icon={Ban} danger onSelect={() => endSeries(r)}>Encerrar mensalidade</DropdownItem>
+              </>
+            )}
+          </DropdownContent>
+        </Dropdown>
+      ),
+    },
+  ]
+
   const columns: Column<Quote>[] = [
     { header: 'Nº', cell: (q) => <span className="tabular font-medium text-slate-500 dark:text-slate-400">{formatQuoteNumber(q.quote_number)}</span> },
     {
@@ -302,8 +453,18 @@ export default function QuoteGenerator() {
         const c = clientOf(q.client_id)
         return (
           <div className="min-w-0">
-            <p className="truncate font-medium">{q.title}</p>
-            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{c ? c.company_name ?? c.name : q.customer_name ?? '—'}</p>
+            <p className="flex items-center gap-2 font-medium">
+              <span className="truncate">{q.title}</span>
+              {q.recurrence_id && (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-50 px-1.5 py-0.5 text-[11px] font-medium text-brand-700 dark:bg-brand-600/20 dark:text-brand-400" title="Mensalidade">
+                  <Repeat className="h-3 w-3" /> Mensal
+                </span>
+              )}
+            </p>
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+              {c ? c.company_name ?? c.name : q.customer_name ?? '—'}
+              {q.due_date ? ` · vence ${formatDate(q.due_date)}` : ''}
+            </p>
           </div>
         )
       },
@@ -495,7 +656,7 @@ export default function QuoteGenerator() {
             <h2 className="text-sm font-semibold">Forma de pagamento</h2>
             <div className="flex flex-wrap items-end gap-3">
               <Field label="Cobrança" className="w-full sm:w-56">
-                <Select disabled={billingLocked} {...register('billing')}>
+                <Select disabled={billingLocked || monthly} {...register('billing')}>
                   <option value="full">Valor integral</option>
                   <option value="deposit">Entrada + saldo</option>
                 </Select>
@@ -514,6 +675,57 @@ export default function QuoteGenerator() {
               </p>
             )}
             {billingLocked && <p className="text-xs text-slate-500 dark:text-slate-400">Já há pagamento registrado: a forma de cobrança não pode mais mudar.</p>}
+          </Card>
+
+          <Card className="space-y-3 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-semibold">
+                  <Repeat className="h-4 w-4 text-slate-400" /> Mensalidade
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Para serviços cobrados todo mês: o sistema gera sozinho o orçamento de cada mês.</p>
+              </div>
+              <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={monthly}
+                  disabled={values.billing === 'deposit' && billingLocked}
+                  onChange={(e) => toggleMonthly(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 accent-brand-600"
+                />
+                Cobrar todo mês
+              </label>
+            </div>
+            {monthly && (
+              <>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label={editingSeries ? 'Vencimento deste orçamento' : 'Vencimento da 1ª mensalidade'}>
+                    <Input type="date" value={firstDue} onChange={(e) => setFirstDue(e.target.value)} />
+                  </Field>
+                  <Field label="Gerar com antecedência (dias)">
+                    <Input type="number" min={0} max={25} value={leadDays} onChange={(e) => setLeadDays(Number(e.target.value))} />
+                  </Field>
+                  <Field label="Até (opcional)">
+                    <Input type="date" value={endsOn} min={firstDue || undefined} onChange={(e) => setEndsOn(e.target.value)} />
+                  </Field>
+                </div>
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                  {firstDue ? (
+                    <>
+                      Vence todo dia <strong>{Number(firstDue.slice(8, 10))}</strong>. {editingSeries ? 'A próxima' : 'A partir do mês seguinte, cada mensalidade'} é gerada{' '}
+                      <strong>{Math.max(0, Number(leadDays) || 0)} dias antes</strong> do vencimento, igual ao último orçamento da série (itens, valor e observações), só com a data nova
+                      {gateway ? ', e a cobrança sai no Asaas, que avisa o cliente' : ', e entra no financeiro como pendente'}.
+                      {editingSeries && recurrenceState(editingSeries) === 'active' && <> Próximo vencimento: <strong>{formatDate(editingSeries.next_due_date)}</strong>.</>}
+                      {endsOn && <> Última mensalidade até <strong>{formatDate(endsOn)}</strong>.</>}
+                    </>
+                  ) : (
+                    'Escolha o vencimento: ele define o dia de todo mês.'
+                  )}
+                </p>
+                {editingSeries && recurrenceState(editingSeries) === 'paused' && <p className="text-xs text-amber-600 dark:text-amber-400">Esta mensalidade está pausada. Retome na lista de mensalidades.</p>}
+              </>
+            )}
+            {!monthly && editingSeries && recurrenceState(editingSeries) !== 'ended' && <p className="text-xs text-amber-600 dark:text-amber-400">Ao salvar, a mensalidade é encerrada: nenhum orçamento novo será gerado.</p>}
           </Card>
 
           <Card className="p-5">
@@ -535,6 +747,20 @@ export default function QuoteGenerator() {
         <PrintPortal>
           <QuoteDocument doc={printing} />
         </PrintPortal>
+      )}
+
+      {seriesRows.length > 0 && (
+        <Card className="mt-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-5 py-3.5">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <Repeat className="h-4 w-4 text-slate-400" /> Mensalidades
+            </h2>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {seriesRows.filter((r) => r.state === 'active').length} ativa{seriesRows.filter((r) => r.state === 'active').length === 1 ? '' : 's'} · geradas sozinhas todo dia de manhã
+            </span>
+          </div>
+          <DataTable columns={seriesColumns} rows={seriesRows} loading={recurrences.isLoading} pageSize={6} empty={null} />
+        </Card>
       )}
 
       <Card className="mt-6">

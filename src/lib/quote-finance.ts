@@ -76,7 +76,9 @@ export async function quoteHasPayment(quoteId: string) {
 export async function syncQuoteTransaction(quote: Quote): Promise<boolean> {
   const parts = quoteParts(await listRows('financial_transactions'), quote.id)
   const base = `Orçamento ${formatQuoteNumber(quote.quote_number)} — ${quote.title}`
-  const dueDate = isoDay(addDays(toDate(quote.created_at), quote.validity_days))
+  // mensalidade tem vencimento fixo; os demais vencem com a validade do orçamento
+  const dueDate = quote.due_date ?? isoDay(addDays(toDate(quote.created_at), quote.validity_days))
+  const category = quote.recurrence_id ? 'Mensalidade' : 'Orçamento'
   let changed = false
 
   const paidParts = parts.filter((t) => t.status === 'paid')
@@ -95,7 +97,7 @@ export async function syncQuoteTransaction(quote: Quote): Promise<boolean> {
     for (const p of plan(quote)) {
       await insertRow('financial_transactions', {
         type: 'income',
-        category: 'Orçamento',
+        category,
         description: p.label ? `${base} · ${p.label}` : base,
         amount: p.amount,
         // a entrada vence com a validade do orçamento; o saldo, um mês depois (ajustável no financeiro)
@@ -122,6 +124,9 @@ export async function syncQuoteTransaction(quote: Quote): Promise<boolean> {
       if (t.client_id !== quote.client_id) patch.client_id = quote.client_id
       // o valor de uma parte já paga é o que entrou de fato; só as abertas acompanham o orçamento
       if (t.status !== 'paid' && !sameMoney(t.amount, p.amount)) patch.amount = p.amount
+      // vencimento fixo (mensalidade) acompanha o orçamento enquanto não foi pago
+      if (quote.due_date && !quote.deposit_pct && t.status !== 'paid' && t.due_date !== quote.due_date) patch.due_date = quote.due_date
+      if (t.category !== category && t.category === (category === 'Mensalidade' ? 'Orçamento' : 'Mensalidade')) patch.category = category
       if (Object.keys(patch).length) {
         await updateRow('financial_transactions', t.id, patch)
         changed = true

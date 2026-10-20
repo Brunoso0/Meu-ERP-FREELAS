@@ -68,12 +68,20 @@ export function QuoteDocument({ doc, className }: { doc: QuoteDoc; className?: s
                 <h6>Data de emissão</h6>
                 <p>{formatDate(doc.date)}</p>
               </div>
-              <div className="pd-meta-item">
-                <h6>Validade</h6>
-                <p>
-                  {doc.validityDays} dias (até {formatDate(doc.validUntil)})
-                </p>
-              </div>
+              {doc.dueDate ? (
+                <div className="pd-meta-item">
+                  <h6>Vencimento</h6>
+                  <p>{formatDate(doc.dueDate)}</p>
+                  {doc.monthly && <span>Mensalidade</span>}
+                </div>
+              ) : (
+                <div className="pd-meta-item">
+                  <h6>Validade</h6>
+                  <p>
+                    {doc.validityDays} dias (até {formatDate(doc.validUntil)})
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="pd-table-box">
