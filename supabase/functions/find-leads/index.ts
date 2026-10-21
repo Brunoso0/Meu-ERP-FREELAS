@@ -1,12 +1,17 @@
 // =====================================================================
-// find-leads: busca empresas no Google Maps por meio do Gemini.
+// find-leads: busca empresas no Google Maps pela Places API (New).
 //
-// A chave do Gemini fica só aqui, como segredo da função (GEMINI_API_KEY),
-// e nunca vai para o navegador. A função só atende quem está logado no app.
+// Os dados vêm direto do Google Maps (nome, telefone, site, avaliações e o
+// link do perfil): nada passa por IA, então não há empresa inventada nem
+// resultado da busca comum do Google. O alvo (sem site, só rede social,
+// poucas avaliações...) é filtrado aqui, pelos dados do próprio perfil.
+//
+// A chave fica só aqui, como segredo da função, e nunca vai para o navegador.
+// A função só atende quem está logado no app.
 //
 // Segredos (Edge Functions → Secrets):
-//   GEMINI_API_KEY  obrigatório, criado em https://aistudio.google.com/apikey
-//   GEMINI_MODEL    opcional, padrão "gemini-2.5-flash"
+//   GOOGLE_PLACES_API_KEY  obrigatório, chave do Google Cloud com a
+//                          "Places API (New)" ativada
 // =====================================================================
 
 const cors = {
@@ -18,55 +23,87 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const SCOPES: Record<string, (place: string) => string> = {
-  city: (p) => `na cidade de ${p}`,
-  region: (p) => `na região de ${p} (a cidade e os municípios em volta)`,
-  other_region: (p) => `na região de ${p}`,
-  country: (p) => `em todo o país: ${p}. Varie as cidades e os estados`,
-  international: (p) => `fora do Brasil, em: ${p}`,
+const SCOPES = ['city', 'region', 'other_region', 'country', 'international']
+const TARGETS = ['no_website', 'no_presence', 'social_only', 'few_reviews', 'any']
+
+/** Cada página da Places API traz até 20 empresas e é cobrada como uma chamada. */
+const MAX_PAGES = 3
+
+const FIELDS = [
+  'places.id',
+  'places.displayName',
+  'places.formattedAddress',
+  'places.nationalPhoneNumber',
+  'places.internationalPhoneNumber',
+  'places.websiteUri',
+  'places.rating',
+  'places.userRatingCount',
+  'places.googleMapsUri',
+  'places.primaryTypeDisplayName',
+  'places.businessStatus',
+  'nextPageToken',
+].join(',')
+
+interface Place {
+  id: string
+  displayName?: { text?: string }
+  formattedAddress?: string
+  nationalPhoneNumber?: string
+  internationalPhoneNumber?: string
+  websiteUri?: string
+  rating?: number
+  userRatingCount?: number
+  googleMapsUri?: string
+  primaryTypeDisplayName?: { text?: string }
+  businessStatus?: string
 }
 
-const TARGETS: Record<string, string> = {
-  no_website: 'empresas que NÃO têm site próprio cadastrado no perfil do Google Maps',
-  no_presence: 'empresas sem presença digital: sem site próprio e sem redes sociais divulgadas no perfil',
-  social_only: 'empresas que usam apenas rede social (Instagram, Facebook) ou link de WhatsApp no lugar de um site próprio',
-  few_reviews: 'empresas com poucas avaliações no Google (menos de 20) ou nota abaixo de 4',
-  any: 'empresas do nicho, com ou sem site',
+const SOCIAL = /(^|\.)(instagram\.com|facebook\.com|fb\.com|fb\.me|wa\.me|whatsapp\.com|linktr\.ee|tiktok\.com|linkin\.bio|beacons\.ai|bio\.link|taplink\.cc|ifood\.com\.br)$/i
+
+function isSocial(url: string) {
+  try {
+    return SOCIAL.test(new URL(url).hostname)
+  } catch {
+    return false
+  }
 }
 
-const clean = (value: unknown, max: number) => String(value ?? '').replace(/[\r\n`]+/g, ' ').trim().slice(0, max)
-
-function buildPrompt(scope: string, place: string, niche: string, target: string, count: number) {
-  return [
-    `Use o Google Maps para encontrar ${count} empresas reais ${SCOPES[scope](place)}.`,
-    `Nicho: ${niche || 'qualquer tipo de comércio ou serviço local'}.`,
-    `Perfil procurado: ${TARGETS[target]}.`,
-    'Só inclua empresas que aparecem no Google Maps e que estão em funcionamento. Não invente empresas nem dados: quando não souber um campo, use null.',
-    'Responda SOMENTE com um array JSON, sem texto antes ou depois, em que cada item tem exatamente estes campos:',
-    '{"name": string, "niche": string, "rating": number|null, "reviews": number|null, "phone": string|null, "address": string|null, "website": string|null, "reason": string}',
-    '"niche" é a categoria da empresa em português. "phone" vem com DDD (e código do país, se for fora do Brasil). "website" é o site ou a rede social cadastrada, ou null. "reason" explica em uma frase curta por que ela se encaixa no perfil procurado.',
-  ].join('\n')
+/** Diz se a empresa se encaixa no alvo e por quê, só com o que está no perfil do Maps. */
+function match(target: string, p: Place): string | null {
+  const site = p.websiteUri ?? null
+  const social = site !== null && isSocial(site)
+  const reviews = p.userRatingCount ?? 0
+  switch (target) {
+    case 'no_website':
+      if (!site) return 'Sem site cadastrado no perfil do Google Maps.'
+      return social ? 'No lugar de um site, o perfil aponta só para uma rede social.' : null
+    case 'no_presence':
+      return site ? null : 'Nenhum site nem rede social cadastrados no perfil do Google Maps.'
+    case 'social_only':
+      return social ? 'Usa só uma rede social como endereço na web, sem site próprio.' : null
+    case 'few_reviews':
+      if (reviews < 20) return reviews === 0 ? 'Ainda sem avaliações no Google.' : `Só ${reviews} ${reviews === 1 ? 'avaliação' : 'avaliações'} no Google.`
+      return p.rating !== undefined && p.rating < 4 ? `Nota ${p.rating.toLocaleString('pt-BR')} no Google, abaixo de 4.` : null
+    default:
+      if (!site) return 'Sem site cadastrado no perfil do Google Maps.'
+      return social ? 'O perfil aponta só para uma rede social.' : 'Já tem site cadastrado no perfil.'
+  }
 }
 
-async function askGemini(key: string, model: string, prompt: string, tool: Record<string, unknown>) {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+function query(scope: string, place: string, niche: string) {
+  const what = niche || 'comércio e serviços'
+  return scope === 'region' ? `${what} na região de ${place}` : `${what} em ${place}`
+}
+
+async function searchPage(key: string, body: Record<string, unknown>) {
+  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      tools: [tool],
-      generationConfig: { temperature: 0.2 },
-    }),
+    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': FIELDS },
+    body: JSON.stringify(body),
   })
   const data = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(data?.error?.message ?? `Gemini respondeu ${response.status}`)
-  const candidate = data?.candidates?.[0]
-  const text = (candidate?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? '').join('')
-  const sources = (candidate?.groundingMetadata?.groundingChunks ?? [])
-    .map((c: { maps?: { title?: string; uri?: string }; web?: { title?: string; uri?: string } }) => c.maps ?? c.web)
-    .filter((s: { uri?: string } | undefined) => s?.uri)
-    .map((s: { title?: string; uri: string }) => ({ title: s.title ?? '', uri: s.uri }))
-  return { text, sources }
+  if (!response.ok) throw new Error(data?.error?.message ?? `O Google Maps respondeu ${response.status}`)
+  return { places: (data?.places ?? []) as Place[], next: (data?.nextPageToken as string | undefined) ?? null }
 }
 
 Deno.serve(async (req) => {
@@ -80,30 +117,56 @@ Deno.serve(async (req) => {
   const who = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/user`, { headers: { Authorization: authorization, apikey } })
   if (!who.ok) return json(401, { error: 'unauthorized', message: 'Entre no sistema para buscar leads.' })
 
-  const key = Deno.env.get('GEMINI_API_KEY')
-  if (!key) return json(500, { error: 'missing_key', message: 'A chave do Gemini (GEMINI_API_KEY) não foi cadastrada nos segredos da função.' })
+  const key = Deno.env.get('GOOGLE_PLACES_API_KEY')
+  if (!key) return json(500, { error: 'missing_key', message: 'A chave do Google Maps (GOOGLE_PLACES_API_KEY) não foi cadastrada nos segredos da função.' })
 
   const body = await req.json().catch(() => ({}))
+  const clean = (value: unknown, max: number) => String(value ?? '').replace(/[\r\n]+/g, ' ').trim().slice(0, max)
   const scope = clean(body.scope, 20)
   const target = clean(body.target, 20)
   const place = clean(body.place, 120)
   const niche = clean(body.niche, 120)
   const count = Math.min(Math.max(Number(body.count) || 10, 1), 20)
-  if (!SCOPES[scope] || !TARGETS[target] || place.length < 2) {
+  if (!SCOPES.includes(scope) || !TARGETS.includes(target) || place.length < 2) {
     return json(400, { error: 'invalid_request', message: 'Informe onde buscar e o perfil das empresas.' })
   }
 
-  const model = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash'
-  const prompt = buildPrompt(scope, place, niche, target, count)
+  const international = scope === 'international'
+  const request: Record<string, unknown> = { textQuery: query(scope, place, niche), languageCode: 'pt-BR', pageSize: 20 }
+  if (!international) request.regionCode = 'BR'
+
+  const leads = []
+  let scanned = 0
   try {
-    try {
-      return json(200, { engine: 'maps', ...(await askGemini(key, model, prompt, { googleMaps: {} })) })
-    } catch (mapsError) {
-      // chave sem acesso à busca no Maps: tenta pela busca do Google
-      console.error('googleMaps falhou:', mapsError)
-      return json(200, { engine: 'search', mapsError: mapsError instanceof Error ? mapsError.message : String(mapsError), ...(await askGemini(key, model, prompt, { googleSearch: {} })) })
+    let token: string | null = null
+    for (let page = 0; page < MAX_PAGES && leads.length < count; page++) {
+      const { places, next } = await searchPage(key, token ? { ...request, pageToken: token } : request)
+      scanned += places.length
+      for (const p of places) {
+        if (leads.length >= count) break
+        if (p.businessStatus && p.businessStatus !== 'OPERATIONAL') continue
+        const reason = match(target, p)
+        if (!reason) continue
+        leads.push({
+          name: p.displayName?.text ?? 'Sem nome',
+          niche: p.primaryTypeDisplayName?.text ?? null,
+          rating: p.rating ?? null,
+          reviews: p.userRatingCount ?? null,
+          phone: (international ? p.internationalPhoneNumber : p.nationalPhoneNumber) ?? p.internationalPhoneNumber ?? null,
+          address: p.formattedAddress ?? null,
+          website: p.websiteUri ?? null,
+          reason,
+          mapsUrl: p.googleMapsUri ?? null,
+          placeId: p.id,
+        })
+      }
+      if (!next) break
+      token = next
     }
   } catch (error) {
-    return json(502, { error: 'gemini_failed', message: error instanceof Error ? error.message : 'O Gemini não respondeu.' })
+    console.error('places falhou:', error)
+    return json(502, { error: 'places_failed', message: `O Google Maps recusou a busca: ${error instanceof Error ? error.message : 'sem resposta'}` })
   }
+
+  return json(200, { engine: 'maps', leads, scanned })
 })

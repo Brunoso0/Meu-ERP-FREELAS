@@ -49,17 +49,14 @@ export interface Lead {
 
 export interface LeadResult {
   leads: Lead[]
-  /** `maps` = Google Maps; `search` = busca do Google (menos preciso); `demo` = dados de exemplo. */
-  engine: 'maps' | 'search' | 'demo'
-  /** Por que a busca no Maps não foi usada, quando caiu para a busca do Google. */
-  mapsError?: string
+  /** `maps` = Google Maps (Places API); `demo` = dados de exemplo. */
+  engine: 'maps' | 'demo'
+  /** Quantas empresas do Google Maps foram olhadas para chegar nestas (o alvo filtra o resto). */
+  scanned?: number
 }
 
-const optionalText = z.preprocess((v) => (typeof v === 'string' && v.trim() && !/^(null|n\/a|-)$/i.test(v.trim()) ? v.trim() : null), z.string().nullable())
-const optionalNumber = z.preprocess((v) => {
-  const n = typeof v === 'string' ? Number(v.replace(',', '.')) : v
-  return typeof n === 'number' && Number.isFinite(n) ? n : null
-}, z.number().nullable())
+const optionalText = z.preprocess((v) => (typeof v === 'string' && v.trim() ? v.trim() : null), z.string().nullable())
+const optionalNumber = z.preprocess((v) => (typeof v === 'number' && Number.isFinite(v) ? v : null), z.number().nullable())
 
 const leadSchema = z.object({
   name: z.string().trim().min(1),
@@ -70,44 +67,20 @@ const leadSchema = z.object({
   address: optionalText,
   website: optionalText,
   reason: optionalText,
+  mapsUrl: optionalText,
 })
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
-/**
- * Extrai os leads do texto devolvido pelo Gemini. O modelo é instruído a
- * responder com um array JSON, mas às vezes o embrulha em ``` ou em uma frase;
- * itens malformados são descartados em vez de derrubar a busca toda.
- */
-export function parseLeads(text: string, sources: Array<{ title: string; uri: string }> = []): Lead[] {
-  const start = text.indexOf('[')
-  const end = text.lastIndexOf(']')
-  if (start < 0 || end <= start) return []
-  let raw: unknown
-  try {
-    raw = JSON.parse(text.slice(start, end + 1))
-  } catch {
-    return []
-  }
+/** Lê as empresas devolvidas pela função; item malformado é descartado em vez de derrubar a busca. */
+export function parseLeads(raw: unknown): Lead[] {
   if (!Array.isArray(raw)) return []
-
-  const seen = new Set<string>()
-  const leads: Lead[] = []
-  for (const item of raw) {
+  return raw.flatMap((item) => {
     const parsed = leadSchema.safeParse(item)
-    if (!parsed.success) continue
-    const key = normalize(parsed.data.name)
-    if (seen.has(key)) continue
-    seen.add(key)
-    const source = sources.find((s) => s.title && (normalize(s.title) === key || normalize(s.title).includes(key) || key.includes(normalize(s.title))))
-    leads.push({
-      ...parsed.data,
-      rating: parsed.data.rating !== null && parsed.data.rating >= 0 && parsed.data.rating <= 5 ? parsed.data.rating : null,
-      id: crypto.randomUUID(),
-      mapsUrl: source && /^https:\/\//i.test(source.uri) ? source.uri : null,
-    })
-  }
-  return leads
+    if (!parsed.success) return []
+    const { mapsUrl, ...lead } = parsed.data
+    return [{ ...lead, id: crypto.randomUUID(), mapsUrl: mapsUrl && /^https:\/\//i.test(mapsUrl) ? mapsUrl : null }]
+  })
 }
 
 /** Link de busca no Google Maps para quando a fonte da empresa não veio na resposta. */
@@ -141,7 +114,7 @@ export async function searchLeads(search: LeadSearch): Promise<LeadResult> {
     if (context?.status === 404) throw new Error('A função de busca (find-leads) ainda não foi publicada no Supabase.')
     throw new Error('Não foi possível falar com a busca de leads. Tente de novo em instantes.')
   }
-  return { leads: parseLeads(String(data?.text ?? ''), data?.sources ?? []), engine: data?.engine === 'search' ? 'search' : 'maps', mapsError: data?.mapsError ? String(data.mapsError).slice(0, 300) : undefined }
+  return { leads: parseLeads(data?.leads), engine: 'maps', scanned: typeof data?.scanned === 'number' ? data.scanned : undefined }
 }
 
 export const defaultLeadMessage =

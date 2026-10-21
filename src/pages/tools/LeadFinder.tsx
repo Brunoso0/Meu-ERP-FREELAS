@@ -46,9 +46,8 @@ function loadPrefs(): Prefs {
 }
 
 const engineNote: Record<LeadResult['engine'], string> = {
-  maps: 'Dados do Google Maps, coletados pelo Gemini. Confira o perfil da empresa antes de entrar em contato: a IA pode errar um telefone ou deixar passar um site.',
-  search: 'A busca no Google Maps não estava disponível para a sua chave; estes resultados vieram da busca do Google e são menos precisos. Confira cada empresa antes de entrar em contato.',
-  demo: 'Modo demo: estas empresas são fictícias. Com o Supabase e a chave do Gemini configurados, a busca traz empresas reais do Google Maps.',
+  maps: 'Dados do perfil de cada empresa no Google Maps. O site considerado é o cadastrado no perfil: confira antes de entrar em contato, a empresa pode ter um site que não colocou lá.',
+  demo: 'Modo demo: estas empresas são fictícias. Com o Supabase e a chave do Google Maps configurados, a busca traz empresas reais do Google Maps.',
 }
 
 export default function LeadFinder() {
@@ -275,8 +274,13 @@ export default function LeadFinder() {
             {result && (
               <div className="flex flex-wrap items-start gap-2 border-b px-5 py-3.5">
                 <Badge tone={result.engine === 'maps' ? 'green' : 'amber'}>{result.leads.length} {result.leads.length === 1 ? 'empresa' : 'empresas'}</Badge>
-                <p className="min-w-0 flex-1 basis-64 text-xs text-slate-500 dark:text-slate-400">{engineNote[result.engine]}
-                  {result.mapsError && <span className="mt-1 block">Resposta do Google: {result.mapsError}</span>}
+                <p className="min-w-0 flex-1 basis-64 text-xs text-slate-500 dark:text-slate-400">
+                  {engineNote[result.engine]}
+                  {result.scanned !== undefined && result.scanned > result.leads.length && (
+                    <span className="mt-1 block">
+                      {result.scanned} empresas olhadas no Maps; {result.leads.length === 1 ? 'esta é a única que se encaixa' : `estas são as que se encaixam`} no alvo.
+                    </span>
+                  )}
                 </p>
               </div>
             )}
