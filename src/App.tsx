@@ -18,6 +18,7 @@ const Tasks = lazy(() => import('@/pages/Tasks'))
 const Agenda = lazy(() => import('@/pages/Agenda'))
 const Finance = lazy(() => import('@/pages/Finance'))
 const Goals = lazy(() => import('@/pages/Goals'))
+const Company = lazy(() => import('@/pages/Company'))
 const BudgetCalculator = lazy(() => import('@/pages/tools/BudgetCalculator'))
 const QuoteGenerator = lazy(() => import('@/pages/tools/QuoteGenerator'))
 const ProposalGenerator = lazy(() => import('@/pages/tools/ProposalGenerator'))
@@ -79,6 +80,7 @@ export default function App() {
             <Route path="agenda" element={<Agenda />} />
             <Route path="financeiro" element={<Finance />} />
             <Route path="metas" element={<Goals />} />
+            <Route path="minha-empresa" element={<Company />} />
             <Route path="ferramentas/calculadora" element={<BudgetCalculator />} />
             <Route path="ferramentas/orcamento" element={<QuoteGenerator />} />
             <Route path="ferramentas/proposta" element={<ProposalGenerator />} />

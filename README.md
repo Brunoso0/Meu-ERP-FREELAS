@@ -98,7 +98,7 @@ Com o Asaas, cada recebimento vira uma cobrança com vencimento, multa e juros, 
 
 1. Rode a migração `011_billing_gateway.sql` (ela usa o Vault do Supabase para guardar a chave cifrada).
 2. Em **Edge Functions**, crie uma função chamada `billing` com o conteúdo de [`supabase/functions/billing/index.ts`](supabase/functions/billing/index.ts) e **desligue "Verify JWT"** (o Asaas não manda JWT; a função confere o usuário e o token do webhook por conta própria). Não precisa cadastrar segredo.
-3. No Asaas, em **Integrações → Chaves de API**, gere uma chave. No app, abra **Minha empresa → Forma de cobrança**, escolha Asaas, cole a chave e clique em Conectar. O app confere a chave e cria sozinho o webhook que avisa os pagamentos.
+3. No Asaas, em **Integrações → Chaves de API**, gere uma chave. No app, abra **Minha empresa → Integrações**, escolha Asaas, cole a chave e clique em Conectar. O app confere a chave e cria sozinho o webhook que avisa os pagamentos.
 
 Para testar sem dinheiro de verdade, crie uma conta no Sandbox do Asaas e conecte com o ambiente "Sandbox (testes)". Não ative a lista de IPs permitidos em Integrações → Segurança: as funções do Supabase não têm IP fixo.
 
@@ -134,7 +134,7 @@ O indicador no topo da tela mostra **Supabase** em verde quando a conexão está
 
 ## Deixar com a sua cara
 
-- **Dados da empresa e Pix.** Menu → seu nome no rodapé → Minha empresa. Ali ficam nome, CNPJ, contatos, a **chave Pix** e a **imagem do QR Code Pix** (a que o app do seu banco gera). Os orçamentos mostram o que estiver cadastrado: QR, chave, ou os dois. O QR é uma imagem fixa: o app mostra o valor ao lado e pede que o cliente o informe ao pagar.
+- **Minha empresa** (seu nome no rodapé do menu) é uma tela com quatro seções: **Dados da Empresa** (nome, CNPJ, contatos e assinatura), **Integrações** (Pix fixo ou Asaas), **Dados Fiscais** (catálogo de serviços da nota) e **Lembretes**. Trocar de seção não perde o que foi digitado, e "Salvar alterações" grava tudo junto. Em Integrações ficam a **chave Pix** e a **imagem do QR Code Pix** (a que o app do seu banco gera). Os orçamentos mostram o que estiver cadastrado: QR, chave, ou os dois. O QR é uma imagem fixa: o app mostra o valor ao lado e pede que o cliente o informe ao pagar.
 - **Cláusulas e serviços do contrato.** Ficam em [`src/lib/contract.ts`](src/lib/contract.ts). As que vêm no projeto foram escritas para serviços de manutenção de sistemas e edição de listas de dados; ajuste a lista `serviceKinds` e os textos para a sua atividade. São um modelo-base, não uma revisão jurídica.
 - **Nome e cor.** O nome aparece em `index.html` e em `src/components/layout/Sidebar.tsx`; a cor de destaque é a paleta `brand` em `tailwind.config.js`.
 

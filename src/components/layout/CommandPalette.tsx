@@ -6,6 +6,7 @@ import { useTable } from '@/hooks/useData'
 import { cn, formatProposalNumber } from '@/lib/utils'
 import { useUI } from '@/store/ui'
 import { mainNav, toolsNav } from './nav'
+import { companySections } from '@/components/forms/companyForm'
 
 interface Result {
   id: string
@@ -48,6 +49,7 @@ export function CommandPalette() {
   const results = useMemo<Result[]>(() => {
     const all: Result[] = [
       ...[...mainNav, ...toolsNav].map((n) => ({ id: `nav-${n.to}`, label: n.label, hint: 'Ir para', icon: n.icon, run: () => navigate(n.to) })),
+      ...companySections.map((c) => ({ id: `empresa-${c.id}`, label: `Minha empresa: ${c.label}`, hint: 'Ir para', icon: c.icon, run: () => navigate(c.id === 'dados' ? '/minha-empresa' : `/minha-empresa?secao=${c.id}`) })),
       ...(clients ?? []).map((c) => ({
         id: `client-${c.id}`,
         label: c.company_name ? `${c.name} — ${c.company_name}` : c.name,

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Download, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { Avatar } from '@/components/ui/primitives'
 import { Tip } from '@/components/ui/overlays'
@@ -39,7 +39,8 @@ function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 }
 
 export function Sidebar() {
-  const { sidebarCollapsed, toggleSidebar, openModal, mobileNavOpen, setMobileNavOpen } = useUI()
+  const { sidebarCollapsed, toggleSidebar, mobileNavOpen, setMobileNavOpen } = useUI()
+  const navigate = useNavigate()
   const narrow = useNarrowScreen()
   // no celular o menu é uma gaveta que abre por cima da tela, sempre com os nomes
   const collapsed = sidebarCollapsed && !narrow
@@ -151,7 +152,7 @@ export function Sidebar() {
               type="button"
               title="Editar dados da empresa"
               disabled={!profile}
-              onClick={() => profile && openModal({ type: 'profile', record: profile })}
+              onClick={() => navigate('/minha-empresa')}
               className={cn('flex min-w-0 items-center gap-2.5 rounded-md text-left', !collapsed && 'flex-1')}
             >
               <Avatar name={name} />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, ArrowRight, Eye, FileCheck2, FileX2, Pencil, ReceiptText, RefreshCw, TriangleAlert, X } from 'lucide-react'
@@ -43,6 +43,7 @@ export default function InvoiceGenerator() {
   const updateProfile = useUpdate('profiles')
   const connection = useBillingConnection()
   const openModal = useUI((s) => s.openModal)
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const preselected = (useLocation().state as { transactionId?: string } | null)?.transactionId
 
@@ -146,7 +147,8 @@ export default function InvoiceGenerator() {
   const problems = stepProblems.flat()
 
   const toggleExtra = (id: string) => setExtras((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]))
-  const editCatalog = () => profile && openModal({ type: 'profile', record: profile })
+  const editCatalog = () => navigate('/minha-empresa?secao=fiscal')
+  const openIntegrations = () => navigate('/minha-empresa?secao=integracoes')
   const setTax = (patch: NfseTaxes) => setTaxes((t) => ({ ...t, ...patch }))
 
   // o código escolhido na busca fica salvo no catálogo, para as próximas notas
@@ -247,7 +249,7 @@ export default function InvoiceGenerator() {
       {(!gateway || (!connection.isLoading && !connection.data)) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           <span>A emissão é feita pelo Asaas. Escolha o Asaas como forma de cobrança e conecte a conta em Minha empresa.</span>
-          <Button variant="secondary" size="sm" onClick={editCatalog}>
+          <Button variant="secondary" size="sm" onClick={openIntegrations}>
             Abrir Minha empresa
           </Button>
         </div>
@@ -333,7 +335,7 @@ export default function InvoiceGenerator() {
                   {services.length === 0 ? (
                     <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
                       <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>Cadastre os serviços que você presta (um por CNAE) em Minha empresa → Nota fiscal.</span>
+                      <span>Cadastre os serviços que você presta (um por CNAE) em Minha empresa → Dados Fiscais.</span>
                     </div>
                   ) : (
                     <>

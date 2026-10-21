@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type UseFormReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
@@ -41,7 +41,7 @@ export interface FieldDef {
 }
 
 /** Campos que só desenham algo na tela e não vão para o banco. */
-const isDisplayOnly = (f: FieldDef) => (f.type === 'custom' && !f.persist) || f.type === 'section'
+export const isDisplayOnly = (f: FieldDef) => (f.type === 'custom' && !f.persist) || f.type === 'section'
 
 interface EntityFormProps {
   open: boolean
@@ -61,7 +61,7 @@ interface EntityFormProps {
   expand?: (payload: Record<string, any>) => Record<string, any>[]
 }
 
-function initialValues(fields: FieldDef[], source: Record<string, any> | undefined) {
+export function initialValues(fields: FieldDef[], source: Record<string, any> | undefined) {
   const values: Record<string, any> = {}
   for (const f of fields) {
     if (isDisplayOnly(f)) continue
@@ -201,6 +201,84 @@ function SignatureField({ field, value, error, onChange }: { field: FieldDef; va
   )
 }
 
+/** O que vai no banco: os campos de dados, com vazio virando null. */
+export function payloadOf(fields: FieldDef[], values: Record<string, any>) {
+  const payload: Record<string, any> = {}
+  for (const f of fields) {
+    if (isDisplayOnly(f)) continue
+    let v = values[f.name]
+    if (f.type === 'custom') {
+      payload[f.name] = v ?? f.initial ?? null
+      continue
+    }
+    if (v === '' || v === undefined) v = null
+    else if (f.type === 'datetime') v = new Date(v).toISOString()
+    payload[f.name] = v
+  }
+  return payload
+}
+
+/** Os campos do formulário numa grade de 2 colunas (usada no painel lateral e em telas inteiras). */
+export function FormFields({ fields, form }: { fields: FieldDef[]; form: UseFormReturn<Record<string, any>> }) {
+  const {
+    register,
+    setValue,
+    watch,
+    formState: { errors },
+  } = form
+  return (
+    <>
+      {fields.map((f) => {
+        if (f.showWhen && !f.showWhen(watch())) return null
+        const error = errors[f.name]?.message as string | undefined
+        if (f.type === 'section') {
+          return (
+            <div key={f.name} className="col-span-2 border-t pt-4 first:border-0 first:pt-0">
+              <p className="text-sm font-semibold">{f.label}</p>
+              {f.hint && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{f.hint}</p>}
+            </div>
+          )
+        }
+        if (f.type === 'custom') {
+          return <div key={f.name} className="col-span-2 grid grid-cols-2">{f.render?.({ values: watch(), setValue: (name, value) => setValue(name, value, { shouldDirty: true }) })}</div>
+        }
+        if (f.type === 'signature') {
+          return <SignatureField key={f.name} field={f} value={watch(f.name) ?? ''} error={error} onChange={(v) => setValue(f.name, v, { shouldDirty: true })} />
+        }
+        if (f.type === 'image') {
+          return <ImageField key={f.name} field={f} value={watch(f.name) ?? ''} error={error} onChange={(v) => setValue(f.name, v, { shouldDirty: true })} />
+        }
+        const reg = register(f.name, f.mask ? { onChange: (e) => setValue(f.name, f.mask!(e.target.value)) } : undefined)
+        const wide = f.full || f.type === 'textarea'
+        return (
+          <Field key={f.name} label={f.label} error={error} className={wide ? 'col-span-2' : 'col-span-2 sm:col-span-1'}>
+            {f.type === 'select' ? (
+              <Select {...reg}>
+                {f.emptyOption && <option value="">{f.emptyOption}</option>}
+                {f.options?.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            ) : f.type === 'textarea' ? (
+              <Textarea placeholder={f.placeholder} {...reg} />
+            ) : (
+              <Input
+                type={f.type === 'datetime' ? 'datetime-local' : f.type ?? 'text'}
+                step={f.type === 'number' ? f.step ?? '0.01' : undefined}
+                placeholder={f.placeholder}
+                {...reg}
+              />
+            )}
+            {f.hint && <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{f.hint}</span>}
+          </Field>
+        )
+      })}
+    </>
+  )
+}
+
 /**
  * Formulário de criação/edição dirigido por configuração: cada entidade
  * declara campos + schema Zod em GlobalModals e este componente cuida de
@@ -213,14 +291,12 @@ export function EntityForm({ open, onClose, noun, title, table, fields: allField
   const update = useUpdate(table)
   const remove = useRemove(table)
 
+  const form = useForm<Record<string, any>>({ resolver: zodResolver(schema), defaultValues: initialValues(fields, record ?? defaults) })
   const {
-    register,
     handleSubmit,
     reset,
-    setValue,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<Record<string, any>>({ resolver: zodResolver(schema), defaultValues: initialValues(fields, record ?? defaults) })
+    formState: { isSubmitting },
+  } = form
 
   // `fields` é recriado a cada render do pai; reiniciar só quando abre ou troca o registro
   useEffect(() => {
@@ -229,18 +305,7 @@ export function EntityForm({ open, onClose, noun, title, table, fields: allField
   }, [open, record?.id])
 
   const submit = handleSubmit(async (values) => {
-    const payload: Record<string, any> = {}
-    for (const f of fields) {
-      if (isDisplayOnly(f)) continue
-      let v = values[f.name]
-      if (f.type === 'custom') {
-        payload[f.name] = v ?? f.initial ?? null
-        continue
-      }
-      if (v === '' || v === undefined) v = null
-      else if (f.type === 'datetime') v = new Date(v).toISOString()
-      payload[f.name] = v
-    }
+    const payload = payloadOf(fields, values)
     try {
       const rows = record ? [] : expand ? expand(payload) : [payload]
       if (record) await update.mutateAsync({ id: record.id, patch: payload })
@@ -268,53 +333,7 @@ export function EntityForm({ open, onClose, noun, title, table, fields: allField
     <Sheet open={open} onClose={onClose} title={title} variant={variant}>
       <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
         <div className="grid flex-1 grid-cols-2 content-start gap-4 overflow-y-auto px-5 py-5">
-          {fields.map((f) => {
-            if (f.showWhen && !f.showWhen(watch())) return null
-            const error = errors[f.name]?.message as string | undefined
-            if (f.type === 'section') {
-              return (
-                <div key={f.name} className="col-span-2 border-t pt-4 first:border-0 first:pt-0">
-                  <p className="text-sm font-semibold">{f.label}</p>
-                  {f.hint && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{f.hint}</p>}
-                </div>
-              )
-            }
-            if (f.type === 'custom') {
-              return <div key={f.name} className="col-span-2 grid grid-cols-2">{f.render?.({ values: watch(), setValue: (name, value) => setValue(name, value, { shouldDirty: true }) })}</div>
-            }
-            if (f.type === 'signature') {
-              return <SignatureField key={f.name} field={f} value={watch(f.name) ?? ''} error={error} onChange={(v) => setValue(f.name, v, { shouldDirty: true })} />
-            }
-            if (f.type === 'image') {
-              return <ImageField key={f.name} field={f} value={watch(f.name) ?? ''} error={error} onChange={(v) => setValue(f.name, v, { shouldDirty: true })} />
-            }
-            const reg = register(f.name, f.mask ? { onChange: (e) => setValue(f.name, f.mask!(e.target.value)) } : undefined)
-            const wide = f.full || f.type === 'textarea'
-            return (
-              <Field key={f.name} label={f.label} error={error} className={wide ? 'col-span-2' : 'col-span-2 sm:col-span-1'}>
-                {f.type === 'select' ? (
-                  <Select {...reg}>
-                    {f.emptyOption && <option value="">{f.emptyOption}</option>}
-                    {f.options?.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </Select>
-                ) : f.type === 'textarea' ? (
-                  <Textarea placeholder={f.placeholder} {...reg} />
-                ) : (
-                  <Input
-                    type={f.type === 'datetime' ? 'datetime-local' : f.type ?? 'text'}
-                    step={f.type === 'number' ? f.step ?? '0.01' : undefined}
-                    placeholder={f.placeholder}
-                    {...reg}
-                  />
-                )}
-                {f.hint && <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{f.hint}</span>}
-              </Field>
-            )
-          })}
+          <FormFields fields={fields} form={form} />
         </div>
         <div className="flex items-center justify-between gap-2 border-t px-5 py-3.5">
           {record && allowDelete ? (

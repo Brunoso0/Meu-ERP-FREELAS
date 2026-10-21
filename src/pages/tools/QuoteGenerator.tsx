@@ -571,7 +571,7 @@ export default function QuoteGenerator() {
       {profile && gateway && !connection.isLoading && !connection.data && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           <span>A forma de cobrança é o Asaas, mas a conta ainda não está conectada. Sem ela, não dá para gerar as cobranças.</span>
-          <Button variant="secondary" size="sm" onClick={() => openModal({ type: 'profile', record: profile })}>
+          <Button variant="secondary" size="sm" onClick={() => navigate('/minha-empresa?secao=integracoes')}>
             Conectar o Asaas
           </Button>
         </div>
@@ -580,7 +580,7 @@ export default function QuoteGenerator() {
       {profile && !gateway && !profile.pix_key && !profile.pix_qr_image && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           <span>Você ainda não cadastrou sua chave Pix nem o QR Code. Sem eles, o orçamento sai sem o bloco de pagamento.</span>
-          <Button variant="secondary" size="sm" onClick={() => openModal({ type: 'profile', record: profile })}>
+          <Button variant="secondary" size="sm" onClick={() => navigate('/minha-empresa?secao=integracoes')}>
             Cadastrar Pix
           </Button>
         </div>
