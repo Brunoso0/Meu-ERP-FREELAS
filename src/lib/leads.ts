@@ -53,6 +53,36 @@ export interface LeadResult {
   engine: 'maps' | 'demo'
   /** Quantas empresas do Google Maps foram olhadas para chegar nestas (o alvo filtra o resto). */
   scanned?: number
+  /** A busca parou antes de achar todas porque a cota gratuita do mês acabou. */
+  stoppedByQuota?: boolean
+  usage?: LeadUsage
+}
+
+/** Chamadas à Places API no mês, contra a cota gratuita do Google. */
+export interface LeadUsage {
+  used: number
+  limit: number
+}
+
+/** Cota gratuita mensal da busca (Text Search Enterprise); a função para de buscar ao chegar nela. */
+export const LEAD_FREE_MONTHLY = 1000
+/** A partir de quanto da cota a tela avisa. */
+export const LEAD_USAGE_WARN = 0.8
+
+const billingMonth = () =>
+  `${new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit' }).format(new Date())}-01`
+
+const usageOf = (value: unknown): LeadUsage | undefined => {
+  const u = value as { used?: unknown; limit?: unknown } | null
+  return u && typeof u.used === 'number' && typeof u.limit === 'number' ? { used: u.used, limit: u.limit } : undefined
+}
+
+/** Uso do mês (o mês do faturamento do Google, no horário do Pacífico). Null no modo demo. */
+export async function fetchLeadUsage(): Promise<LeadUsage | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase.from('api_usage').select('calls').eq('api', 'places_text_search').eq('month', billingMonth()).maybeSingle()
+  if (error) return null
+  return { used: Number(data?.calls ?? 0), limit: LEAD_FREE_MONTHLY }
 }
 
 const optionalText = z.preprocess((v) => (typeof v === 'string' && v.trim() ? v.trim() : null), z.string().nullable())
@@ -114,7 +144,13 @@ export async function searchLeads(search: LeadSearch): Promise<LeadResult> {
     if (context?.status === 404) throw new Error('A função de busca (find-leads) ainda não foi publicada no Supabase.')
     throw new Error('Não foi possível falar com a busca de leads. Tente de novo em instantes.')
   }
-  return { leads: parseLeads(data?.leads), engine: 'maps', scanned: typeof data?.scanned === 'number' ? data.scanned : undefined }
+  return {
+    leads: parseLeads(data?.leads),
+    engine: 'maps',
+    scanned: typeof data?.scanned === 'number' ? data.scanned : undefined,
+    stoppedByQuota: data?.stoppedByQuota === true,
+    usage: usageOf(data?.usage),
+  }
 }
 
 export const defaultLeadMessage =

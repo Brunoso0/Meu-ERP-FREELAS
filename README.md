@@ -81,6 +81,7 @@ No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase
 14. `014_project_proposal.sql` liga projeto e proposta um para um (no máximo um projeto por proposta) e cria o par que falta nos registros antigos. Antes de rodar, ligue à mão os pares que já existem.
 15. `015_quote_recurrence.sql` cria as mensalidades do Gerador de Orçamentos e o agendamento diário (pg_cron) que chama a função `billing` para gerá-las.
 16. `016_reminders.sql` cria os lembretes diários das demandas (horário e canais no perfil, aparelhos inscritos nas notificações, chaves do Web Push no Vault) e o agendamento de hora em hora que chama a função `reminders`.
+17. `017_api_usage.sql` cria o contador mensal de chamadas à Places API, usado pela Busca de Leads para avisar quando a cota gratuita do Google está acabando e parar antes de gerar cobrança.
 
 #### Busca de leads (opcional)
 
@@ -90,7 +91,7 @@ A Busca de Leads consulta o Google Maps pela **Places API (New)**, por meio de u
 2. No painel do Supabase, em **Edge Functions**, crie uma função chamada `find-leads` com o conteúdo de [`supabase/functions/find-leads/index.ts`](supabase/functions/find-leads/index.ts) (ou rode `supabase functions deploy find-leads`).
 3. Em **Edge Functions → Secrets**, cadastre `GOOGLE_PLACES_API_KEY` com a sua chave.
 
-A função só responde a quem está logado no app. Cada busca faz de 1 a 3 chamadas à Places API (20 empresas por chamada; o alvo, como "sem site", filtra as que não se encaixam). O Google cobra por chamada, com uma cota gratuita mensal. "Sem site" considera o site cadastrado no perfil do Maps.
+A função só responde a quem está logado no app. Cada busca faz de 1 a 3 chamadas à Places API (20 empresas por chamada; o alvo, como "sem site", filtra as que não se encaixam). O Google cobra por chamada, com uma cota gratuita mensal de 1.000 chamadas. O app conta as chamadas do mês (tabela `api_usage`, migração 017), mostra o uso na tela, avisa a partir de 80% e para de buscar ao chegar em 1.000, para nunca gerar cobrança. "Sem site" considera o site cadastrado no perfil do Maps.
 
 #### Cobrança pelo Asaas (opcional)
 

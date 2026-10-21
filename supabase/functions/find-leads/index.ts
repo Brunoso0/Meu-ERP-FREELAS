@@ -6,6 +6,9 @@
 // resultado da busca comum do Google. O alvo (sem site, só rede social,
 // poucas avaliações...) é filtrado aqui, pelos dados do próprio perfil.
 //
+// Cada chamada é somada na tabela api_usage (migração 017). Ao chegar na
+// cota gratuita do mês, a função para de buscar: nunca gera cobrança.
+//
 // A chave fica só aqui, como segredo da função, e nunca vai para o navegador.
 // A função só atende quem está logado no app.
 //
@@ -28,6 +31,14 @@ const TARGETS = ['no_website', 'no_presence', 'social_only', 'few_reviews', 'any
 
 /** Cada página da Places API traz até 20 empresas e é cobrada como uma chamada. */
 const MAX_PAGES = 3
+
+/** Cota gratuita mensal do Text Search Enterprise (telefone, site e avaliações). */
+const FREE_MONTHLY = 1000
+const USAGE_API = 'places_text_search'
+
+/** Mês de faturamento do Google (horário do Pacífico), no formato da coluna api_usage.month. */
+const billingMonth = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit' }).format(new Date()) + '-01'
 
 const FIELDS = [
   'places.id',
@@ -106,6 +117,23 @@ async function searchPage(key: string, body: Record<string, unknown>) {
   return { places: (data?.places ?? []) as Place[], next: (data?.nextPageToken as string | undefined) ?? null }
 }
 
+/** Contador de chamadas, gravado com o login de quem buscou (o registro é dele, por RLS). */
+function usageStore(authorization: string, apikey: string) {
+  const base = `${Deno.env.get('SUPABASE_URL')}/rest/v1`
+  const headers = { Authorization: authorization, apikey, 'Content-Type': 'application/json' }
+  return {
+    async read() {
+      const r = await fetch(`${base}/api_usage?select=calls&api=eq.${USAGE_API}&month=eq.${billingMonth()}`, { headers })
+      const rows = r.ok ? await r.json() : []
+      return Number(rows?.[0]?.calls ?? 0)
+    },
+    async add(): Promise<number | null> {
+      const r = await fetch(`${base}/rpc/api_usage_add`, { method: 'POST', headers, body: JSON.stringify({ p_api: USAGE_API, p_calls: 1 }) })
+      return r.ok ? Number(await r.json()) : null
+    },
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
@@ -135,12 +163,29 @@ Deno.serve(async (req) => {
   const request: Record<string, unknown> = { textQuery: query(scope, place, niche), languageCode: 'pt-BR', pageSize: 20 }
   if (!international) request.regionCode = 'BR'
 
+  const usage = usageStore(authorization, apikey)
+  let used = await usage.read()
+  if (used >= FREE_MONTHLY) {
+    return json(429, {
+      error: 'free_quota_reached',
+      message: `A cota gratuita do Google Maps deste mês acabou (${used} de ${FREE_MONTHLY} chamadas). A busca volta no dia 1º, sem gerar cobrança.`,
+      usage: { used, limit: FREE_MONTHLY },
+    })
+  }
+
   const leads = []
   let scanned = 0
+  let stoppedByQuota = false
   try {
     let token: string | null = null
     for (let page = 0; page < MAX_PAGES && leads.length < count; page++) {
+      if (used >= FREE_MONTHLY) {
+        stoppedByQuota = true
+        break
+      }
       const { places, next } = await searchPage(key, token ? { ...request, pageToken: token } : request)
+      // se o contador falhar, conta aqui mesmo para não passar da cota nesta busca
+      used = (await usage.add().catch(() => null)) ?? used + 1
       scanned += places.length
       for (const p of places) {
         if (leads.length >= count) break
@@ -165,8 +210,8 @@ Deno.serve(async (req) => {
     }
   } catch (error) {
     console.error('places falhou:', error)
-    return json(502, { error: 'places_failed', message: `O Google Maps recusou a busca: ${error instanceof Error ? error.message : 'sem resposta'}` })
+    return json(502, { error: 'places_failed', message: `O Google Maps recusou a busca: ${error instanceof Error ? error.message : 'sem resposta'}`, usage: { used, limit: FREE_MONTHLY } })
   }
 
-  return json(200, { engine: 'maps', leads, scanned })
+  return json(200, { engine: 'maps', leads, scanned, stoppedByQuota, usage: { used, limit: FREE_MONTHLY } })
 })
