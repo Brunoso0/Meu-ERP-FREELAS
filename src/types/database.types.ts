@@ -77,6 +77,12 @@ export interface Profile {
   /** Regime e alíquotas da última nota (migração 013). */
   nfse_regime?: NfseRegime
   nfse_taxes?: NfseTaxes
+  /** Lembrete diário das demandas (migração 016). */
+  reminder_email?: boolean
+  reminder_push?: boolean
+  /** Hora do lembrete, no horário de Brasília (0 a 23). */
+  reminder_hour?: number
+  reminder_last_sent?: string | null
   created_at: string
 }
 

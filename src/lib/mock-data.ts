@@ -153,7 +153,7 @@ export function buildSeed(): MockDB {
 
   const profiles: MockDB['profiles'] = [
     { id: u, full_name: 'Usuário Demo', company_name: 'Demo Serviços Digitais', document: '00.000.000/0001-00', email: 'demo@meuerp.example', phone: '(11) 90000-0000', avatar_url: null, pix_key: 'demo@meuerp.example', pix_qr_image: null,
-      billing_provider: 'simple', billing_fine_pct: 2, billing_interest_pct: 1, billing_discount_pct: 0, billing_discount_days: 0, billing_types: 'UNDEFINED', billing_notify: true, created_at: created(365) },
+      billing_provider: 'simple', billing_fine_pct: 2, billing_interest_pct: 1, billing_discount_pct: 0, billing_discount_days: 0, billing_types: 'UNDEFINED', billing_notify: true, reminder_email: false, reminder_push: true, reminder_hour: 7, created_at: created(365) },
   ]
 
   const quotes: MockDB['quotes'] = [

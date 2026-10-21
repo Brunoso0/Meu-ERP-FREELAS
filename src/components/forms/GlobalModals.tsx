@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { EntityForm, type FieldDef } from './EntityForm'
 import { GatewayConnection } from '@/components/billing/GatewayConnection'
 import { NfseServicesEditor } from '@/components/billing/NfseServicesEditor'
+import { ReminderSettings } from '@/components/reminders/ReminderSettings'
 import { billingProviders, billingTypes } from '@/lib/billing'
 import { useTable } from '@/hooks/useData'
 import { useUI, type ModalType } from '@/store/ui'
@@ -131,6 +132,9 @@ const schemas: Record<ModalType, z.ZodTypeAny> = {
       .nullable()
       .transform((v) => v ?? []),
     nfse_observations: text.max(1000, 'Até 1.000 caracteres'),
+    reminder_email: z.union([z.boolean(), z.enum(['true', 'false'])]).transform((v) => v === true || v === 'true'),
+    reminder_push: z.union([z.boolean(), z.enum(['true', 'false'])]).transform((v) => v === true || v === 'true'),
+    reminder_hour: z.coerce.number().int().min(0).max(23),
   }),
 }
 
@@ -239,6 +243,11 @@ export function GlobalModals() {
       { name: 'nfse_services', label: 'Serviços', type: 'custom', persist: true, initial: [], showWhen: (v) => v.billing_provider === 'asaas', render: ({ values, setValue }) => <NfseServicesEditor value={values.nfse_services} onChange={(services) => setValue('nfse_services', services)} /> },
       { name: 'nfse_observations', label: 'Observações em toda nota (opcional)', type: 'textarea', showWhen: (v) => v.billing_provider === 'asaas' },
       { name: 'billing_notify', label: 'Avisos ao cliente', type: 'select', options: [{ value: 'true', label: 'O Asaas avisa o cliente por e-mail e SMS' }, { value: 'false', label: 'Não avisar (eu mando o link)' }], full: true, hint: 'Vale para os clientes cadastrados no Asaas a partir de agora.', showWhen: (v) => v.billing_provider === 'asaas' },
+      { name: 'reminder_section', label: 'Lembretes', type: 'section', hint: 'Todo dia, no horário escolhido, as demandas do dia e as atrasadas chegam por e-mail e como notificação no celular.' },
+      { name: 'reminder_hour', label: 'Horário (Brasília)', type: 'select', options: Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, '0')}:00` })) },
+      { name: 'reminder_email', label: 'Por e-mail', type: 'select', options: [{ value: 'true', label: 'Enviar' }, { value: 'false', label: 'Não enviar' }] },
+      { name: 'reminder_push', label: 'Notificação no celular', type: 'select', options: [{ value: 'true', label: 'Enviar para os aparelhos ativados' }, { value: 'false', label: 'Não enviar' }], full: true },
+      { name: 'reminder_device', label: 'Aparelho', type: 'custom', render: ({ values }) => <ReminderSettings email={values.email ?? ''} /> },
     ],
   }
 

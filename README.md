@@ -41,6 +41,7 @@ Para zerar os dados de exemplo, apague a chave `meu-erp-freelas:demo-db:v1` no a
 | **Propostas** | Lista com status e a proposta em páginas A4 (capa, escopo, cronograma, investimento), pronta para "Salvar em PDF / Imprimir". |
 | **Projetos** | Agrupa as demandas, os recebimentos e as despesas de um trabalho para um cliente. |
 | **Demandas** | Tabela ou kanban semanal (Backlog, Segunda a Sexta). Arraste os cards entre os dias. |
+| **Lembretes** | Todo dia, no horário escolhido em Minha empresa → Lembretes, as demandas do dia e as atrasadas chegam por e-mail (Resend) e como notificação no celular (app instalado). Cada aparelho é ativado nele mesmo; dá para mandar um teste na hora. |
 | **Agenda** | Mês ou semana, com reuniões, prazos e as demandas agendadas. |
 | **Financeiro** | O que você tem a receber e as suas despesas, por mês, trimestre, ano ou tudo, com gráficos de entradas e saídas por mês e de recebido por cliente. Dá para anexar comprovante a cada lançamento e criar lançamentos que se repetem todo mês (mensalidades), com um quadro de quanto tempo cada um ainda dura. |
 | **Metas & Relatórios** | Metas com progresso automático e a margem líquida de cada projeto. |
@@ -79,6 +80,7 @@ No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase
 13. `013_nfse_regime.sql` guarda o regime tributário da nota (MEI, Simples Nacional ou fora dele) e as alíquotas da última nota.
 14. `014_project_proposal.sql` liga projeto e proposta um para um (no máximo um projeto por proposta) e cria o par que falta nos registros antigos. Antes de rodar, ligue à mão os pares que já existem.
 15. `015_quote_recurrence.sql` cria as mensalidades do Gerador de Orçamentos e o agendamento diário (pg_cron) que chama a função `billing` para gerá-las.
+16. `016_reminders.sql` cria os lembretes diários das demandas (horário e canais no perfil, aparelhos inscritos nas notificações, chaves do Web Push no Vault) e o agendamento de hora em hora que chama a função `reminders`.
 
 #### Busca de leads (opcional)
 
