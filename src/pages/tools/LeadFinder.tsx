@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Check, Gauge, MapPin, MessageCircle, Phone, Radar, Search, Star, UserPlus } from 'lucide-react'
+import { Check, CircleHelp, MapPin, MessageCircle, Phone, Radar, Search, Star, UserPlus } from 'lucide-react'
 import { Pager, usePagination } from '@/components/ui/Pagination'
 import { Avatar, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Skeleton, Textarea } from '@/components/ui/primitives'
 import { useInsert, useTable } from '@/hooks/useData'
 import {
   defaultLeadMessage,
-  fetchLeadUsage,
   fillLeadMessage,
-  LEAD_USAGE_WARN,
   isSavedLead,
   leadScopes,
   leadTargets,
@@ -21,7 +18,6 @@ import {
   type LeadResult,
   type LeadScope,
   type LeadTarget,
-  type LeadUsage,
 } from '@/lib/leads'
 import { cn } from '@/lib/utils'
 
@@ -50,32 +46,9 @@ function loadPrefs(): Prefs {
 }
 
 const engineNote: Record<LeadResult['engine'], string> = {
-  maps: 'Dados do perfil de cada empresa no Google Maps. O site considerado é o cadastrado no perfil: confira antes de entrar em contato, a empresa pode ter um site que não colocou lá.',
-  demo: 'Modo demo: estas empresas são fictícias. Com o Supabase e a chave do Google Maps configurados, a busca traz empresas reais do Google Maps.',
-}
-
-/** Quanto da cota gratuita do Google Maps já foi usado no mês; avisa ao se aproximar do fim. */
-function UsageMeter({ usage }: { usage: LeadUsage }) {
-  const ratio = Math.min(usage.used / usage.limit, 1)
-  const level = ratio >= 1 ? 'over' : ratio >= LEAD_USAGE_WARN ? 'warn' : 'ok'
-  const left = Math.max(usage.limit - usage.used, 0)
-  return (
-    <div className="min-w-0 flex-1 basis-56 text-xs" role="status">
-      <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-          <Gauge className="h-3.5 w-3.5" aria-hidden /> Cota grátis do Google Maps no mês
-        </span>
-        <span className={cn('tabular font-medium', level === 'ok' ? 'text-slate-700 dark:text-slate-200' : level === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>
-          {usage.used.toLocaleString('pt-BR')} de {usage.limit.toLocaleString('pt-BR')}
-        </span>
-      </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-        <div className={cn('h-full rounded-full', level === 'ok' ? 'bg-brand-600' : level === 'warn' ? 'bg-amber-500' : 'bg-red-500')} style={{ width: `${ratio * 100}%` }} />
-      </div>
-      {level === 'warn' && <p className="mt-1 text-amber-700 dark:text-amber-300">Restam {left} chamadas grátis (cada busca usa de 1 a 3). Ao acabar, a busca para até o dia 1º, sem cobrança.</p>}
-      {level === 'over' && <p className="mt-1 text-red-700 dark:text-red-300">A cota grátis deste mês acabou. A busca volta no dia 1º, sem gerar cobrança.</p>}
-    </div>
-  )
+  maps: 'Dados do Google Maps, coletados pelo Gemini. Confira o perfil da empresa antes de entrar em contato: a IA pode errar um telefone ou deixar passar um site.',
+  search: 'O Google Maps não estava disponível para a sua chave do Gemini, então a busca foi feita no Google, atrás dos perfis de empresa (o mesmo cadastro do Maps) e de guias locais. Cada empresa foi conferida: telefones inválidos saíram e quem contradizia o alvo ficou de fora. As marcadas "confira" não apareceram nas fontes citadas: abra no Maps antes de entrar em contato.',
+  demo: 'Modo demo: estas empresas são fictícias. Com o Supabase e a chave do Gemini configurados, a busca traz empresas reais do Google Maps.',
 }
 
 export default function LeadFinder() {
@@ -88,8 +61,6 @@ export default function LeadFinder() {
   const [error, setError] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState<string | undefined>()
   const [saving, setSaving] = useState<string | null>(null)
-  const queryClient = useQueryClient()
-  const usage = useQuery({ queryKey: ['lead-usage'], queryFn: fetchLeadUsage, staleTime: 60_000 })
 
   useEffect(() => {
     try {
@@ -116,19 +87,9 @@ export default function LeadFinder() {
     try {
       const found = await searchLeads({ scope: prefs.scope, place: place.trim(), niche: prefs.niche.trim(), target: prefs.target, count: prefs.count })
       setResult(found)
-      if (found.usage) {
-        const before = usage.data?.used ?? 0
-        const warnAt = found.usage.limit * LEAD_USAGE_WARN
-        // avisa uma vez, na busca que cruza o limite de aviso
-        if (before < warnAt && found.usage.used >= warnAt && found.usage.used < found.usage.limit) {
-          toast.warning('A cota grátis do Google Maps está acabando', { description: `${found.usage.used} de ${found.usage.limit} chamadas usadas neste mês.` })
-        }
-        queryClient.setQueryData(['lead-usage'], found.usage)
-      }
     } catch (err) {
       setResult(null)
       setError(err instanceof Error ? err.message : 'Não foi possível buscar.')
-      queryClient.invalidateQueries({ queryKey: ['lead-usage'] })
     } finally {
       setLoading(false)
     }
@@ -168,6 +129,11 @@ export default function LeadFinder() {
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <p className="min-w-0 break-words text-sm font-semibold">{l.name}</p>
             {l.niche && <Badge>{l.niche}</Badge>}
+            {!l.verified && (
+              <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400" title="Esta empresa não apareceu nas fontes que o Gemini citou. Abra no Google Maps para conferir antes de entrar em contato.">
+                <CircleHelp className="h-3.5 w-3.5" aria-hidden /> confira
+              </span>
+            )}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-300">
             {l.rating !== null ? (
@@ -283,10 +249,9 @@ export default function LeadFinder() {
                   ))}
                 </Select>
               </Field>
-              <Button type="submit" loading={loading} disabled={!!usage.data && usage.data.used >= usage.data.limit}>
+              <Button type="submit" loading={loading}>
                 <Search className="h-4 w-4" /> Buscar leads
               </Button>
-              {usage.data && <UsageMeter usage={usage.data} />}
             </div>
           </form>
         </Card>
@@ -317,12 +282,12 @@ export default function LeadFinder() {
                 <Badge tone={result.engine === 'maps' ? 'green' : 'amber'}>{result.leads.length} {result.leads.length === 1 ? 'empresa' : 'empresas'}</Badge>
                 <p className="min-w-0 flex-1 basis-64 text-xs text-slate-500 dark:text-slate-400">
                   {engineNote[result.engine]}
-                  {result.stoppedByQuota && <span className="mt-1 block text-amber-700 dark:text-amber-300">A busca parou antes porque a cota grátis do mês acabou.</span>}
-                  {result.scanned !== undefined && result.scanned > result.leads.length && (
+                  {!!result.dropped && (
                     <span className="mt-1 block">
-                      {result.scanned} empresas olhadas no Maps; {result.leads.length === 1 ? 'esta é a única que se encaixa' : `estas são as que se encaixam`} no alvo.
+                      {result.dropped} {result.dropped === 1 ? 'empresa descartada' : 'empresas descartadas'} na conferência (contradiziam o alvo ou vieram sem nenhum contato).
                     </span>
                   )}
+                  {result.mapsError && <span className="mt-1 block">Por que não veio do Maps: {result.mapsError}</span>}
                 </p>
               </div>
             )}

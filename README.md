@@ -81,6 +81,7 @@ No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase
 14. `014_project_proposal.sql` liga projeto e proposta um para um (no máximo um projeto por proposta) e cria o par que falta nos registros antigos. Antes de rodar, ligue à mão os pares que já existem.
 15. `015_quote_recurrence.sql` cria as mensalidades do Gerador de Orçamentos e o agendamento diário (pg_cron) que chama a função `billing` para gerá-las.
 16. `016_reminders.sql` cria os lembretes diários das demandas (horário e canais no perfil, aparelhos inscritos nas notificações, chaves do Web Push no Vault) e o agendamento de hora em hora que chama a função `reminders`.
+17. `017_api_usage.sql` cria um contador mensal de chamadas a APIs pagas. Foi feito para a Places API do Google, que acabou não sendo adotada; hoje a tabela não é usada.
 
 #### Busca de leads (opcional)
 
@@ -90,7 +91,7 @@ A Busca de Leads usa o Gemini por meio de uma função do Supabase, para a chave
 2. No painel do Supabase, em **Edge Functions**, crie uma função chamada `find-leads` com o conteúdo de [`supabase/functions/find-leads/index.ts`](supabase/functions/find-leads/index.ts) (ou rode `supabase functions deploy find-leads`).
 3. Em **Edge Functions → Secrets**, cadastre `GEMINI_API_KEY` com a sua chave. Opcional: `GEMINI_MODEL` para trocar o modelo (padrão `gemini-2.5-flash`).
 
-A função só responde a quem está logado no app. A busca no Google Maps pelo Gemini é cobrada pelo Google conforme o plano da sua chave; se ela não estiver disponível, a função cai para a busca comum do Google, menos precisa. Os dados vêm de uma IA: confira o perfil da empresa antes de entrar em contato.
+A função só responde a quem está logado no app. A busca no Google Maps pelo Gemini é cobrada pelo Google conforme o plano da sua chave; se ela não estiver disponível (a cota gratuita da chave não cobre o Maps), a função busca no Google os perfis de empresa e guias locais e confere o resultado: telefone inválido sai, empresa que contradiz o alvo (por exemplo, com site próprio numa busca "sem site") é descartada, e as que não aparecem nas fontes citadas pelo Gemini vêm marcadas "confira". Depois de uma recusa por cota ou acesso, a função deixa de tentar o Maps por 6 horas. Os dados vêm de uma IA: confira o perfil da empresa antes de entrar em contato.
 
 #### Cobrança pelo Asaas (opcional)
 

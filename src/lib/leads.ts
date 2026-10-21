@@ -45,44 +45,18 @@ export interface Lead {
   reason: string | null
   /** Link da empresa no Google Maps, quando a busca devolveu a fonte. */
   mapsUrl: string | null
+  /** A empresa aparece nas fontes que o Gemini consultou (sempre true no Maps e no demo). */
+  verified: boolean
 }
 
 export interface LeadResult {
   leads: Lead[]
-  /** `maps` = Google Maps (Places API); `demo` = dados de exemplo. */
-  engine: 'maps' | 'demo'
-  /** Quantas empresas do Google Maps foram olhadas para chegar nestas (o alvo filtra o resto). */
-  scanned?: number
-  /** A busca parou antes de achar todas porque a cota gratuita do mês acabou. */
-  stoppedByQuota?: boolean
-  usage?: LeadUsage
-}
-
-/** Chamadas à Places API no mês, contra a cota gratuita do Google. */
-export interface LeadUsage {
-  used: number
-  limit: number
-}
-
-/** Cota gratuita mensal da busca (Text Search Enterprise); a função para de buscar ao chegar nela. */
-export const LEAD_FREE_MONTHLY = 1000
-/** A partir de quanto da cota a tela avisa. */
-export const LEAD_USAGE_WARN = 0.8
-
-const billingMonth = () =>
-  `${new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit' }).format(new Date())}-01`
-
-const usageOf = (value: unknown): LeadUsage | undefined => {
-  const u = value as { used?: unknown; limit?: unknown } | null
-  return u && typeof u.used === 'number' && typeof u.limit === 'number' ? { used: u.used, limit: u.limit } : undefined
-}
-
-/** Uso do mês (o mês do faturamento do Google, no horário do Pacífico). Null no modo demo. */
-export async function fetchLeadUsage(): Promise<LeadUsage | null> {
-  if (!supabase) return null
-  const { data, error } = await supabase.from('api_usage').select('calls').eq('api', 'places_text_search').eq('month', billingMonth()).maybeSingle()
-  if (error) return null
-  return { used: Number(data?.calls ?? 0), limit: LEAD_FREE_MONTHLY }
+  /** `maps` = Google Maps; `search` = perfis de empresa achados na busca do Google; `demo` = dados de exemplo. */
+  engine: 'maps' | 'search' | 'demo'
+  /** Por que a busca no Maps não foi usada, quando caiu para a busca do Google. */
+  mapsError?: string
+  /** Empresas descartadas na conferência (contradiziam o alvo ou vieram sem nenhum contato). */
+  dropped?: number
 }
 
 const optionalText = z.preprocess((v) => (typeof v === 'string' && v.trim() ? v.trim() : null), z.string().nullable())
@@ -98,18 +72,19 @@ const leadSchema = z.object({
   website: optionalText,
   reason: optionalText,
   mapsUrl: optionalText,
+  verified: z.boolean().catch(false),
 })
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
-/** Lê as empresas devolvidas pela função; item malformado é descartado em vez de derrubar a busca. */
-export function parseLeads(raw: unknown): Lead[] {
+/** Lê as empresas já conferidas pela função; item malformado é descartado em vez de derrubar a busca. */
+export function parseLeads(raw: unknown, engine: LeadResult['engine']): Lead[] {
   if (!Array.isArray(raw)) return []
   return raw.flatMap((item) => {
     const parsed = leadSchema.safeParse(item)
     if (!parsed.success) return []
-    const { mapsUrl, ...lead } = parsed.data
-    return [{ ...lead, id: crypto.randomUUID(), mapsUrl: mapsUrl && /^https:\/\//i.test(mapsUrl) ? mapsUrl : null }]
+    const { mapsUrl, verified, ...lead } = parsed.data
+    return [{ ...lead, id: crypto.randomUUID(), mapsUrl: mapsUrl && /^https:\/\//i.test(mapsUrl) ? mapsUrl : null, verified: engine === 'maps' || verified }]
   })
 }
 
@@ -126,7 +101,7 @@ const demoLeads = (search: LeadSearch): Lead[] =>
     { name: 'Pet Shop Amigo Fiel', niche: 'Pet shop', rating: 4.7, reviews: 58, phone: null, address: 'Av. das Palmeiras, 910 — Vila Nova', website: null, reason: 'Sem site cadastrado no perfil.' },
   ]
     .slice(0, search.count)
-    .map((lead) => ({ ...lead, niche: search.niche.trim() || lead.niche, id: crypto.randomUUID(), mapsUrl: null }))
+    .map((lead) => ({ ...lead, niche: search.niche.trim() || lead.niche, id: crypto.randomUUID(), mapsUrl: null, verified: true }))
 
 /** Busca leads. No modo demo devolve empresas fictícias, para a tela poder ser experimentada. */
 export async function searchLeads(search: LeadSearch): Promise<LeadResult> {
@@ -144,12 +119,12 @@ export async function searchLeads(search: LeadSearch): Promise<LeadResult> {
     if (context?.status === 404) throw new Error('A função de busca (find-leads) ainda não foi publicada no Supabase.')
     throw new Error('Não foi possível falar com a busca de leads. Tente de novo em instantes.')
   }
+  const engine = data?.engine === 'search' ? 'search' : 'maps'
   return {
-    leads: parseLeads(data?.leads),
-    engine: 'maps',
-    scanned: typeof data?.scanned === 'number' ? data.scanned : undefined,
-    stoppedByQuota: data?.stoppedByQuota === true,
-    usage: usageOf(data?.usage),
+    leads: parseLeads(data?.leads, engine),
+    engine,
+    mapsError: data?.mapsError ? String(data.mapsError).slice(0, 300) : undefined,
+    dropped: typeof data?.dropped === 'number' ? data.dropped : undefined,
   }
 }
 
