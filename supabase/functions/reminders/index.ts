@@ -88,29 +88,109 @@ function summary(d: Digest) {
 
 // ---------- e-mail ----------
 
+// Mesmo visual dos PDFs de proposta e orçamento: onda em degradê no topo,
+// selo magenta, título em caixa alta, tabela em caixa arredondada e rodapé
+// com a pílula. E-mail não aceita SVG nem CSS externo: a onda é uma imagem
+// publicada com o app (public/email/onda.png) e o resto é tabela com estilo
+// em linha. Quem não carrega imagens perde só a onda.
+const INK = '#18092b'
+const BODY = '#4b5563'
+const MAGENTA = '#e6007a'
+const PURPLE = '#7928ca'
+const GRADIENT = 'linear-gradient(135deg,#ec008c 0%,#8916b5 60%,#4b0082 100%)'
+const FONT = "'Plus Jakarta Sans',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+const DISPLAY = "'Space Grotesk','Plus Jakarta Sans',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+const PRIORITY_STYLE: Record<string, string> = {
+  urgent: 'background:#fee2e2;color:#b91c1c',
+  high: 'background:#ffedd5;color:#c2410c',
+  medium: 'background:#f3e8ff;color:#7e22ce',
+  low: 'background:#f1f5f9;color:#475569',
+}
+
 function emailHtml(d: Digest, day: string, name: string) {
+  const first = name ? escapeHtml(name.split(' ')[0]) : ''
+  const pill = (priority: string) =>
+    PRIORITY[priority]
+      ? `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;${PRIORITY_STYLE[priority] ?? PRIORITY_STYLE.low}">${PRIORITY[priority]}</span>`
+      : ''
   const row = (i: Item, late: boolean) => `
-    <tr>
-      <td style="padding:10px 0;border-bottom:1px solid #eef0f4">
-        <div style="font-size:14px;font-weight:600;color:#0f172a">${escapeHtml(i.title)}</div>
-        <div style="font-size:12px;color:#64748b;margin-top:2px">${[i.project && escapeHtml(i.project), PRIORITY[i.priority] && `prioridade ${PRIORITY[i.priority].toLowerCase()}`, i.due && (late ? `<span style="color:#dc2626">venceu em ${brDate(i.due)}</span>` : `prazo ${brDate(i.due)}`)].filter(Boolean).join(' · ')}</div>
-      </td>
-    </tr>`
+            <tr>
+              <td style="padding:12px 16px;border-top:1px solid #eef0f6;font-family:${FONT}">
+                <div style="font-size:14px;font-weight:600;color:${INK};line-height:1.35">${escapeHtml(i.title)}</div>
+                ${i.project ? `<div style="font-size:12px;color:${BODY};margin-top:3px">${escapeHtml(i.project)}</div>` : ''}
+              </td>
+              <td align="right" style="padding:12px 16px;border-top:1px solid #eef0f6;white-space:nowrap;vertical-align:top;font-family:${FONT}">
+                ${pill(i.priority)}
+                ${i.due ? `<div style="font-size:12px;margin-top:5px;font-weight:600;color:${late ? '#dc2626' : BODY}">${late ? `venceu ${brDate(i.due)}` : i.due === day ? 'vence hoje' : `prazo ${brDate(i.due)}`}</div>` : ''}
+              </td>
+            </tr>`
   const section = (title: string, items: Item[], late: boolean) =>
-    items.length ? `<h2 style="font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:${late ? '#dc2626' : '#475569'};margin:24px 0 4px">${title}</h2><table width="100%" cellpadding="0" cellspacing="0">${items.map((i) => row(i, late)).join('')}</table>` : ''
-  return `<!doctype html><html><body style="margin:0;background:#f6f7fb;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-  <div style="max-width:560px;margin:0 auto;padding:24px 16px">
-    <div style="background:#fff;border-radius:12px;padding:24px;border:1px solid #e5e7eb">
-      <p style="margin:0;font-size:12px;color:#64748b">${brDate(day)}</p>
-      <h1 style="margin:4px 0 0;font-size:20px;color:#0f172a">Bom dia${name ? `, ${escapeHtml(name.split(' ')[0])}` : ''}!</h1>
-      <p style="margin:6px 0 0;font-size:14px;color:#475569">${summary(d)}.</p>
-      ${section('Para hoje', d.today, false)}
-      ${section('Atrasadas', d.late, true)}
-      ${!d.today.length && !d.late.length ? '<p style="font-size:14px;color:#475569;margin-top:20px">Nada agendado para hoje.</p>' : ''}
-      <p style="margin:24px 0 0"><a href="${APP_URL}/demandas" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 16px;border-radius:8px">Abrir as demandas</a></p>
-    </div>
-    <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:16px">Lembrete do Meu ERP Freelas. Para parar, desligue o e-mail em Minha empresa → Lembretes.</p>
-  </div></body></html>`
+    items.length
+      ? `
+      <tr><td style="padding:0 32px 20px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e9e4f2;border-radius:14px;border-collapse:separate;overflow:hidden">
+          <tr>
+            <td style="padding:10px 16px;background:${late ? '#fef2f2' : '#f8f6fc'};font-family:${FONT};font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${late ? '#dc2626' : '#6b5b86'}">${title}</td>
+            <td align="right" style="padding:10px 16px;background:${late ? '#fef2f2' : '#f8f6fc'};font-family:${FONT};font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${late ? '#dc2626' : '#6b5b86'}">${items.length}</td>
+          </tr>${items.map((i) => row(i, late)).join('')}
+        </table>
+      </td></tr>`
+      : ''
+  const meta = (label: string, value: string, color = INK) => `
+          <td valign="top" style="padding:0 16px 0 0;font-family:${FONT}">
+            <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8b7fa3">${label}</div>
+            <div style="font-size:15px;font-weight:700;color:${color};margin-top:4px">${value}</div>
+          </td>`
+
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Demandas de hoje</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background:#f3f0f8">
+  <div style="display:none;max-height:0;overflow:hidden">${summary(d)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f0f8">
+    <tr><td align="center" style="padding:24px 12px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 12px 30px rgba(75,0,130,.12)">
+        <tr><td style="line-height:0;font-size:0;background:#ffffff"><img src="${APP_URL}/email/onda.png" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0"></td></tr>
+        <tr><td style="padding:8px 32px 0;font-family:${FONT}">
+          <div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:${MAGENTA}">Lembrete do dia</div>
+          <h1 style="margin:10px 0 0;font-family:${DISPLAY};font-size:30px;line-height:1.08;font-weight:700;text-transform:uppercase;color:${INK}">Demandas de hoje</h1>
+          <p style="margin:10px 0 0;font-size:15px;line-height:1.5;color:${BODY}">Bom dia${first ? `, ${first}` : ''}! ${d.today.length || d.late.length ? 'Estas são as demandas que pedem atenção hoje.' : 'Nada agendado para hoje.'}</p>
+        </td></tr>
+        <tr><td style="padding:22px 32px 24px">
+          <table role="presentation" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee8f6;padding-top:16px;width:100%">
+            <tr>
+              ${meta('Data', brDate(day))}
+              ${meta('Para hoje', String(d.today.length))}
+              ${meta('Atrasadas', String(d.late.length), d.late.length ? '#dc2626' : INK)}
+            </tr>
+          </table>
+        </td></tr>
+        ${section('Para hoje', d.today, false)}
+        ${section('Atrasadas', d.late, true)}
+        <tr><td style="padding:4px 32px 32px">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="border-radius:999px;background:${PURPLE};background-image:${GRADIENT}">
+              <a href="${APP_URL}/demandas" style="display:inline-block;padding:13px 26px;font-family:${FONT};font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:999px">Abrir as demandas</a>
+            </td>
+          </tr></table>
+        </td></tr>
+        <tr><td style="padding:14px 32px;border-top:1px solid #f0ebf7;font-family:${FONT}">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td style="font-size:11px;color:#8b7fa3">Para parar, desligue o e-mail em Minha empresa → Lembretes.</td>
+            <td align="right"><span style="display:inline-block;padding:3px 10px;border-radius:999px;background:${PURPLE};background-image:${GRADIENT};color:#ffffff;font-size:10px;font-weight:700;white-space:nowrap">Meu ERP Freelas</span></td>
+          </tr></table>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
 }
 
 async function sendEmail(to: string, d: Digest, day: string, name: string): Promise<string> {
