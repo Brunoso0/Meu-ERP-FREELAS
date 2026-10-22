@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Skeleton } from '@/components/ui/primitives'
 import { GlobalModals } from '@/components/forms/GlobalModals'
+import { BalanceDueDialog } from '@/components/quotes/BalanceDue'
 import { PaymentChoiceDialog } from '@/components/quotes/PaymentChoice'
 import { ConfirmDialog } from '@/components/ui/confirm'
 import { useRecurrenceCatchUp } from '@/hooks/useRecurrenceCatchUp'
@@ -28,6 +29,7 @@ export function AppLayout() {
       <GlobalModals />
       <ConfirmDialog />
       <PaymentChoiceDialog />
+      <BalanceDueDialog />
     </div>
   )
 }

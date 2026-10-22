@@ -22,6 +22,11 @@ export interface QuoteDoc {
   split: Array<{ label: string; amount: number; paid: boolean }>
   /** O que o cliente deve pagar agora (o total, a entrada ou o saldo). */
   due: { label: string; amount: number }
+  /**
+   * Documento da parte 2 (o saldo, com a entrada já paga): sai com a data
+   * de emissão do dia e o vencimento do saldo, no lugar da validade original.
+   */
+  balance: { paidOn: string | null } | null
   /** Dados de pagamento cadastrados no perfil (Minha empresa). */
   pix: { key: string; qr: string | null }
   /**
@@ -51,21 +56,33 @@ export type QuoteDraft = Pick<Quote, 'quote_number' | 'client_id' | 'customer_na
 /**
  * `received` é o que já foi pago do orçamento (soma dos lançamentos pagos).
  * `charge` é o lançamento que o cliente deve pagar agora, com a cobrança do gateway, se houver.
+ * Quando ele é o saldo (parte 2) e a entrada já foi paga, o documento é o
+ * orçamento do saldo: emitido hoje, com o vencimento do saldo; `depositPaidOn`
+ * é a data em que a entrada foi paga.
  */
-export function buildQuoteDoc(quote: QuoteDraft, client: Client | undefined, profile: Profile | undefined, received = 0, charge?: FinancialTransaction | null): QuoteDoc {
-  const date = quote.created_at ? new Date(quote.created_at) : new Date()
+export function buildQuoteDoc(
+  quote: QuoteDraft,
+  client: Client | undefined,
+  profile: Profile | undefined,
+  received = 0,
+  charge?: FinancialTransaction | null,
+  depositPaidOn?: string | null,
+): QuoteDoc {
   const validityDays = Number(quote.validity_days) || 0
   const total = Number(quote.total_amount) || 0
   const pct = quote.deposit_pct || null
   const deposit = pct ? depositAmount(total, pct) : total
   const depositPaid = pct !== null && received > 0 && received >= deposit - 0.005
+  const balance = depositPaid && charge?.installment === 2 && charge.status !== 'paid'
+  const date = balance ? new Date() : quote.created_at ? new Date(quote.created_at) : new Date()
+  const fixedDue = balance ? charge.due_date : quote.due_date
   return {
-    number: formatQuoteNumber(quote.quote_number),
+    number: formatQuoteNumber(quote.quote_number) + (balance ? ' · 2/2' : ''),
     title: quote.title || 'Orçamento sem título',
     date,
     validUntil: addDays(date, validityDays),
     validityDays,
-    dueDate: quote.due_date ? new Date(`${quote.due_date}T12:00:00`) : null,
+    dueDate: fixedDue ? new Date(`${fixedDue}T12:00:00`) : null,
     monthly: !!(quote.monthly || quote.recurrence_id),
     issuer: {
       name: profile?.company_name || profile?.full_name || 'Sua empresa',
@@ -94,6 +111,7 @@ export function buildQuoteDoc(quote: QuoteDraft, client: Client | undefined, pro
       : depositPaid
         ? { label: `Saldo (${100 - pct}%)`, amount: Math.round((total - deposit) * 100) / 100 }
         : { label: `Entrada (${pct}%) a pagar agora`, amount: deposit },
+    balance: balance ? { paidOn: depositPaidOn ?? null } : null,
     // só data URL de imagem vira <img>: o valor vem do banco e não pode apontar para outro lugar
     pix: { key: profile?.pix_key?.trim() ?? '', qr: profile?.pix_qr_image?.startsWith('data:image/') ? profile.pix_qr_image : null },
     gateway:

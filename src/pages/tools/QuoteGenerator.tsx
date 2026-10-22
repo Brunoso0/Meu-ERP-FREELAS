@@ -9,6 +9,7 @@ import { useBillingConnection } from '@/components/billing/GatewayConnection'
 import { useNavigate } from 'react-router-dom'
 import { canIssueInvoice, nfseStatus } from '@/lib/nfse'
 import { PrintPortal } from '@/components/proposals/PrintPortal'
+import { chooseBalanceDue } from '@/components/quotes/BalanceDue'
 import { QuoteDocument } from '@/components/quotes/QuoteDocument'
 import { confirm } from '@/components/ui/confirm'
 import { DataTable, type Column } from '@/components/ui/DataTable'
@@ -147,7 +148,7 @@ export default function QuoteGenerator() {
   const editingProgress = editing ? progressOf(editing) : null
   // com pagamento registrado, a forma de cobrança fica travada
   const billingLocked = (editingProgress?.received ?? 0) > 0
-  const doc = buildQuoteDoc(draft, clientOf(draft.client_id), profile, editingProgress?.received ?? 0, editingProgress?.next)
+  const doc = buildQuoteDoc(draft, clientOf(draft.client_id), profile, editingProgress?.received ?? 0, editingProgress?.next, editingProgress?.parts[0]?.payment_date)
 
   // propostas que podem originar este orçamento: as que ainda não têm orçamento (ou a deste)
   const linkedProposals = new Set((quotes.data ?? []).filter((q) => q.proposal_id && q.id !== editing?.id).map((q) => q.proposal_id))
@@ -212,13 +213,36 @@ export default function QuoteGenerator() {
   /**
    * PDF do orçamento. No modo Asaas, se o valor a pagar agora ainda não tem
    * cobrança, ela é gerada antes: é dela que vêm o QR Code Pix e o link.
+   *
+   * Com a entrada paga, o PDF é o orçamento do saldo (parte 2): emitido hoje,
+   * com um vencimento novo para o saldo, escolhido aqui e gravado no
+   * financeiro. Mandar de novo o documento da entrada, com as datas antigas,
+   * não serve para cobrar o saldo.
    */
   const printQuote = async (q: Quote) => {
     let progress = quoteProgress(await listRows('financial_transactions'), q.id)
+    const balance = !!q.deposit_pct && progress.next?.installment === 2
+    // com cobrança já gerada no Asaas, o vencimento é o dela e não muda daqui
+    if (balance && progress.next && !progress.next.gateway_charge_id) {
+      const today = isoDay(new Date())
+      const current = progress.next.due_date
+      const due = await chooseBalanceDue({
+        title: `${formatQuoteNumber(q.quote_number)} — ${q.title}`,
+        amount: Number(progress.next.amount),
+        suggested: current >= today ? current : shiftDays(today, Number(q.validity_days) || 7),
+        current,
+      })
+      if (!due) return
+      if (due !== current) {
+        await updateRow('financial_transactions', progress.next.id, { due_date: due })
+        await refreshLinked()
+        progress = quoteProgress(await listRows('financial_transactions'), q.id)
+      }
+    }
     if (gateway && connection.data && progress.next && !progress.next.gateway_charge_id) {
       if (await chargeQuote(q)) progress = quoteProgress(await listRows('financial_transactions'), q.id)
     }
-    setPrinting(buildQuoteDoc(q, clientOf(q.client_id), profile, progress.received, progress.next))
+    setPrinting(buildQuoteDoc(q, clientOf(q.client_id), profile, progress.received, progress.next, balance ? progress.parts[0]?.payment_date : null))
   }
 
   const updatePix = async (transactionId: string) => {
@@ -507,7 +531,13 @@ export default function QuoteGenerator() {
             </Button>
           </DropdownTrigger>
           <DropdownContent>
-            <DropdownItem icon={Download} onSelect={() => printQuote(q)}>{gateway && connection.data && next && !next.gateway_charge_id ? 'Gerar cobrança e PDF' : 'Salvar em PDF / Imprimir'}</DropdownItem>
+            <DropdownItem icon={Download} onSelect={() => printQuote(q)}>
+              {q.deposit_pct && next?.installment === 2
+                ? `Gerar orçamento do saldo (${formatCurrency(next.amount)})`
+                : gateway && connection.data && next && !next.gateway_charge_id
+                  ? 'Gerar cobrança e PDF'
+                  : 'Salvar em PDF / Imprimir'}
+            </DropdownItem>
             {gateway && next && !next.gateway_charge_id && (
               <DropdownItem icon={Send} onSelect={() => chargeQuote(q)}>
                 {q.deposit_pct ? `Gerar cobrança da ${next.installment === 1 ? 'entrada' : 'parte final'} no Asaas` : 'Gerar cobrança no Asaas'}

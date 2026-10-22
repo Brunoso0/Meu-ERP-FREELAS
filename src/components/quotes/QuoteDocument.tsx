@@ -53,7 +53,7 @@ export function QuoteDocument({ doc, className }: { doc: QuoteDoc; className?: s
           </div>
 
           <div className="pd-content pd-quote-content">
-            <span className="pd-cover-badge">Orçamento</span>
+            <span className="pd-cover-badge">{doc.balance ? 'Orçamento · Saldo' : 'Orçamento'}</span>
             <h1 className={cn('pd-cover-title pd-quote-title', titleSize)}>{doc.title}</h1>
 
             <div className="pd-cover-meta pd-quote-meta">
@@ -73,6 +73,7 @@ export function QuoteDocument({ doc, className }: { doc: QuoteDoc; className?: s
                   <h6>Vencimento</h6>
                   <p>{formatDate(doc.dueDate)}</p>
                   {doc.monthly && <span>Mensalidade</span>}
+                  {doc.balance && <span>Parcela 2 de 2 (saldo)</span>}
                 </div>
               ) : (
                 <div className="pd-meta-item">
@@ -109,11 +110,11 @@ export function QuoteDocument({ doc, className }: { doc: QuoteDoc; className?: s
                     <td colSpan={3}>Total do orçamento</td>
                     <td className="pd-num">{formatCurrency(doc.total)}</td>
                   </tr>
-                  {doc.split.map((part) => (
+                  {doc.split.map((part, i) => (
                     <tr key={part.label}>
                       <td colSpan={3} style={{ fontWeight: 600 }}>
                         {part.label}
-                        {part.paid && ' · pago'}
+                        {part.paid && (doc.balance?.paidOn && i === 0 ? ` · pago em ${formatDate(doc.balance.paidOn)}` : ' · pago')}
                       </td>
                       <td className="pd-num" style={{ fontWeight: 600 }}>
                         {formatCurrency(part.amount)}
@@ -199,7 +200,7 @@ export function QuoteDocument({ doc, className }: { doc: QuoteDoc; className?: s
                       </>
                     )}
                     <li>Confira o favorecido, informe o valor de {formatCurrency(doc.due.amount)} e confirme.</li>
-                    <li>Envie o comprovante para darmos início ao serviço.</li>
+                    <li>{doc.balance ? 'Envie o comprovante do pagamento.' : 'Envie o comprovante para darmos início ao serviço.'}</li>
                   </ol>
                 </div>
               </div>
