@@ -44,7 +44,7 @@ export function ReminderSettings({ email }: { email: string }) {
     try {
       const r = await sendTestReminder()
       const lines = [
-        r.summary,
+        `${r.summary}.`,
         r.emailTo ? `E-mail para ${r.emailTo}: ${r.email}.` : `E-mail: ${r.email}.`,
         r.push ? (r.push.sent ? `Notificação enviada para ${r.push.sent} aparelho${r.push.sent === 1 ? '' : 's'}.` : 'Nenhum aparelho com notificações ativadas.') : 'Notificações desligadas no perfil.',
       ]
