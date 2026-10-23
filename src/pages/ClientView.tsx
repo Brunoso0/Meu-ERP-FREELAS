@@ -5,6 +5,10 @@ import { ArrowLeft, Check, ChevronDown, ChevronRight, FileCheck2, FileSignature,
 import { clientSchema } from '@/components/forms/GlobalModals'
 import { InvoiceCell, ProofCell, useTransactionFiles } from '@/components/finance/useTransactionFiles'
 import { DataTable, type Column } from '@/components/ui/DataTable'
+import { ListToolbar } from '@/components/ui/ListToolbar'
+import { Pager, usePagination } from '@/components/ui/Pagination'
+import { useListState } from '@/hooks/useListState'
+import { matchesSearch, sortPair, sortRows, type SortOption } from '@/lib/list'
 import { Dropdown, DropdownContent, DropdownItem, DropdownTrigger } from '@/components/ui/overlays'
 import { Avatar, Badge, Button, Card, EmptyState, Field, Input, Select, Skeleton, Textarea } from '@/components/ui/primitives'
 import { useTable, useUpdate } from '@/hooks/useData'
@@ -100,6 +104,26 @@ export default function ClientView() {
     const parts = [...g.quotes.flatMap((q) => quoteParts(income, q.id)), ...g.others]
     return { total: sum(parts.map((t) => t.amount)), received: sum(parts.filter((t) => t.status === 'paid').map((t) => t.amount)) }
   }
+
+  const payList = useListState(`cliente-pagamentos:${id}`, { search: '', status: '', sort: 'due-desc' })
+  const paySort: SortOption<FinancialTransaction>[] = [
+    ...sortPair<FinancialTransaction>('due', ['Vencimento mais recente', 'Vencimento mais antigo'], (t) => t.due_date),
+    ...sortPair<FinancialTransaction>('amount', ['Maior valor', 'Menor valor'], (t) => Number(t.amount)),
+    ...sortPair<FinancialTransaction>('paid', ['Pagamento mais recente', 'Pagamento mais antigo'], (t) => t.payment_date),
+  ]
+  const payRows = useMemo(() => {
+    const { search, status, sort } = payList.state
+    const rows = income.filter((t) => {
+      const s = effectiveStatus(t)
+      return (!status || (status === 'open' ? s !== 'paid' : s === status)) && matchesSearch(search, [t.description, t.category, t.nfse_number, Number(t.amount).toFixed(2).replace('.', ',')])
+    })
+    return sortRows(rows, paySort, sort)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [income, payList.state])
+  const groupPage = usePagination(groups)
+  const invoicePage = usePagination(invoices)
+  const proposalPage = usePagination(clientProposals)
+  const contractPage = usePagination(clientContracts)
 
   if (clients.isLoading) {
     return (
@@ -382,7 +406,7 @@ export default function ClientView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {groups.map((g) => {
+                  {groupPage.visible.map((g) => {
                     const expanded = open.includes(g.id)
                     const money = groupMoney(g)
                     const count = g.quotes.length
@@ -446,6 +470,7 @@ export default function ClientView() {
               </table>
             </div>
           )}
+          <Pager {...groupPage} />
         </Card>
       </div>
 
@@ -453,7 +478,37 @@ export default function ClientView() {
         <h2 className="flex items-center gap-2 border-b px-5 py-3.5 text-sm font-semibold">
           <Wallet className="h-4 w-4 text-slate-400" /> Pagamentos
         </h2>
-        <DataTable columns={paymentColumns} rows={income} loading={transactions.isLoading} pageSize={10} empty={<EmptyState icon={Wallet} title="Nenhum pagamento ainda" description="Os recebimentos deste cliente aparecem aqui." className="py-10" />} />
+        {income.length > 0 && (
+          <ListToolbar
+            search={{ value: payList.state.search, onChange: (v) => payList.set('search', v), placeholder: 'Buscar por descrição, categoria, nota ou valor' }}
+            filters={[
+              {
+                label: 'Filtrar pagamentos por situação',
+                value: payList.state.status,
+                onChange: (v) => payList.set('status', v),
+                allLabel: 'Todas as situações',
+                options: [{ value: 'open', label: 'Em aberto (pendente ou atrasado)' }, ...toOptions(transactionStatus)],
+              },
+            ]}
+            sort={{ value: payList.state.sort, onChange: (v) => payList.set('sort', v), options: paySort }}
+            count={{ shown: payRows.length, total: income.length, noun: ['pagamento', 'pagamentos'] }}
+            filtering={payList.filtering}
+            onClear={payList.reset}
+          />
+        )}
+        <DataTable
+          columns={paymentColumns}
+          rows={payRows}
+          loading={transactions.isLoading}
+          pageSize={10}
+          empty={
+            income.length > 0 ? (
+              <EmptyState icon={Wallet} title="Nenhum pagamento encontrado" description="Ajuste a busca ou o filtro." className="py-10" />
+            ) : (
+              <EmptyState icon={Wallet} title="Nenhum pagamento ainda" description="Os recebimentos deste cliente aparecem aqui." className="py-10" />
+            )
+          }
+        />
       </Card>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -465,7 +520,7 @@ export default function ClientView() {
             <p className={cn(muted, 'px-5 py-6 text-center')}>Nenhuma nota fiscal ainda.</p>
           ) : (
             <ul>
-              {invoices.map((t) => {
+              {invoicePage.visible.map((t) => {
                 const s = t.nfse_status ? nfseStatus[t.nfse_status] : null
                 return (
                   <li key={t.id} className="flex items-center gap-3 border-b px-5 py-3 last:border-0">
@@ -486,6 +541,7 @@ export default function ClientView() {
               })}
             </ul>
           )}
+          <Pager {...invoicePage} />
         </Card>
 
         <Card>
@@ -496,7 +552,7 @@ export default function ClientView() {
             <p className={cn(muted, 'px-5 py-6 text-center')}>Nenhuma proposta ainda.</p>
           ) : (
             <ul>
-              {clientProposals.map((p) => (
+              {proposalPage.visible.map((p) => (
                 <li key={p.id}>
                   <Link to={`/propostas/${p.id}`} className="flex items-center gap-3 border-b px-5 py-3 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                     <div className="min-w-0 flex-1">
@@ -511,6 +567,7 @@ export default function ClientView() {
               ))}
             </ul>
           )}
+          <Pager {...proposalPage} />
         </Card>
 
         <Card>
@@ -521,7 +578,7 @@ export default function ClientView() {
             <p className={cn(muted, 'px-5 py-6 text-center')}>Nenhum contrato ainda.</p>
           ) : (
             <ul>
-              {clientContracts.map((c) => (
+              {contractPage.visible.map((c) => (
                 <li key={c.id} className="flex items-center gap-3 border-b px-5 py-3 last:border-0">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{c.title}</p>
@@ -535,6 +592,7 @@ export default function ClientView() {
               ))}
             </ul>
           )}
+          <Pager {...contractPage} />
         </Card>
       </div>
     </>

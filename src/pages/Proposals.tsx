@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Check, Copy, Eye, FileSignature, FileText, Link2, MessageCircle, MoreHorizontal, PenLine, Plus, QrCode, ScrollText, Send, Trash2, X } from 'lucide-react'
+import { addDays, startOfDay, startOfYear, subDays } from 'date-fns'
+import { Check, Copy, Eye, FileSignature, FileText, Link2, MessageCircle, MoreHorizontal, PenLine, Plus, QrCode, ScrollText, Search, Send, Trash2, X } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui/DataTable'
+import { ListToolbar } from '@/components/ui/ListToolbar'
+import { useListState } from '@/hooks/useListState'
+import { linkOptions, matchesSearch, sortPair, sortRows, type SortOption } from '@/lib/list'
+import { toOptions } from '@/lib/labels'
+import { toDate } from '@/lib/utils'
 import { Dropdown, DropdownContent, DropdownItem, DropdownSeparator, DropdownTrigger, Sheet } from '@/components/ui/overlays'
 import { Badge, Button, Card, EmptyState, Input, PageHeader } from '@/components/ui/primitives'
 import { choosePayment } from '@/components/quotes/PaymentChoice'
@@ -31,6 +37,38 @@ export default function Proposals() {
     const c = clients.data?.find((x) => x.id === id)
     return c ? c.company_name ?? c.name : '—'
   }
+
+  const list = useListState('propostas', { search: '', status: '', client: '', created: '', quote: '', sort: 'created-desc' })
+  const { search, status, client, created, quote, sort } = list.state
+  /** Último dia em que a proposta vale (criação + validade). */
+  const validUntil = (p: Proposal) => addDays(toDate(p.created_at), Number(p.validity_days) || 0).toISOString()
+
+  const sortOptions: SortOption<Proposal>[] = [
+    ...sortPair<Proposal>('created', ['Mais recentes', 'Mais antigas'], (p) => p.created_at),
+    ...sortPair<Proposal>('amount', ['Maior valor', 'Menor valor'], (p) => Number(p.total_amount)),
+    ...sortPair<Proposal>('valid', ['Validade mais distante', 'Validade mais próxima'], validUntil),
+    ...sortPair<Proposal>('title', ['Título Z–A', 'Título A–Z'], (p) => p.title).reverse(),
+    ...sortPair<Proposal>('client', ['Cliente Z–A', 'Cliente A–Z'], (p) => clientName(p.client_id)).reverse(),
+  ]
+
+  const rows = useMemo(() => {
+    const today = startOfDay(new Date())
+    const createdFrom: Record<string, Date> = { '30': subDays(today, 30), '90': subDays(today, 90), year: startOfYear(today) }
+    const filtered = (proposals.data ?? []).filter((p) => {
+      const createdAt = toDate(p.created_at)
+      return (
+        (!status || p.status === status) &&
+        (!client || (client === 'none' ? !p.client_id : p.client_id === client)) &&
+        (!created || (created === 'older' ? createdAt < startOfYear(today) : createdAt >= createdFrom[created])) &&
+        (!quote || (quote === 'with' ? hasQuote(p) : !hasQuote(p))) &&
+        matchesSearch(search, [p.title, formatProposalNumber(p.proposal_number), p.proposal_number, clientName(p.client_id)])
+      )
+    })
+    return sortRows(filtered, sortOptions, sort)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposals.data, clients.data, quotes.data, search, status, client, created, quote, sort])
+
+  const clientOptions = linkOptions((proposals.data ?? []).map((p) => p.client_id), clientName, 'Sem cliente')
 
   const setStatus = (p: Proposal, status: ProposalStatus) =>
     update.mutate({ id: p.id, patch: { status } }, { onSuccess: () => toast.success(`Proposta marcada como ${proposalStatus[status].label.toLowerCase()}`) })
@@ -175,17 +213,54 @@ export default function Proposals() {
         actions={action}
       />
       <Card>
+        <ListToolbar
+          search={{ value: search, onChange: (v) => list.set('search', v), placeholder: 'Buscar por título, número ou cliente' }}
+          filters={[
+            { label: 'Filtrar por status', value: status, onChange: (v) => list.set('status', v), allLabel: 'Todos os status', options: toOptions(proposalStatus) },
+            { label: 'Filtrar por cliente', value: client, onChange: (v) => list.set('client', v), allLabel: 'Todos os clientes', options: clientOptions },
+            {
+              label: 'Filtrar por data de criação',
+              value: created,
+              onChange: (v) => list.set('created', v),
+              allLabel: 'Criadas em qualquer data',
+              options: [
+                { value: '30', label: 'Últimos 30 dias' },
+                { value: '90', label: 'Últimos 90 dias' },
+                { value: 'year', label: 'Este ano' },
+                { value: 'older', label: 'Anos anteriores' },
+              ],
+            },
+            { label: 'Filtrar por orçamento', value: quote, onChange: (v) => list.set('quote', v), allLabel: 'Com ou sem orçamento', options: [{ value: 'with', label: 'Com orçamento gerado' }, { value: 'without', label: 'Sem orçamento' }] },
+          ]}
+          sort={{ value: sort, onChange: (v) => list.set('sort', v), options: sortOptions }}
+          count={{ shown: rows.length, total: proposals.data?.length ?? 0, noun: ['proposta', 'propostas'] }}
+          filtering={list.filtering}
+          onClear={list.reset}
+        />
         <DataTable
           columns={columns}
-          rows={proposals.data}
+          rows={rows}
           loading={proposals.isLoading}
           empty={
-            <EmptyState
-              icon={FileText}
-              title="Nenhuma proposta ainda"
-              description="Monte a primeira proposta no gerador: escopo, entregáveis, cronograma e preços em um PDF pronto para enviar."
-              action={action}
-            />
+            list.filtering ? (
+              <EmptyState
+                icon={Search}
+                title="Nenhuma proposta encontrada"
+                description="Ajuste a busca ou os filtros."
+                action={
+                  <Button variant="secondary" onClick={list.reset}>
+                    Limpar filtros
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={FileText}
+                title="Nenhuma proposta ainda"
+                description="Monte a primeira proposta no gerador: escopo, entregáveis, cronograma e preços em um PDF pronto para enviar."
+                action={action}
+              />
+            )
           }
         />
       </Card>

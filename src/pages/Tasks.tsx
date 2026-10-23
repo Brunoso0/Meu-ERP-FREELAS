@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react'
 import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd'
 import { addDays, addWeeks, isBefore, startOfDay, startOfWeek } from 'date-fns'
-import { CalendarClock, ChevronLeft, ChevronRight, Kanban, LayoutGrid, List, Plus } from 'lucide-react'
+import { CalendarClock, ChevronLeft, ChevronRight, Kanban, LayoutGrid, List, Plus, Search } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui/DataTable'
+import { ListToolbar } from '@/components/ui/ListToolbar'
 import { Badge, Button, Card, EmptyState, PageHeader, Segmented, Skeleton } from '@/components/ui/primitives'
 import { useTable, useUpdate } from '@/hooks/useData'
-import { taskPriority, taskStatus } from '@/lib/labels'
+import { useListState } from '@/hooks/useListState'
+import { taskPriority, taskStatus, toOptions } from '@/lib/labels'
+import { linkOptions, matchesSearch, sortPair, sortRows, type SortOption } from '@/lib/list'
 import { cn, formatCurrency, formatDate, isoDay, toDate } from '@/lib/utils'
 import { useUI } from '@/store/ui'
 import type { Task, TaskPriority } from '@/types/database.types'
@@ -37,16 +40,56 @@ export default function Tasks() {
     [monday],
   )
 
-  const tasksOf = (columnId: string) =>
-    (tasks.data ?? [])
-      .filter((t) => (columnId === BACKLOG ? !t.scheduled_date && t.status !== 'done' : t.scheduled_date === columnId))
-      .sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority] || a.created_at.localeCompare(b.created_at))
-
   const clientTag = (task: Task) => {
     const project = projects.data?.find((p) => p.id === task.project_id)
     const client = clients.data?.find((c) => c.id === project?.client_id)
     return client?.company_name ?? client?.name ?? project?.title ?? null
   }
+  const projectTitle = (id: string) => projects.data?.find((p) => p.id === id)?.title ?? 'Projeto removido'
+
+  // busca, projeto, prioridade e prazo valem no kanban e na tabela; status e ordenação, só na tabela
+  const list = useListState('demandas', { search: '', project: '', priority: '', due: '', status: 'open', sort: 'due-asc' })
+  const { search, project, priority, due, status, sort } = list.state
+  const isLateTask = (t: Task) => t.status !== 'done' && !!t.due_date && t.due_date < today
+
+  const filtered = useMemo(() => {
+    const weekEnd = isoDay(addDays(new Date(), 7))
+    return (tasks.data ?? []).filter((t) => {
+      const p = projects.data?.find((x) => x.id === t.project_id)
+      return (
+        (!project || (project === 'none' ? !t.project_id : t.project_id === project)) &&
+        (!priority || t.priority === priority) &&
+        (!due ||
+          (due === 'late'
+            ? isLateTask(t)
+            : due === 'today'
+              ? t.due_date === today
+              : due === 'week'
+                ? !!t.due_date && t.due_date >= today && t.due_date <= weekEnd
+                : !t.due_date)) &&
+        matchesSearch(search, [t.title, t.description, p?.title, clientTag(t)])
+      )
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks.data, projects.data, clients.data, search, project, priority, due, today])
+
+  const sortOptions: SortOption<Task>[] = [
+    ...sortPair<Task>('due', ['Prazo mais distante', 'Prazo mais próximo'], (t) => t.due_date).reverse(),
+    ...sortPair<Task>('priority', ['Prioridade mais alta', 'Prioridade mais baixa'], (t) => 3 - priorityRank[t.priority]),
+    ...sortPair<Task>('scheduled', ['Dia mais distante', 'Dia mais próximo'], (t) => t.scheduled_date).reverse(),
+    ...sortPair<Task>('created', ['Mais recentes', 'Mais antigas'], (t) => t.created_at),
+    ...sortPair<Task>('amount', ['Maior valor', 'Menor valor'], (t) => Number(t.charged_amount ?? 0)),
+  ]
+  const tableRows = useMemo(
+    () => sortRows(filtered.filter((t) => !status || (status === 'open' ? t.status !== 'done' : t.status === status)), sortOptions, sort),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, status, sort],
+  )
+
+  const tasksOf = (columnId: string) =>
+    filtered
+      .filter((t) => (columnId === BACKLOG ? !t.scheduled_date && t.status !== 'done' : t.scheduled_date === columnId))
+      .sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority] || a.created_at.localeCompare(b.created_at))
 
   const onDragEnd = ({ destination, source, draggableId }: DropResult) => {
     if (!destination || destination.droppableId === source.droppableId) return
@@ -84,6 +127,34 @@ export default function Tasks() {
 
   const newTask = (defaults?: Record<string, unknown>) => openModal({ type: 'task', defaults })
   const empty = !tasks.isLoading && (tasks.data?.length ?? 0) === 0
+  const filterBar = (
+    <ListToolbar
+      search={{ value: search, onChange: (v) => list.set('search', v), placeholder: 'Buscar por demanda, projeto ou cliente' }}
+      filters={[
+        { label: 'Filtrar por projeto', value: project, onChange: (v) => list.set('project', v), allLabel: 'Todos os projetos', options: linkOptions((tasks.data ?? []).map((t) => t.project_id), projectTitle, 'Sem projeto') },
+        { label: 'Filtrar por prioridade', value: priority, onChange: (v) => list.set('priority', v), allLabel: 'Todas as prioridades', options: toOptions(taskPriority).reverse() },
+        {
+          label: 'Filtrar por prazo',
+          value: due,
+          onChange: (v) => list.set('due', v),
+          allLabel: 'Qualquer prazo',
+          options: [
+            { value: 'late', label: 'Atrasadas' },
+            { value: 'today', label: 'Vencem hoje' },
+            { value: 'week', label: 'Vencem em 7 dias' },
+            { value: 'none', label: 'Sem prazo' },
+          ],
+        },
+        ...(view === 'table'
+          ? [{ label: 'Filtrar por status', value: status, onChange: (v: string) => list.set('status', v), allLabel: 'Todos os status', options: [{ value: 'open', label: 'Em aberto (não concluídas)' }, ...toOptions(taskStatus)] }]
+          : []),
+      ]}
+      sort={view === 'table' ? { value: sort, onChange: (v) => list.set('sort', v), options: sortOptions } : undefined}
+      count={view === 'table' ? { shown: tableRows.length, total: tasks.data?.length ?? 0, noun: ['demanda', 'demandas'] } : { shown: filtered.length, total: tasks.data?.length ?? 0, noun: ['demanda', 'demandas'] }}
+      filtering={view === 'table' ? list.filtering : !!(search || project || priority || due)}
+      onClear={list.reset}
+    />
+  )
 
   return (
     <>
@@ -122,17 +193,30 @@ export default function Tasks() {
         </Card>
       ) : view === 'table' ? (
         <Card>
+          {filterBar}
           <DataTable
             columns={tableColumns}
-            rows={tasks.data}
+            rows={tableRows}
             loading={tasks.isLoading}
             pageSize={10}
             onRowClick={(t) => openModal({ type: 'task', record: t })}
-            empty={null}
+            empty={
+              <EmptyState
+                icon={Search}
+                title="Nenhuma demanda encontrada"
+                description={list.filtering ? 'Ajuste a busca ou os filtros.' : 'Todas as demandas estão concluídas.'}
+                action={
+                  <Button variant="secondary" onClick={() => (list.filtering ? list.reset() : list.set('status', ''))}>
+                    {list.filtering ? 'Limpar filtros' : 'Ver todas'}
+                  </Button>
+                }
+              />
+            }
           />
         </Card>
       ) : (
         <>
+          <Card className="mb-3">{filterBar}</Card>
           <div className="mb-3 flex items-center gap-2">
             <Button variant="secondary" size="icon" onClick={() => setWeekOffset(weekOffset - 1)} aria-label="Semana anterior">
               <ChevronLeft className="h-4 w-4" />

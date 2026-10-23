@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react'
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, setHours, setMinutes, startOfMonth, startOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Plus, Video } from 'lucide-react'
+import { ListToolbar } from '@/components/ui/ListToolbar'
 import { Button, Card, PageHeader, Segmented, Skeleton } from '@/components/ui/primitives'
 import { useTable } from '@/hooks/useData'
+import { useListState } from '@/hooks/useListState'
+import { matchesSearch } from '@/lib/list'
 import { useNarrowScreen } from '@/hooks/useMediaQuery'
 import { cn, toDate } from '@/lib/utils'
 import { useUI } from '@/store/ui'
@@ -39,8 +42,10 @@ export default function Agenda() {
   // no celular o mês mostra só pontos; o dia tocado abre a lista embaixo
   const [selected, setSelected] = useState(new Date())
   const narrow = useNarrowScreen()
+  const list = useListState('agenda', { search: '', kind: '' })
+  const { search, kind } = list.state
 
-  const items = useMemo<AgendaItem[]>(() => {
+  const allItems = useMemo<AgendaItem[]>(() => {
     const fromEvents: AgendaItem[] = (events.data ?? []).map((e) => ({
       id: e.id,
       title: e.title,
@@ -64,6 +69,8 @@ export default function Agenda() {
     // demandas (sem horário) primeiro, depois compromissos em ordem de hora
     return [...fromTasks, ...fromEvents.sort((a, b) => a.date.getTime() - b.date.getTime())]
   }, [events.data, tasks.data, openModal])
+
+  const items = useMemo(() => allItems.filter((i) => (!kind || i.kind === kind) && matchesSearch(search, [i.title])), [allItems, kind, search])
 
   const days = useMemo(() => {
     const start = view === 'month' ? startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 }) : startOfWeek(cursor, { weekStartsOn: 1 })
@@ -102,6 +109,30 @@ export default function Agenda() {
           </>
         }
       />
+
+      <Card className="mb-3">
+        <ListToolbar
+          className="border-b-0"
+          search={{ value: search, onChange: (v) => list.set('search', v), placeholder: 'Buscar compromisso ou demanda pelo título' }}
+          filters={[
+            {
+              label: 'Filtrar por tipo',
+              value: kind,
+              onChange: (v) => list.set('kind', v),
+              allLabel: 'Todos os tipos',
+              options: [
+                { value: 'meeting', label: 'Reuniões' },
+                { value: 'deadline', label: 'Prazos' },
+                { value: 'review', label: 'Revisões' },
+                { value: 'task', label: 'Demandas agendadas' },
+              ],
+            },
+          ]}
+          count={{ shown: items.length, total: allItems.length, noun: ['item', 'itens'] }}
+          filtering={list.filtering}
+          onClear={list.reset}
+        />
+      </Card>
 
       <div className="mb-3 flex items-center gap-2">
         <Button variant="secondary" size="icon" onClick={() => move(-1)} aria-label="Anterior">

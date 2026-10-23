@@ -4,7 +4,10 @@ import { addMonths, addQuarters, addYears, endOfMonth, endOfQuarter, endOfYear, 
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
-import { Ban, Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Eye, FileCheck2, FileText, FileX2, MessageCircle, MoreHorizontal, Paperclip, Pencil, Plus, RefreshCw, Send, Wallet } from 'lucide-react'
+import { Ban, Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Eye, FileCheck2, FileText, FileX2, MessageCircle, MoreHorizontal, Paperclip, Pencil, Plus, RefreshCw, Search, Send, Wallet } from 'lucide-react'
+import { ListToolbar } from '@/components/ui/ListToolbar'
+import { useListState } from '@/hooks/useListState'
+import { distinctOptions, linkOptions, matchesSearch, sortPair, sortRows, type SortOption } from '@/lib/list'
 import { FinanceCharts } from '@/components/finance/FinanceCharts'
 import { RecurrenceList } from '@/components/finance/RecurrenceList'
 import { InvoiceCell, ProofCell, useTransactionFiles } from '@/components/finance/useTransactionFiles'
@@ -18,7 +21,7 @@ import { cancelCharge, cancelInvoice, chargeMessage, createCharge, gatewayStatus
 import { canIssueInvoice } from '@/lib/nfse'
 import { updateRow } from '@/lib/db'
 import { whatsappUrl } from '@/lib/leads'
-import { effectiveStatus, transactionStatus } from '@/lib/labels'
+import { effectiveStatus, toOptions, transactionStatus } from '@/lib/labels'
 import { cn, formatCurrency, formatDate, isoDay, sum, toDate } from '@/lib/utils'
 import { useUI } from '@/store/ui'
 import type { FinancialTransaction } from '@/types/database.types'
@@ -83,6 +86,25 @@ export default function Finance() {
     }
   }, [all, range])
 
+  const counterpart = (t: FinancialTransaction) => {
+    const c = clients.data?.find((x) => x.id === t.client_id)
+    return c ? c.company_name ?? c.name : undefined
+  }
+  const projectTitle = (id: string | null) => projects.data?.find((p) => p.id === id)?.title
+
+  const list = useListState('financeiro', { search: '', status: '', category: '', client: '', origin: '', docs: '', sort: 'due-desc' })
+  const { search, status: statusFilter, category: categoryFilter, client: clientFilter, origin: originFilter, docs: docFilter, sort } = list.state
+  const hasInvoice = (t: FinancialTransaction) => t.nfse_status === 'AUTHORIZED' || !!t.invoice_url
+  /** De onde veio o lançamento: mensalidade, orçamento, contrato, parcela recorrente ou lançado à mão. */
+  const originOf = (t: FinancialTransaction) =>
+    t.category === 'Mensalidade' ? 'monthly' : t.quote_id ? 'quote' : t.contract_id ? 'contract' : t.recurrence_id ? 'recurrence' : 'manual'
+  const sortOptions: SortOption<FinancialTransaction>[] = [
+    ...sortPair<FinancialTransaction>('due', ['Vencimento mais recente', 'Vencimento mais antigo'], (t) => t.due_date),
+    ...sortPair<FinancialTransaction>('amount', ['Maior valor', 'Menor valor'], (t) => Number(t.amount)),
+    ...sortPair<FinancialTransaction>('paid', ['Pagamento mais recente', 'Pagamento mais antigo'], (t) => t.payment_date),
+    ...sortPair<FinancialTransaction>('description', ['Descrição Z–A', 'Descrição A–Z'], (t) => t.description).reverse(),
+  ]
+
   const rowsByTab: Record<Tab, FinancialTransaction[]> = useMemo(() => {
     const inRange = (day: string | null) => !!day && (!range || (toDate(day) >= range.start && toDate(day) <= range.end))
     const shown = all.filter((t) => inRange(t.due_date) || (t.status === 'paid' && inRange(t.payment_date)))
@@ -93,22 +115,39 @@ export default function Finance() {
     const anchor = new Map<string, string>()
     for (const t of rows) if (t.quote_id && (anchor.get(t.quote_id) ?? '') < t.due_date) anchor.set(t.quote_id, t.due_date)
     const key = (t: FinancialTransaction) => (t.quote_id ? anchor.get(t.quote_id)! : t.due_date)
-    const order = (a: FinancialTransaction, b: FinancialTransaction) =>
-      key(b).localeCompare(key(a)) || (a.quote_id ?? a.id).localeCompare(b.quote_id ?? b.id) || (a.installment ?? 0) - (b.installment ?? 0)
+    const dir = sort === 'due-asc' ? -1 : 1
+    const grouped = (a: FinancialTransaction, b: FinancialTransaction) =>
+      key(b).localeCompare(key(a)) * dir || (a.quote_id ?? a.id).localeCompare(b.quote_id ?? b.id) || (a.installment ?? 0) - (b.installment ?? 0)
+    // por vencimento, as partes de um orçamento ficam juntas; nas demais ordens, cada lançamento vale por si
+    const order = (items: FinancialTransaction[]) => (sort === 'due-desc' || sort === 'due-asc' ? [...items].sort(grouped) : sortRows(items, sortOptions, sort))
+    const visible = rows.filter((t) => {
+      const status = effectiveStatus(t)
+      const docs = t.type === 'income' ? docFilter : docFilter.startsWith('invoice') ? '' : docFilter
+      return (
+        (!statusFilter || (statusFilter === 'open' ? status !== 'paid' : status === statusFilter)) &&
+        (!categoryFilter || (t.category ?? '') === categoryFilter) &&
+        (!clientFilter || t.type !== 'income' || (clientFilter === 'none' ? !t.client_id : t.client_id === clientFilter)) &&
+        (!originFilter || originOf(t) === originFilter) &&
+        (!docs ||
+          (docs === 'proof' ? !!t.proof_url : docs === 'no-proof' ? !t.proof_url : docs === 'invoice' ? hasInvoice(t) : !hasInvoice(t))) &&
+        matchesSearch(search, [t.description, t.category, counterpart(t), projectTitle(t.project_id), t.nfse_number, Number(t.amount).toFixed(2).replace('.', ',')])
+      )
+    })
     return {
-      income: rows.filter((t) => t.type === 'income').sort(order),
-      expenses: rows.filter((t) => t.type === 'expense').sort(order),
+      income: order(visible.filter((t) => t.type === 'income')),
+      expenses: order(visible.filter((t) => t.type === 'expense')),
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [all, range, clients.data, projects.data, search, statusFilter, categoryFilter, clientFilter, originFilter, docFilter, sort])
+
+  const totalByTab = useMemo(() => {
+    const inRange = (day: string | null) => !!day && (!range || (toDate(day) >= range.start && toDate(day) <= range.end))
+    const shown = all.filter((t) => inRange(t.due_date) || (t.status === 'paid' && inRange(t.payment_date)))
+    return { income: shown.filter((t) => t.type === 'income').length, expenses: shown.filter((t) => t.type === 'expense').length }
   }, [all, range])
 
   /** A linha está na lista por outro motivo que não o vencimento no período (pago nele ou parte do mesmo orçamento). */
   const outsideDue = (t: FinancialTransaction) => !!range && (toDate(t.due_date) < range.start || toDate(t.due_date) > range.end)
-
-  const counterpart = (t: FinancialTransaction) => {
-    const c = clients.data?.find((x) => x.id === t.client_id)
-    return c ? c.company_name ?? c.name : undefined
-  }
-  const projectTitle = (id: string | null) => projects.data?.find((p) => p.id === id)?.title
 
   const markPaid = (t: FinancialTransaction) =>
     update.mutate({ id: t.id, patch: { status: 'paid', payment_date: isoDay(new Date()) } }, { onSuccess: () => toast.success('Marcado como pago') })
@@ -335,7 +374,18 @@ export default function Finance() {
 
       {files.input}
 
-      <Tabs.Root value={tab} onValueChange={(v) => setTab(v as Tab)} className="mt-4">
+      <Tabs.Root
+        value={tab}
+        onValueChange={(v) => {
+          setTab(v as Tab)
+          // categoria, cliente, origem e nota fiscal são de cada aba: não valem na outra
+          list.set('category', '')
+          list.set('client', '')
+          list.set('origin', '')
+          if (docFilter.startsWith('invoice')) list.set('docs', '')
+        }}
+        className="mt-4"
+      >
         <Card>
           <Tabs.List className="flex gap-1 overflow-x-auto border-b px-3">
             {tabs.map((t) => (
@@ -345,10 +395,78 @@ export default function Finance() {
                 className="-mb-px whitespace-nowrap border-b-2 border-transparent px-3 py-3 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800 data-[state=active]:border-brand-600 data-[state=active]:text-slate-900 dark:hover:text-slate-200 dark:data-[state=active]:text-slate-100"
               >
                 {t.label}
-                <span className="tabular ml-2 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{rowsByTab[t.value].length}</span>
+                <span className="tabular ml-2 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                  {list.filtering ? `${rowsByTab[t.value].length} de ${totalByTab[t.value]}` : rowsByTab[t.value].length}
+                </span>
               </Tabs.Trigger>
             ))}
           </Tabs.List>
+          <ListToolbar
+            search={{ value: search, onChange: (v) => list.set('search', v), placeholder: 'Buscar por descrição, cliente, projeto, categoria ou valor' }}
+            filters={[
+              {
+                label: 'Filtrar por situação',
+                value: statusFilter,
+                onChange: (v) => list.set('status', v),
+                allLabel: 'Todas as situações',
+                options: [{ value: 'open', label: 'Em aberto (pendente ou atrasado)' }, ...toOptions(transactionStatus)],
+              },
+              {
+                label: 'Filtrar por categoria',
+                value: categoryFilter,
+                onChange: (v) => list.set('category', v),
+                allLabel: 'Todas as categorias',
+                options: distinctOptions(all.filter((t) => t.type === (tab === 'income' ? 'income' : 'expense')).map((t) => t.category)),
+              },
+              ...(tab === 'income'
+                ? [
+                    {
+                      label: 'Filtrar por cliente',
+                      value: clientFilter,
+                      onChange: (v: string) => list.set('client', v),
+                      allLabel: 'Todos os clientes',
+                      options: linkOptions(all.filter((t) => t.type === 'income').map((t) => t.client_id), (id) => clients.data?.find((c) => c.id === id)?.company_name ?? clients.data?.find((c) => c.id === id)?.name ?? 'Cliente removido', 'Sem cliente'),
+                    },
+                  ]
+                : []),
+              {
+                label: 'Filtrar por origem',
+                value: originFilter,
+                onChange: (v) => list.set('origin', v),
+                allLabel: 'Qualquer origem',
+                options: [
+                  ...(tab === 'income'
+                    ? [
+                        { value: 'quote', label: 'Orçamentos' },
+                        { value: 'monthly', label: 'Mensalidades' },
+                        { value: 'contract', label: 'Contratos' },
+                      ]
+                    : []),
+                  { value: 'recurrence', label: 'Recorrências' },
+                  { value: 'manual', label: 'Lançados à mão' },
+                ],
+              },
+              {
+                label: 'Filtrar por documentos',
+                value: docFilter,
+                onChange: (v) => list.set('docs', v),
+                allLabel: 'Com ou sem documentos',
+                options: [
+                  { value: 'proof', label: 'Com comprovante' },
+                  { value: 'no-proof', label: 'Sem comprovante' },
+                  ...(tab === 'income'
+                    ? [
+                        { value: 'invoice', label: 'Com nota fiscal' },
+                        { value: 'invoice-none', label: 'Sem nota fiscal' },
+                      ]
+                    : []),
+                ],
+              },
+            ]}
+            sort={{ value: sort, onChange: (v) => list.set('sort', v), options: sortOptions }}
+            filtering={list.filtering}
+            onClear={list.reset}
+          />
           {tabs.map((t) => (
             <Tabs.Content key={t.value} value={t.value} className="focus:outline-none">
               <DataTable
@@ -356,16 +474,29 @@ export default function Finance() {
                 rows={rowsByTab[t.value]}
                 loading={loading}
                 empty={
-                  <EmptyState
-                    icon={Wallet}
-                    title={t.emptyTitle}
-                    description={t.emptyText}
-                    action={
-                      <Button onClick={newTransaction}>
-                        <Plus className="h-4 w-4" /> Nova transação
-                      </Button>
-                    }
-                  />
+                  list.filtering && totalByTab[t.value] > 0 ? (
+                    <EmptyState
+                      icon={Search}
+                      title="Nenhum lançamento encontrado"
+                      description="Ajuste a busca ou os filtros, ou escolha outro período."
+                      action={
+                        <Button variant="secondary" onClick={list.reset}>
+                          Limpar filtros
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={Wallet}
+                      title={t.emptyTitle}
+                      description={t.emptyText}
+                      action={
+                        <Button onClick={newTransaction}>
+                          <Plus className="h-4 w-4" /> Nova transação
+                        </Button>
+                      }
+                    />
+                  )
                 }
               />
             </Tabs.Content>
