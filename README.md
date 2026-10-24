@@ -282,6 +282,28 @@ As telas nunca falam direto com o Supabase: tudo passa por `src/lib/db.ts`, que 
 
 Para **adicionar um campo** a um cadastro: crie a coluna numa nova migração, adicione a propriedade em `database.types.ts` e inclua o campo em `fields` e `schemas` de `src/components/forms/GlobalModals.tsx`.
 
+## Ambientes e publicação (quem mantém o serviço)
+
+O projeto tem dois ambientes Supabase: **produção** e **testes**. As migrações e as funções não são mais coladas à mão: o GitHub Actions cuida disso.
+
+| O que acontece | Quando | Onde |
+|---|---|---|
+| Tipos, build, Deno e testes de acesso (RLS) | Em todo pull request | `.github/workflows/ci.yml` |
+| Migrações + funções vão para o banco de **testes** | A cada merge na `main` que mexe em `supabase/` | `.github/workflows/deploy.yml` |
+| Migrações + funções vão para **produção** | Botão *Run workflow* em Actions > Publicar; mostra o `db push --dry-run` e espera a aprovação do environment `production` | `.github/workflows/deploy.yml` |
+
+**Segredos do GitHub** (Settings > Secrets and variables > Actions): `SUPABASE_ACCESS_TOKEN`, `STAGING_PROJECT_ID`, `STAGING_DB_PASSWORD`, `PRODUCTION_PROJECT_ID`, `PRODUCTION_DB_PASSWORD`. O environment `production` exige aprovador.
+
+**Segredos das funções** (Supabase > Edge Functions > Secrets, por ambiente): veja `supabase/functions/.env.example`. `APP_ORIGINS` lista os endereços do site que podem usar a biometria (se vazio, vale a lista padrão).
+
+**Endereço do projeto no pg_cron:** o deploy grava o segredo `project_url` no Vault de cada ambiente; os agendamentos (migração 019) leem dele. Não há mais endereço escrito no SQL.
+
+**Site (Cloudflare Pages):** defina `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` separadamente para produção e para as prévias. A política de segurança do site (`public/_headers`) recebe o host certo no build; no Cloudflare o build falha se `VITE_SUPABASE_URL` estiver vazia.
+
+**Testes de acesso localmente:** com Docker e o Supabase CLI, `supabase start` e depois `supabase test db`.
+
+**Backup antes de mudanças grandes:** `pg_dump -Fc --schema=public --schema=auth --schema=storage`, guardado fora do repositório. O dump não leva o conteúdo do Vault nem os arquivos do Storage.
+
 ## Problemas comuns
 
 **O app abriu sem pedir login e com dados de exemplo.**

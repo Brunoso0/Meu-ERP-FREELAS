@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Tipos e build do site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # sem VITE_SUPABASE_URL o build gera a CSP do modo demo (só confere que compila)
+      - run: npx vite build
+
+  functions:
+    name: Tipos das Edge Functions (Deno)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/*/index.ts
+
+  database:
+    name: Migrações do zero e testes de acesso (RLS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Sobe um Supabase descartável (aplica as migrações 001 em diante)
+        run: supabase start -x studio,mailpit,imgproxy,logflare,vector,edge-runtime,realtime,postgres-meta
+      - name: Testes de acesso (pgTAP)
+        run: supabase test db

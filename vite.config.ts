@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
@@ -31,8 +31,43 @@ function serviceWorkerAssets(): Plugin {
   }
 }
 
+/**
+ * Troca o marcador __SUPABASE_HOST__ do _headers pelo host de VITE_SUPABASE_URL,
+ * para cada ambiente sair com a política de segurança do seu próprio banco.
+ * Sem a variável (modo demo ou CI) o host é removido; no Cloudflare Pages
+ * (CF_PAGES=1) a falta da variável quebra o build, para não publicar um site
+ * que não consegue falar com o banco.
+ */
+function cspSupabaseHost(): Plugin {
+  let outDir = 'dist'
+  let supabaseUrl = ''
+  return {
+    name: 'csp-supabase-host',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir)
+      supabaseUrl = (config.env.VITE_SUPABASE_URL as string | undefined) ?? process.env.VITE_SUPABASE_URL ?? ''
+      if (!supabaseUrl && process.env.CF_PAGES === '1') {
+        throw new Error('VITE_SUPABASE_URL está vazia: defina a variável no Cloudflare Pages para este ambiente.')
+      }
+    },
+    closeBundle() {
+      const file = resolve(outDir, '_headers')
+      if (!existsSync(file)) return
+      let source = readFileSync(file, 'utf8')
+      if (supabaseUrl) {
+        source = source.replaceAll('__SUPABASE_HOST__', new URL(supabaseUrl).host)
+      } else {
+        console.warn('[csp-supabase-host] VITE_SUPABASE_URL vazia: CSP gerada sem o host do Supabase (modo demo).')
+        source = source.replaceAll(' https://__SUPABASE_HOST__', '').replaceAll(' wss://__SUPABASE_HOST__', '')
+      }
+      writeFileSync(file, source)
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), serviceWorkerAssets()],
+  plugins: [react(), serviceWorkerAssets(), cspSupabaseHost()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

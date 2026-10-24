@@ -6,3 +6,10 @@ dist
 .DS_Store
 qrcodepix.jpeg
 *.tsbuildinfo
+
+# backups, builds e arquivos locais do Supabase CLI
+*.zip
+*.dump
+supabase/.temp
+supabase/.branches
+supabase/functions/.env

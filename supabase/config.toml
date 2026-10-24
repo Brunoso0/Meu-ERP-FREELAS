@@ -1,0 +1,24 @@
+# Configuração do Supabase CLI. A fonte da verdade do verify_jwt é este arquivo
+# (espelha o que está publicado hoje em produção): quem chama billing, reminders
+# e find-leads confere o próprio token dentro da função, e o pg_cron usa o
+# x-cron-token; a webauthn exige o JWT do Supabase.
+project_id = "meu-erp-freelas"
+
+[api]
+enabled = true
+
+[db]
+port = 54322
+major_version = 17
+
+[functions.billing]
+verify_jwt = false
+
+[functions.find-leads]
+verify_jwt = false
+
+[functions.reminders]
+verify_jwt = false
+
+[functions.webauthn]
+verify_jwt = true

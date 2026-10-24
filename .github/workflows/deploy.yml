@@ -1,0 +1,101 @@
+name: Publicar
+
+# Testes: automático a cada merge na main.
+# Produção: botão "Run workflow" (Actions > Publicar). Primeiro mostra o que vai
+# mudar (db push --dry-run) e só publica depois que você aprova o environment `production`.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      alvo:
+        description: 'Onde publicar'
+        type: choice
+        options: [producao]
+        default: producao
+
+env:
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+jobs:
+  testes:
+    name: Publicar em TESTES
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_REF: ${{ secrets.STAGING_PROJECT_ID }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase link --project-ref "$PROJECT_REF"
+      - run: supabase db push
+      - run: supabase functions deploy --project-ref "$PROJECT_REF"
+      - name: Gravar project_url no Vault (usado pelo pg_cron)
+        env:
+          PGPASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+        run: |
+          POOLER="$(cat supabase/.temp/pooler-url)"
+          psql "$POOLER" -v ON_ERROR_STOP=1 -v url="https://${PROJECT_REF}.supabase.co" <<'SQL'
+          select case
+            when exists (select 1 from vault.secrets where name = 'project_url')
+              then vault.update_secret((select id from vault.secrets where name = 'project_url'), :'url')
+            else vault.create_secret(:'url', 'project_url', 'URL do projeto (usada pelo pg_cron)')
+          end;
+          SQL
+
+  producao-previa:
+    name: PRODUÇÃO - o que vai mudar (dry-run)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_REF: ${{ secrets.PRODUCTION_PROJECT_ID }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase link --project-ref "$PROJECT_REF"
+      - name: Migrações pendentes
+        run: |
+          supabase migration list | tee migration-list.txt
+          { echo '### Migrações (produção)'; echo '```'; cat migration-list.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: db push --dry-run
+        run: |
+          supabase db push --dry-run 2>&1 | tee dry-run.txt
+          { echo '### db push --dry-run'; echo '```'; cat dry-run.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  producao:
+    name: PRODUÇÃO - publicar
+    needs: producao-previa
+    runs-on: ubuntu-latest
+    environment: production # exige a sua aprovação
+    env:
+      PROJECT_REF: ${{ secrets.PRODUCTION_PROJECT_ID }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase link --project-ref "$PROJECT_REF"
+      - run: supabase db push
+      - run: supabase functions deploy --project-ref "$PROJECT_REF"
+      - name: Gravar project_url no Vault (usado pelo pg_cron)
+        env:
+          PGPASSWORD: ${{ secrets.PRODUCTION_DB_PASSWORD }}
+        run: |
+          POOLER="$(cat supabase/.temp/pooler-url)"
+          psql "$POOLER" -v ON_ERROR_STOP=1 -v url="https://${PROJECT_REF}.supabase.co" <<'SQL'
+          select case
+            when exists (select 1 from vault.secrets where name = 'project_url')
+              then vault.update_secret((select id from vault.secrets where name = 'project_url'), :'url')
+            else vault.create_secret(:'url', 'project_url', 'URL do projeto (usada pelo pg_cron)')
+          end;
+          SQL
