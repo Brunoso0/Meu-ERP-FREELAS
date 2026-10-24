@@ -130,7 +130,7 @@ export const companySections: CompanySection[] = [
           label: 'Segurança',
           description: 'Como o acesso ao app é protegido neste aparelho.',
           icon: ShieldCheck,
-          fields: [{ name: 'biometric_device', label: 'Biometria', type: 'custom', render: ({ values }) => <BiometricSettings name={values.full_name} /> }] as FieldDef[],
+          fields: [{ name: 'biometric_device', label: 'Biometria', type: 'custom', render: () => <BiometricSettings /> }] as FieldDef[],
         },
       ]
     : []),

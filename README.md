@@ -42,7 +42,7 @@ Para zerar os dados de exemplo, apague a chave `meu-erp-freelas:demo-db:v1` no a
 | **Projetos** | Agrupa as demandas, os recebimentos e as despesas de um trabalho para um cliente. |
 | **Demandas** | Tabela ou kanban semanal (Backlog, Segunda a Sexta). Arraste os cards entre os dias. |
 | **Lembretes** | Todo dia, no horário escolhido em Minha empresa → Lembretes, as demandas do dia e as atrasadas chegam por e-mail (Resend) e como notificação no celular (app instalado). Cada aparelho é ativado nele mesmo; dá para mandar um teste na hora. |
-| **Sessão e biometria** | A cada 30 dias o app pede a senha de novo. Sem biometria, 12 horas sem uso encerram a sessão. Com a biometria ativada em Minha empresa → Segurança (WebAuthn, digital/rosto/bloqueio de tela do aparelho), o app bloqueia ao abrir, depois de 5 minutos fora ou 15 parado, e pelo botão de cadeado no menu. As regras ficam em `src/lib/session.ts`; o token continua guardado no aparelho, a biometria protege o acesso à tela. |
+| **Sessão e biometria** | 5 minutos sem usar o app (com ele aberto ou fechado) encerram a sessão (`src/lib/session.ts`). Login com biometria (WebAuthn/passkey: digital, rosto ou bloqueio de tela do aparelho), ativado em Minha empresa → Segurança ou no aviso depois de entrar com a senha: na tela de login, tocar no campo de e-mail pede a biometria; cancelando, segue com e-mail e senha. A função `webauthn` confere a assinatura com a chave pública guardada (migração 018) e devolve um token de uso único que o app troca por sessão. |
 | **Agenda** | Mês ou semana, com reuniões, prazos e as demandas agendadas. |
 | **Financeiro** | O que você tem a receber e as suas despesas, por mês, trimestre, ano ou tudo, com gráficos de entradas e saídas por mês e de recebido por cliente. Dá para anexar comprovante a cada lançamento e criar lançamentos que se repetem todo mês (mensalidades), com um quadro de quanto tempo cada um ainda dura. |
 | **Metas & Relatórios** | Metas com progresso automático e a margem líquida de cada projeto. |
@@ -84,6 +84,7 @@ No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase
 15. `015_quote_recurrence.sql` cria as mensalidades do Gerador de Orçamentos e o agendamento diário (pg_cron) que chama a função `billing` para gerá-las.
 16. `016_reminders.sql` cria os lembretes diários das demandas (horário e canais no perfil, aparelhos inscritos nas notificações, chaves do Web Push no Vault) e o agendamento de hora em hora que chama a função `reminders`.
 17. `017_api_usage.sql` cria um contador mensal de chamadas a APIs pagas. Foi feito para a Places API do Google, que acabou não sendo adotada; hoje a tabela não é usada.
+18. `018_webauthn.sql` cria as tabelas do login com biometria: a chave pública de cada aparelho cadastrado e os desafios de uso único (só a função `webauthn` lê).
 
 #### Busca de leads (opcional)
 
@@ -94,6 +95,12 @@ A Busca de Leads usa o Gemini por meio de uma função do Supabase, para a chave
 3. Em **Edge Functions → Secrets**, cadastre `GEMINI_API_KEY` com a sua chave. Opcional: `GEMINI_MODEL` para trocar o modelo (padrão `gemini-2.5-flash`).
 
 A função só responde a quem está logado no app. A busca no Google Maps pelo Gemini é cobrada pelo Google conforme o plano da sua chave; se ela não estiver disponível (a cota gratuita da chave não cobre o Maps), a função busca no Google os perfis de empresa e guias locais e confere o resultado: telefone inválido sai, empresa que contradiz o alvo (por exemplo, com site próprio numa busca "sem site") é descartada, e as que não aparecem nas fontes citadas pelo Gemini vêm marcadas "confira". Depois de uma recusa por cota ou acesso, a função deixa de tentar o Maps por 6 horas. Os dados vêm de uma IA: confira o perfil da empresa antes de entrar em contato.
+
+#### Login com biometria
+
+1. Rode a migração `018_webauthn.sql`.
+2. Em **Edge Functions**, crie uma função chamada `webauthn` com o conteúdo de [`supabase/functions/webauthn/index.ts`](supabase/functions/webauthn/index.ts) e **desligue "Verify JWT"** (o login acontece sem sessão; o cadastro confere o usuário por conta própria). Não precisa cadastrar segredo.
+3. Se o app rodar em outro endereço, acrescente-o em `ORIGINS` no começo da função: a biometria fica presa ao domínio em que foi cadastrada.
 
 #### Cobrança pelo Asaas (opcional)
 

@@ -1,46 +1,33 @@
-import { useEffect, useLayoutEffect } from 'react'
+import { useEffect } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { biometricFor, expireSession, judgeSession, loginAt, markActive, useSessionLock, type SessionVerdict } from '@/lib/session'
+import { expireSession, markActive, sessionIdle } from '@/lib/session'
 
-const ACTIVITY_THROTTLE_MS = 30_000
-const CHECK_EVERY_MS = 60_000
+const ACTIVITY_THROTTLE_MS = 15_000
+const CHECK_EVERY_MS = 20_000
 
 /**
- * Aplica as regras de src/lib/session.ts à sessão aberta: encerra a que venceu
- * e bloqueia o app (biometria) ao abrir, ao voltar depois de um tempo fora ou
- * depois de muito tempo parado. Usado uma vez, no App.
+ * Aplica a regra de src/lib/session.ts à sessão aberta: 5 minutos sem uso
+ * encerram a sessão, ao abrir o app, ao voltar para ele ou com ele parado na
+ * tela. Usado uma vez, no App.
  */
 export function useSessionGuard(session: Session | null) {
   const userId = session?.user.id
-  const { locked, setLocked } = useSessionLock()
-
-  // antes de pintar a tela, para o conteúdo não aparecer por um instante ao abrir o app
-  useLayoutEffect(() => {
-    if (!userId) return setLocked(false)
-    const verdict = judgeSession(userId, { away: true })
-    if (verdict === 'expired') return void apply(verdict)
-    // ao abrir o app a biometria é pedida sempre, menos logo depois de entrar com a senha
-    const justLoggedIn = Date.now() - loginAt() < 60_000
-    if (biometricFor(userId) && !justLoggedIn) setLocked(true)
-    else markActive()
-  }, [userId, setLocked])
 
   useEffect(() => {
     if (!userId) return
+    if (sessionIdle()) return void expireSession()
+
     let lastMark = 0
     const onActivity = () => {
-      if (useSessionLock.getState().locked || Date.now() - lastMark < ACTIVITY_THROTTLE_MS) return
+      if (Date.now() - lastMark < ACTIVITY_THROTTLE_MS) return
+      // parado além do limite, o primeiro toque já não vale: a sessão venceu antes dele
+      if (sessionIdle()) return void expireSession()
       lastMark = Date.now()
       markActive()
     }
-    const onVisibility = () => {
-      if (useSessionLock.getState().locked) return
-      if (document.visibilityState === 'hidden') markActive()
-      else apply(judgeSession(userId, { away: true }))
-    }
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && !useSessionLock.getState().locked) apply(judgeSession(userId, { away: false }))
-    }, CHECK_EVERY_MS)
+    const check = () => sessionIdle() && void expireSession()
+    const onVisibility = () => document.visibilityState === 'visible' && check()
+    const timer = window.setInterval(check, CHECK_EVERY_MS)
 
     const events = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
     events.forEach((name) => window.addEventListener(name, onActivity, { passive: true }))
@@ -51,11 +38,4 @@ export function useSessionGuard(session: Session | null) {
       window.clearInterval(timer)
     }
   }, [userId])
-
-  return locked
-}
-
-function apply(verdict: SessionVerdict) {
-  if (verdict === 'lock') useSessionLock.getState().setLocked(true)
-  if (verdict === 'expired') void expireSession({ notice: true })
 }
