@@ -34,8 +34,9 @@ function serviceWorkerAssets(): Plugin {
 /**
  * Escreve no _headers o host do Supabase de quem está sendo publicado
  * (testes ou produção), para a Content-Security-Policy liberar só ele.
- * Em modo demo (sem VITE_SUPABASE_URL) o marcador sai e nada é liberado;
- * no Cloudflare Pages (CF_PAGES) a variável é obrigatória.
+ * Em modo demo (sem VITE_SUPABASE_URL) o marcador sai e nada é liberado.
+ * No Cloudflare Pages, a publicação da main (produção) exige a variável;
+ * as prévias de outros ramos sem ela saem em modo demo, como antes.
  */
 function securityHeaders(): Plugin {
   let outDir = 'dist'
@@ -46,7 +47,7 @@ function securityHeaders(): Plugin {
     configResolved(config) {
       outDir = resolve(config.root, config.build.outDir)
       const url = loadEnv(config.mode, config.root, 'VITE_').VITE_SUPABASE_URL ?? ''
-      if (!url && process.env.CF_PAGES) throw new Error('VITE_SUPABASE_URL não está definida neste ambiente do Cloudflare Pages.')
+      if (!url && process.env.CF_PAGES && process.env.CF_PAGES_BRANCH === 'main') throw new Error('VITE_SUPABASE_URL não está definida neste ambiente do Cloudflare Pages.')
       host = url ? new URL(url).host : ''
     },
     closeBundle() {

@@ -187,7 +187,7 @@ Se o código está no GitHub, o Cloudflare pode fazer o build e publicar sozinho
 2. Em **Settings → Build → Git repository**, clique em **Connect**, escolha o repositório e a branch `main`, com build command `npm run build` e output directory `dist`.
 3. Se o repositório não aparecer na lista, libere-o para o aplicativo do Cloudflare em [github.com/settings/installations](https://github.com/settings/installations).
 
-A partir daí, cada push na `main` vai para o ar em cerca de um minuto. No Cloudflare, o build falha se `VITE_SUPABASE_URL` não estiver cadastrada, para não publicar um site que não conecta. Para ter um site de prévia ligado ao banco de testes, cadastre as mesmas variáveis no ambiente **Preview** do Pages, com os dados do projeto de testes.
+A partir daí, cada push na `main` vai para o ar em cerca de um minuto. No Cloudflare, o build da `main` falha se `VITE_SUPABASE_URL` não estiver cadastrada, para não publicar um site que não conecta; as prévias de outros ramos sem a variável saem em modo demo. Para ter um site de prévia ligado ao banco de testes, cadastre as mesmas variáveis no ambiente **Preview** do Pages, com os dados do projeto de testes.
 
 No Supabase, em **Authentication → URL Configuration**, coloque o endereço publicado em **Site URL**, para que e-mails de redefinição de senha apontem para o lugar certo.
 
