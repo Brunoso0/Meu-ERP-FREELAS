@@ -415,11 +415,12 @@ enabled = true
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
 
-# Funções do app. As três com verify_jwt = false recebem chamadas sem sessão
-# (login por biometria, webhook do Asaas, pg_cron) e conferem quem chama por
-# conta própria. Antes isso era desligado à mão no painel.
+# Funções do app, todas com verify_jwt = false: webauthn (login sem sessão),
+# billing (webhook do Asaas e pg_cron) e reminders (pg_cron) recebem chamadas
+# sem JWT, e find-leads confere o usuário por conta própria em /auth/v1/user.
+# Cada uma valida quem chama. Antes isso era ligado e desligado à mão no painel.
 [functions.find-leads]
-verify_jwt = true
+verify_jwt = false
 
 [functions.webauthn]
 verify_jwt = false
