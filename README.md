@@ -65,7 +65,22 @@ Em supabase.com, crie uma conta e um projeto novo. Guarde a senha do banco que e
 
 ### 2. Crie as tabelas
 
-No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase/migrations/`](supabase/migrations/), **nesta ordem**, colando o conteúdo de cada um e clicando em Run:
+Com o [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) (`npx supabase`), na pasta do projeto:
+
+```bash
+npx supabase login
+npx supabase link --project-ref SEU-PROJETO   # o trecho antes de .supabase.co
+npx supabase db push                           # aplica as migrações que faltam, em ordem
+npx supabase functions deploy                  # publica as quatro Edge Functions
+```
+
+O `db push` aplica as migrações da pasta [`supabase/migrations/`](supabase/migrations/) e lembra quais já rodaram. O `functions deploy` já publica cada função com o "Verify JWT" certo (está em [`supabase/config.toml`](supabase/config.toml)). Depois do primeiro push, grave o endereço do projeto para os agendamentos (migração 019), no SQL Editor:
+
+```sql
+select public.set_project_url('https://SEU-PROJETO.supabase.co');
+```
+
+Sem o CLI, dá para colar cada arquivo no **SQL Editor**, nesta ordem, e criar as funções à mão no painel. O que cada migração faz:
 
 1. `001_initial_schema.sql` cria as tabelas, as regras de acesso e o espaço para comprovantes.
 2. `002_quotes.sql` cria a tabela de orçamentos.
@@ -85,6 +100,7 @@ No painel do projeto, abra **SQL Editor** e rode os arquivos da pasta [`supabase
 16. `016_reminders.sql` cria os lembretes diários das demandas (horário e canais no perfil, aparelhos inscritos nas notificações, chaves do Web Push no Vault) e o agendamento de hora em hora que chama a função `reminders`.
 17. `017_api_usage.sql` cria um contador mensal de chamadas a APIs pagas. Foi feito para a Places API do Google, que acabou não sendo adotada; hoje a tabela não é usada.
 18. `018_webauthn.sql` cria as tabelas do login com biometria: a chave pública de cada aparelho cadastrado e os desafios de uso único (só a função `webauthn` lê).
+19. `019_project_url.sql` tira o endereço fixo dos agendamentos das migrações 015 e 016: eles passam a ler o endereço do projeto do Vault (`set_project_url`), para cada ambiente chamar as próprias funções.
 
 #### Busca de leads (opcional)
 
@@ -100,7 +116,9 @@ A função só responde a quem está logado no app. A busca no Google Maps pelo 
 
 1. Rode a migração `018_webauthn.sql`.
 2. Em **Edge Functions**, crie uma função chamada `webauthn` com o conteúdo de [`supabase/functions/webauthn/index.ts`](supabase/functions/webauthn/index.ts) e **desligue "Verify JWT"** (o login acontece sem sessão; o cadastro confere o usuário por conta própria). Não precisa cadastrar segredo.
-3. Se o app rodar em outro endereço, acrescente-o em `ORIGINS` no começo da função: a biometria fica presa ao domínio em que foi cadastrada.
+3. Em **Edge Functions → Secrets**, cadastre `APP_ORIGINS` com os endereços onde o app roda, separados por vírgula (por exemplo `https://meus-freelas.pages.dev,http://localhost:5173`). A biometria fica presa ao domínio em que foi cadastrada. Sem o segredo, vale a lista padrão da função.
+
+Todos os segredos das funções estão em [`supabase/functions/.env.example`](supabase/functions/.env.example).
 
 #### Cobrança pelo Asaas (opcional)
 
@@ -152,13 +170,12 @@ O indicador no topo da tela mostra **Supabase** em verde quando a conexão está
 
 O app é um site estático: qualquer hospedagem de arquivos serve. Abaixo, o caminho pelo **Cloudflare Pages**, que é gratuito e dá um endereço `seu-nome.pages.dev`.
 
-1. Abra [`public/_headers`](public/_headers) e troque o endereço do Supabase que aparece na linha `Content-Security-Policy` (em `img-src` e `connect-src`) pelo do **seu** projeto. Se pular este passo, o site publicado bloqueia a conexão com o banco e o login não funciona.
-2. Gere o site com o `.env.local` já preenchido:
+1. Gere o site com o `.env.local` já preenchido (o build escreve em `dist/_headers` o endereço do seu Supabase, que a política de segurança do site precisa liberar):
    ```bash
    npm run build
    ```
-3. No Cloudflare, vá em **Workers & Pages → Create → Pages → Drag and drop your files**, dê um nome ao projeto e envie a pasta `dist` (ou um zip do conteúdo dela).
-4. Clique em **Deploy site**.
+2. No Cloudflare, vá em **Workers & Pages → Create → Pages → Drag and drop your files**, dê um nome ao projeto e envie a pasta `dist` (ou um zip do conteúdo dela).
+3. Clique em **Deploy site**.
 
 Para atualizar depois, rode `npm run build` de novo e, no projeto do Pages, use **Create deployment** para enviar a nova pasta `dist`.
 
@@ -170,7 +187,7 @@ Se o código está no GitHub, o Cloudflare pode fazer o build e publicar sozinho
 2. Em **Settings → Build → Git repository**, clique em **Connect**, escolha o repositório e a branch `main`, com build command `npm run build` e output directory `dist`.
 3. Se o repositório não aparecer na lista, libere-o para o aplicativo do Cloudflare em [github.com/settings/installations](https://github.com/settings/installations).
 
-A partir daí, cada push na `main` vai para o ar em cerca de um minuto.
+A partir daí, cada push na `main` vai para o ar em cerca de um minuto. No Cloudflare, o build falha se `VITE_SUPABASE_URL` não estiver cadastrada, para não publicar um site que não conecta. Para ter um site de prévia ligado ao banco de testes, cadastre as mesmas variáveis no ambiente **Preview** do Pages, com os dados do projeto de testes.
 
 No Supabase, em **Authentication → URL Configuration**, coloque o endereço publicado em **Site URL**, para que e-mails de redefinição de senha apontem para o lugar certo.
 
@@ -275,7 +292,28 @@ src/
     layout/                 Sidebar, TopBar, CommandPalette
   pages/                    uma tela por módulo; tools/ para as ferramentas
 supabase/migrations/        scripts SQL do banco, em ordem
-public/_headers             cabeçalhos de segurança da hospedagem
+supabase/functions/         Edge Functions (find-leads, webauthn, billing, reminders)
+supabase/tests/database/    testes de acesso (pgTAP)
+supabase/config.toml        configuração do Supabase CLI
+.github/workflows/          verificação e publicação
+public/_headers             cabeçalhos de segurança da hospedagem (host do Supabase entra no build)
+```
+
+### Ambientes, verificação e publicação
+
+São dois projetos Supabase: **testes** e **produção**.
+
+- Todo PR passa pela [verificação](.github/workflows/ci.yml): tipos e build do app, tipos das Edge Functions, e um banco descartável que roda todas as migrações do zero e os testes de acesso de [`supabase/tests/database/`](supabase/tests/database/) (um usuário não vê, não altera e não apaga os dados de outro).
+- Cada push na `main` [publica](.github/workflows/deploy.yml) migrações e funções no projeto de **testes**.
+- A **produção** é publicada pelo botão **Actions → Publicação → Run workflow**, escolhendo `production`. Com "Simular" marcado, só mostra o que mudaria no banco; desmarcado, publica. O ambiente `production` do GitHub pede aprovação.
+
+Cada ambiente do GitHub (Settings → Environments, `test` e `production`) precisa da variável `SUPABASE_PROJECT_REF` e do segredo `SUPABASE_DB_PASSWORD`; o repositório, do segredo `SUPABASE_ACCESS_TOKEN`.
+
+Para rodar o banco e os testes na sua máquina (precisa do Docker):
+
+```bash
+npx supabase db start   # Postgres local com todas as migrações
+npx supabase test db    # testes de acesso
 ```
 
 As telas nunca falam direto com o Supabase: tudo passa por `src/lib/db.ts`, que decide entre o banco real e o demo. É por isso que o app inteiro funciona sem configuração.

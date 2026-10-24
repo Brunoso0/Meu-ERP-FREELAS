@@ -36,8 +36,15 @@ const json = (status: number, body: unknown) =>
 const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
 
 const RP_NAME = 'Meu ERP Freelas'
-/** Onde o app roda. A credencial fica presa ao domínio em que foi criada. */
-const ORIGINS = ['https://meus-freelas.pages.dev', 'http://localhost:5173', 'http://localhost:5199']
+/**
+ * Onde o app roda. A credencial fica presa ao domínio em que foi criada.
+ * APP_ORIGINS (segredo da função) lista os endereços de cada ambiente,
+ * separados por vírgula; sem ele, valem os de sempre.
+ */
+const ORIGINS = (Deno.env.get('APP_ORIGINS') ?? 'https://meus-freelas.pages.dev,http://localhost:5173,http://localhost:5199')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean)
 const CHALLENGE_TTL_MS = 5 * 60 * 1000
 
 class Problem extends Error {

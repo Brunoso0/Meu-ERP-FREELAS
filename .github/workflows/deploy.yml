@@ -1,0 +1,75 @@
+# Publica migrações e Edge Functions no Supabase.
+#
+# - Push na main: publica em "test" sozinho.
+# - Botão "Run workflow": escolhe o ambiente. Com "simular" marcado (padrão),
+#   só mostra o que mudaria (db push --dry-run); desmarcado, publica.
+#   O ambiente "production" exige a aprovação configurada no GitHub.
+#
+# Cada ambiente do GitHub (Settings → Environments) precisa de:
+#   variável SUPABASE_PROJECT_REF  id do projeto (o trecho antes de .supabase.co)
+#   segredo  SUPABASE_DB_PASSWORD  senha do banco daquele projeto
+# e o repositório, do segredo SUPABASE_ACCESS_TOKEN (Account → Access Tokens).
+name: Publicação
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente
+        type: choice
+        options: [test, production]
+        default: test
+      dry_run:
+        description: Simular (só mostrar o que mudaria)
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-${{ inputs.environment || 'test' }}
+  cancel-in-progress: false
+
+jobs:
+  supabase:
+    name: Supabase (${{ inputs.environment || 'test' }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'test' }}
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+
+      - name: Conferir configuração do ambiente
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "::error::Falta o segredo SUPABASE_ACCESS_TOKEN"; exit 1; }
+          test -n "$SUPABASE_DB_PASSWORD" || { echo "::error::Falta o segredo SUPABASE_DB_PASSWORD neste ambiente"; exit 1; }
+          test -n "$PROJECT_REF" || { echo "::error::Falta a variável SUPABASE_PROJECT_REF neste ambiente"; exit 1; }
+
+      - run: supabase link --project-ref "$PROJECT_REF"
+
+      - name: O que vai mudar no banco
+        run: supabase db push --dry-run
+
+      - name: Aplicar migrações
+        if: env.DRY_RUN != 'true'
+        run: supabase db push
+
+      # endereço usado pelos agendamentos do pg_cron (migração 019)
+      - name: Gravar o endereço do projeto
+        if: env.DRY_RUN != 'true'
+        run: |
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": \"select public.set_project_url('https://$PROJECT_REF.supabase.co')\"}"
+
+      - name: Publicar Edge Functions
+        if: env.DRY_RUN != 'true'
+        run: supabase functions deploy --project-ref "$PROJECT_REF"
