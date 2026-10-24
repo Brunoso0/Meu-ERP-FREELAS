@@ -66,7 +66,7 @@ export function BiometricSettings() {
           </Button>
         )}
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400">Por segurança, 5 minutos sem usar o app encerram a sessão, com ele aberto ou fechado.</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">Por segurança, 15 minutos sem usar o app encerram a sessão, com ele aberto ou fechado.</p>
     </div>
   )
 }

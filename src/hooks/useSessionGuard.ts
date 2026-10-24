@@ -6,7 +6,7 @@ const ACTIVITY_THROTTLE_MS = 15_000
 const CHECK_EVERY_MS = 20_000
 
 /**
- * Aplica a regra de src/lib/session.ts à sessão aberta: 5 minutos sem uso
+ * Aplica a regra de src/lib/session.ts à sessão aberta: 15 minutos sem uso
  * encerram a sessão, ao abrir o app, ao voltar para ele ou com ele parado na
  * tela. Usado uma vez, no App.
  */

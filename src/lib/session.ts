@@ -4,11 +4,11 @@ import { supabase } from './supabase'
 /*
  * Regras da sessão. O Supabase renova o acesso sozinho para sempre (o token de
  * renovação não vence no plano gratuito), então o limite é aplicado aqui:
- * 5 minutos sem usar o app (tocar, clicar, digitar, rolar) encerram a sessão,
+ * 15 minutos sem usar o app (tocar, clicar, digitar, rolar) encerram a sessão,
  * com o app aberto ou fechado. Para voltar, a biometria (se ativada neste
  * aparelho) ou e-mail e senha.
  */
-export const IDLE_LOGOUT_MS = 5 * 60 * 1000
+export const IDLE_LOGOUT_MS = 15 * 60 * 1000
 
 const KEY = 'meu-erp-freelas:auth'
 const LAST_ACTIVE = `${KEY}:last-active`
