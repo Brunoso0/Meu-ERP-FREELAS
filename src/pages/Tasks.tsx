@@ -116,8 +116,8 @@ export default function Tasks() {
       ),
     },
     { header: 'Status', cell: (t) => <Badge tone={taskStatus[t.status].tone}>{taskStatus[t.status].label}</Badge> },
-    { header: 'Prioridade', cell: (t) => <Badge tone={taskPriority[t.priority].tone}>{taskPriority[t.priority].label}</Badge> },
-    { header: 'Dia', cell: (t) => <span className="tabular text-slate-600 dark:text-slate-300">{formatDate(t.scheduled_date, 'dd/MM')}</span> },
+    { header: 'Prioridade', priority: 2, cell: (t) => <Badge tone={taskPriority[t.priority].tone}>{taskPriority[t.priority].label}</Badge> },
+    { header: 'Dia', priority: 3, cell: (t) => <span className="tabular text-slate-600 dark:text-slate-300">{formatDate(t.scheduled_date, 'dd/MM')}</span> },
     {
       header: 'Prazo',
       cell: (t) => <span className={cn('tabular', isLate(t) ? 'font-medium text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300')}>{formatDate(t.due_date, 'dd/MM')}</span>,

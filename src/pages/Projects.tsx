@@ -82,6 +82,7 @@ export default function Projects() {
     { header: 'Status', cell: (p) => <Badge tone={projectStatus[p.status].tone}>{projectStatus[p.status].label}</Badge> },
     {
       header: 'Demandas',
+      priority: 2,
       cell: (p) => {
         const { done, total } = progress(p.id)
         return (

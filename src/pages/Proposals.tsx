@@ -135,7 +135,7 @@ export default function Proposals() {
   }
 
   const columns: Column<Proposal>[] = [
-    { header: 'Nº', cell: (p) => <span className="tabular font-medium text-slate-500 dark:text-slate-400">{formatProposalNumber(p.proposal_number)}</span> },
+    { header: 'Nº', priority: 3, cell: (p) => <span className="tabular font-medium text-slate-500 dark:text-slate-400">{formatProposalNumber(p.proposal_number)}</span> },
     {
       header: 'Proposta',
       primary: true,
@@ -149,7 +149,7 @@ export default function Proposals() {
       ),
     },
     { header: 'Status', cell: (p) => <Badge tone={proposalStatus[p.status].tone}>{proposalStatus[p.status].label}</Badge> },
-    { header: 'Criada em', cell: (p) => <span className="tabular text-slate-600 dark:text-slate-300">{formatDate(p.created_at)}</span> },
+    { header: 'Criada em', priority: 2, cell: (p) => <span className="tabular text-slate-600 dark:text-slate-300">{formatDate(p.created_at)}</span> },
     { header: 'Valor', className: 'text-right', cell: (p) => <span className="tabular font-medium">{formatCurrency(p.total_amount)}</span> },
     {
       header: '',

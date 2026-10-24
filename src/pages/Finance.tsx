@@ -213,7 +213,7 @@ export default function Finance() {
     if (ok) charge('Cancelando a cobrança…', () => cancelCharge(t.id), 'Cobrança cancelada no Asaas')
   }
 
-  const invoiceColumn: Column<FinancialTransaction> = { header: 'Nota fiscal', cell: (t) => <InvoiceCell t={t} files={files} /> }
+  const invoiceColumn: Column<FinancialTransaction> = { header: 'Nota fiscal', priority: 3, cell: (t) => <InvoiceCell t={t} files={files} /> }
 
   const columns: Column<FinancialTransaction>[] = [
     {
@@ -243,7 +243,7 @@ export default function Finance() {
         </span>
       ),
     },
-    { header: 'Pagamento', cell: (t) => <span className="tabular text-slate-600 dark:text-slate-300">{formatDate(t.payment_date)}</span> },
+    { header: 'Pagamento', priority: 2, cell: (t) => <span className="tabular text-slate-600 dark:text-slate-300">{formatDate(t.payment_date)}</span> },
     {
       header: 'Situação',
       cell: (t) => {
@@ -263,6 +263,7 @@ export default function Finance() {
     },
     {
       header: 'Comprovante',
+      priority: 3,
       cell: (t) => <ProofCell t={t} files={files} />,
     },
     { header: 'Valor', className: 'text-right', cell: (t) => <span className="tabular font-medium">{formatCurrency(t.amount)}</span> },

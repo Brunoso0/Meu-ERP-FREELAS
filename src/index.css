@@ -85,3 +85,28 @@
     width: 100% !important;
   }
 }
+
+/* tela de login: luzes do fundo pulsando devagar e brilho no campo em foco */
+@keyframes login-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.06);
+  }
+}
+.login-glow {
+  animation: login-glow 7s ease-in-out infinite;
+}
+.login-field:focus-within {
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.45), 0 0 25px rgba(99, 102, 241, 0.15);
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-glow {
+    animation: none;
+  }
+}

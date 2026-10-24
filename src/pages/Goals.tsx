@@ -92,9 +92,9 @@ export default function Goals() {
         </div>
       ),
     },
-    { header: 'Status', cell: (r) => <Badge tone={projectStatus[r.status].tone}>{projectStatus[r.status].label}</Badge> },
+    { header: 'Status', priority: 2, cell: (r) => <Badge tone={projectStatus[r.status].tone}>{projectStatus[r.status].label}</Badge> },
     { header: 'Cobrado', className: 'text-right', cell: (r) => <span className="tabular">{formatCurrency(r.charged)}</span> },
-    { header: 'Custos', className: 'text-right', cell: (r) => <span className="tabular text-slate-500 dark:text-slate-400">− {formatCurrency(r.extras)}</span> },
+    { header: 'Custos', priority: 3, className: 'text-right', cell: (r) => <span className="tabular text-slate-500 dark:text-slate-400">− {formatCurrency(r.extras)}</span> },
     {
       header: 'Margem líquida',
       className: 'text-right',

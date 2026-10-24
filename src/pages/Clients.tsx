@@ -85,6 +85,7 @@ export default function Clients() {
     },
     {
       header: 'Contato',
+      priority: 2,
       cell: (c) => (
         <div className="text-slate-600 dark:text-slate-300">
           <p className="truncate">{c.email ?? '—'}</p>
@@ -92,7 +93,7 @@ export default function Clients() {
         </div>
       ),
     },
-    { header: 'CPF / CNPJ', cell: (c) => <span className="tabular whitespace-nowrap text-slate-600 dark:text-slate-300">{c.document ?? '—'}</span> },
+    { header: 'CPF / CNPJ', priority: 3, cell: (c) => <span className="tabular whitespace-nowrap text-slate-600 dark:text-slate-300">{c.document ?? '—'}</span> },
     { header: 'Status', cell: (c) => <Badge tone={clientStatus[c.status].tone}>{clientStatus[c.status].label}</Badge> },
     {
       header: 'LTV',
@@ -100,7 +101,7 @@ export default function Clients() {
       cell: (c) => {
         const m = moneyOf(c)
         return (
-          <div className="tabular">
+          <div className="tabular whitespace-nowrap">
             <p className="font-medium">{formatCurrency(m.ltv)}</p>
             {m.open > 0 && <p className={m.late > 0 ? 'text-xs text-red-600 dark:text-red-400' : 'text-xs text-slate-500 dark:text-slate-400'}>{formatCurrency(m.open)} a receber</p>}
           </div>

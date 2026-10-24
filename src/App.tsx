@@ -55,7 +55,8 @@ export default function App() {
 
   return (
     <>
-      <Toaster theme={theme} position="bottom-right" richColors closeButton />
+      {/* a tela de login é sempre escura: os avisos dela acompanham */}
+      <Toaster theme={needsLogin ? 'dark' : theme} position="bottom-right" richColors closeButton />
       {isPublicPage ? (
         <Suspense fallback={null}>
           <Routes>
