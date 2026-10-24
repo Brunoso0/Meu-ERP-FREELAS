@@ -1,12 +1,13 @@
 import { useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Download, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { Download, Lock, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { Avatar } from '@/components/ui/primitives'
 import { Tip } from '@/components/ui/overlays'
 import { useTable } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
 import { useNarrowScreen } from '@/hooks/useMediaQuery'
 import { useInstallApp } from '@/lib/pwa'
+import { biometricFor, useSessionLock } from '@/lib/session'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useUI } from '@/store/ui'
@@ -57,7 +58,10 @@ export function Sidebar() {
     return () => window.removeEventListener('keydown', onKey)
   }, [mobileNavOpen, setMobileNavOpen])
   const profile = useTable('profiles').data?.[0]
-  const { signOut } = useAuth()
+  const { session, signOut } = useAuth()
+  const setLocked = useSessionLock((s) => s.setLocked)
+  useSessionLock((s) => s.biometricVersion) // redesenha quando a biometria é ligada/desligada
+  const canLock = Boolean(session && biometricFor(session.user.id))
   const install = useInstallApp()
   const name = profile?.full_name || profile?.email || 'Usuário'
 
@@ -165,6 +169,18 @@ export function Sidebar() {
                 </div>
               )}
             </button>
+            {canLock && (
+              <Tip label="Bloquear" side="top">
+                <button
+                  type="button"
+                  onClick={() => setLocked(true, true)}
+                  aria-label="Bloquear"
+                  className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                >
+                  <Lock className="h-4 w-4" />
+                </button>
+              </Tip>
+            )}
             {isSupabaseConfigured && (
               <Tip label="Sair" side="top">
                 <button

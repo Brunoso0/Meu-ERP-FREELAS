@@ -89,7 +89,7 @@ export default function Company() {
 
   return (
     <>
-      <PageHeader title="Minha empresa" description="Seus dados como emitente, a forma de cobrança, a nota fiscal e os lembretes." />
+      <PageHeader title="Minha empresa" description="Seus dados como emitente, a forma de cobrança, a nota fiscal, os lembretes e a segurança." />
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[230px_1fr]">
         <nav ref={nav} aria-label="Seções" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:sticky lg:top-20 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">

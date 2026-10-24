@@ -1,9 +1,11 @@
 import { z } from 'zod'
-import { Bell, Building2, Plug, ReceiptText, type LucideIcon } from 'lucide-react'
+import { Bell, Building2, Plug, ReceiptText, ShieldCheck, type LucideIcon } from 'lucide-react'
 import type { FieldDef } from './EntityForm'
 import { GatewayConnection } from '@/components/billing/GatewayConnection'
 import { NfseServicesEditor } from '@/components/billing/NfseServicesEditor'
+import { BiometricSettings } from '@/components/auth/BiometricSettings'
 import { ReminderSettings } from '@/components/reminders/ReminderSettings'
+import { isSupabaseConfigured } from '@/lib/supabase'
 import { billingProviders, billingTypes } from '@/lib/billing'
 import { maskCpfCnpj, maskPhone } from '@/lib/utils'
 
@@ -52,7 +54,7 @@ export const companySchema = z.object({
 const asaas = (v: Record<string, any>) => v.billing_provider === 'asaas'
 const note = (text: string) => <p className="col-span-2 -mt-2 text-xs text-slate-500 dark:text-slate-400">{text}</p>
 
-export type CompanySectionId = 'dados' | 'integracoes' | 'fiscal' | 'lembretes'
+export type CompanySectionId = 'dados' | 'integracoes' | 'fiscal' | 'lembretes' | 'seguranca'
 
 export interface CompanySection {
   id: CompanySectionId
@@ -121,4 +123,15 @@ export const companySections: CompanySection[] = [
       { name: 'reminder_device', label: 'Aparelho', type: 'custom', render: ({ values }) => <ReminderSettings email={values.email ?? ''} /> },
     ],
   },
+  ...(isSupabaseConfigured
+    ? [
+        {
+          id: 'seguranca' as const,
+          label: 'Segurança',
+          description: 'Como o acesso ao app é protegido neste aparelho.',
+          icon: ShieldCheck,
+          fields: [{ name: 'biometric_device', label: 'Biometria', type: 'custom', render: ({ values }) => <BiometricSettings name={values.full_name} /> }] as FieldDef[],
+        },
+      ]
+    : []),
 ]

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { clearSessionMarks } from '@/lib/session'
 
 /** Em modo demo não há login: `ready` já nasce true e `session` fica nula. */
 export function useAuth() {
@@ -17,5 +18,12 @@ export function useAuth() {
     return () => data.subscription.unsubscribe()
   }, [])
 
-  return { session, ready, signOut: () => supabase?.auth.signOut() }
+  return {
+    session,
+    ready,
+    signOut: () => {
+      clearSessionMarks()
+      return supabase?.auth.signOut()
+    },
+  }
 }

@@ -42,6 +42,7 @@ Para zerar os dados de exemplo, apague a chave `meu-erp-freelas:demo-db:v1` no a
 | **Projetos** | Agrupa as demandas, os recebimentos e as despesas de um trabalho para um cliente. |
 | **Demandas** | Tabela ou kanban semanal (Backlog, Segunda a Sexta). Arraste os cards entre os dias. |
 | **Lembretes** | Todo dia, no horário escolhido em Minha empresa → Lembretes, as demandas do dia e as atrasadas chegam por e-mail (Resend) e como notificação no celular (app instalado). Cada aparelho é ativado nele mesmo; dá para mandar um teste na hora. |
+| **Sessão e biometria** | A cada 30 dias o app pede a senha de novo. Sem biometria, 12 horas sem uso encerram a sessão. Com a biometria ativada em Minha empresa → Segurança (WebAuthn, digital/rosto/bloqueio de tela do aparelho), o app bloqueia ao abrir, depois de 5 minutos fora ou 15 parado, e pelo botão de cadeado no menu. As regras ficam em `src/lib/session.ts`; o token continua guardado no aparelho, a biometria protege o acesso à tela. |
 | **Agenda** | Mês ou semana, com reuniões, prazos e as demandas agendadas. |
 | **Financeiro** | O que você tem a receber e as suas despesas, por mês, trimestre, ano ou tudo, com gráficos de entradas e saídas por mês e de recebido por cliente. Dá para anexar comprovante a cada lançamento e criar lançamentos que se repetem todo mês (mensalidades), com um quadro de quanto tempo cada um ainda dura. |
 | **Metas & Relatórios** | Metas com progresso automático e a margem líquida de cada projeto. |

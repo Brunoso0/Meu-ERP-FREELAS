@@ -5,6 +5,8 @@ import { Toaster } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/hooks/useAuth'
+import { useSessionGuard } from '@/hooks/useSessionGuard'
+import { LockScreen } from '@/components/auth/LockScreen'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { useUI } from '@/store/ui'
 import Login from '@/pages/Login'
@@ -31,6 +33,7 @@ const PublicContract = lazy(() => import('@/pages/PublicContract'))
 export default function App() {
   const theme = useUI((s) => s.theme)
   const { session, ready } = useAuth()
+  const locked = useSessionGuard(session)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -67,6 +70,8 @@ export default function App() {
         </div>
       ) : needsLogin ? (
         <Login />
+      ) : locked && session ? (
+        <LockScreen session={session} />
       ) : (
         <Routes>
           <Route element={<AppLayout />}>
