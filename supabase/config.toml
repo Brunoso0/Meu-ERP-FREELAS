@@ -421,9 +421,9 @@ enabled = true
 # Cada uma valida quem chama. Antes isso era ligado e desligado à mão no painel.
 [functions.find-leads]
 verify_jwt = false
-
+# Exceção: webauthn fica com verify_jwt = true, igual ao que já roda em produção.
 [functions.webauthn]
-verify_jwt = false
+verify_jwt = true
 
 [functions.billing]
 verify_jwt = false
