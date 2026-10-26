@@ -1,6 +1,9 @@
--- Prova das regras de membros e convites (migração 021). Só no banco de testes;
--- tudo dentro de uma transação que termina em ROLLBACK.
+-- Membros, papéis e convites (migração 021).
+-- Roda com `supabase test db` (local e no GitHub Actions) numa transação desfeita no fim.
+-- Cada verificação lança uma exceção que começa com FALHA se não for atendida.
 begin;
+create extension if not exists pgtap with schema extensions;
+select no_plan();
 
 insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, created_at, updated_at)
 values
@@ -19,7 +22,7 @@ end $$;
 set local role authenticated;
 
 -- ---------- Ana (dona) convida Beto como membro e Cris como leitora ----------
-select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}';
 do $$
 declare v_a uuid := current_setting('test.ws_a')::uuid; v_i jsonb;
 begin
@@ -32,7 +35,7 @@ begin
 end $$;
 
 -- ---------- convite é só para o e-mail certo ----------
-select set_config('request.jwt.claims', '{"sub":"cccccccc-0000-0000-0000-00000000000c","role":"authenticated"}', true);
+set local request.jwt.claims = '{"sub":"cccccccc-0000-0000-0000-00000000000c","role":"authenticated"}';
 do $$
 begin
   begin
@@ -45,7 +48,7 @@ begin
   perform public.accept_workspace_invite(current_setting('test.tok_cris')::uuid);
 end $$;
 
-select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+set local request.jwt.claims = '{"sub":"bbbbbbbb-0000-0000-0000-00000000000b","role":"authenticated"}';
 do $$
 declare v_a uuid := current_setting('test.ws_a')::uuid;
 begin
@@ -70,7 +73,7 @@ begin
 end $$;
 
 -- ---------- Duda entra como admin; admin não mexe em admin nem no dono ----------
-select set_config('request.jwt.claims', '{"sub":"dddddddd-0000-0000-0000-00000000000d","role":"authenticated"}', true);
+set local request.jwt.claims = '{"sub":"dddddddd-0000-0000-0000-00000000000d","role":"authenticated"}';
 do $$
 declare v_a uuid := current_setting('test.ws_a')::uuid;
 begin
@@ -93,7 +96,7 @@ begin
 end $$;
 
 -- ---------- Ana: posse, saída ----------
-select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}';
 do $$
 declare v_a uuid := current_setting('test.ws_a')::uuid;
 begin
@@ -114,7 +117,7 @@ exception when others then
   null;
 end $$;
 
-select set_config('request.jwt.claims', '{"sub":"dddddddd-0000-0000-0000-00000000000d","role":"authenticated"}', true);
+set local request.jwt.claims = '{"sub":"dddddddd-0000-0000-0000-00000000000d","role":"authenticated"}';
 do $$
 declare v_a uuid := current_setting('test.ws_a')::uuid;
 begin
@@ -126,5 +129,6 @@ begin
 end $$;
 
 reset role;
-select 'OK: membros e convites' as resultado;
+select pass('OK: membros e convites');
+select * from finish();
 rollback;

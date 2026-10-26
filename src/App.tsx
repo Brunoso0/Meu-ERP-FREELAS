@@ -4,10 +4,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { WorkspaceGate } from '@/components/layout/WorkspaceGate'
 import { useAuth } from '@/hooks/useAuth'
 import { useSessionGuard } from '@/hooks/useSessionGuard'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { useUI } from '@/store/ui'
+import { useWorkspaceStore } from '@/store/workspace'
 import Login from '@/pages/Login'
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Clients = lazy(() => import('@/pages/Clients'))
@@ -26,6 +28,8 @@ const ProposalGenerator = lazy(() => import('@/pages/tools/ProposalGenerator'))
 const ContractGenerator = lazy(() => import('@/pages/tools/ContractGenerator'))
 const LeadFinder = lazy(() => import('@/pages/tools/LeadFinder'))
 const InvoiceGenerator = lazy(() => import('@/pages/tools/InvoiceGenerator'))
+const Team = lazy(() => import('@/pages/Team'))
+const AcceptInvite = lazy(() => import('@/pages/AcceptInvite'))
 const PublicProposal = lazy(() => import('@/pages/PublicProposal'))
 const PublicContract = lazy(() => import('@/pages/PublicContract'))
 
@@ -45,7 +49,10 @@ export default function App() {
   useEffect(() => {
     // só limpa quando alguém que estava logado sai ou é trocado. Limpar na entrada
     // derrubaria as consultas que o layout acabou de abrir (menu ficaria sem perfil).
-    if (lastUserId.current && lastUserId.current !== userId) queryClient.clear()
+    if (lastUserId.current && lastUserId.current !== userId) {
+      queryClient.clear()
+      useWorkspaceStore.getState().setActive(null)
+    }
     lastUserId.current = userId
   }, [userId, queryClient])
 
@@ -71,6 +78,7 @@ export default function App() {
       ) : needsLogin ? (
         <Login />
       ) : (
+        <WorkspaceGate>
         <Routes>
           <Route element={<AppLayout />}>
             <Route index element={<Dashboard />} />
@@ -84,6 +92,8 @@ export default function App() {
             <Route path="financeiro" element={<Finance />} />
             <Route path="metas" element={<Goals />} />
             <Route path="minha-empresa" element={<Company />} />
+            <Route path="equipe" element={<Team />} />
+            <Route path="convite/:token" element={<AcceptInvite />} />
             <Route path="ferramentas/calculadora" element={<BudgetCalculator />} />
             <Route path="ferramentas/orcamento" element={<QuoteGenerator />} />
             <Route path="ferramentas/proposta" element={<ProposalGenerator />} />
@@ -93,6 +103,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
+        </WorkspaceGate>
       )}
     </>
   )

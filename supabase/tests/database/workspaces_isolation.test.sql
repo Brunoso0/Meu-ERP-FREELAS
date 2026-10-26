@@ -1,7 +1,9 @@
--- Prova de isolamento entre workspaces. Rode SÓ no banco de testes, no SQL
--- Editor ou por `psql -f`. Tudo acontece dentro de uma transação que termina
--- em ROLLBACK: nada fica gravado. Qualquer falha lança uma exceção.
+-- Isolamento entre workspaces (migração 020).
+-- Roda com `supabase test db` (local e no GitHub Actions) numa transação desfeita no fim.
+-- Cada verificação lança uma exceção que começa com FALHA se não for atendida.
 begin;
+create extension if not exists pgtap with schema extensions;
+select no_plan();
 
 -- duas pessoas, cada uma com o seu workspace (o gatilho de cadastro cria)
 insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, created_at, updated_at)
@@ -26,7 +28,7 @@ end $$;
 
 -- ---------------- Ana grava no workspace dela ----------------
 set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}';
 
 do $$
 declare v_a uuid := current_setting('test.ws_a')::uuid; v_n int; v_num int;
@@ -40,7 +42,7 @@ begin
 end $$;
 
 -- ---------------- Beto não vê nada da Ana ----------------
-select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+set local request.jwt.claims = '{"sub":"bbbbbbbb-0000-0000-0000-00000000000b","role":"authenticated"}';
 
 do $$
 declare v_a uuid := current_setting('test.ws_a')::uuid; v_b uuid := current_setting('test.ws_b')::uuid; v_n int; v_num int;
@@ -85,7 +87,7 @@ begin
 end $$;
 
 -- ---------------- Cris (contador, só leitura) ----------------
-select set_config('request.jwt.claims', '{"sub":"cccccccc-0000-0000-0000-00000000000c","role":"authenticated"}', true);
+set local request.jwt.claims = '{"sub":"cccccccc-0000-0000-0000-00000000000c","role":"authenticated"}';
 
 do $$
 declare v_a uuid := current_setting('test.ws_a')::uuid; v_n int;
@@ -112,7 +114,7 @@ begin
 end $$;
 
 -- ---------------- a pessoa não move dados para outro workspace ----------------
-select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}';
 do $$
 declare v_a uuid := current_setting('test.ws_a')::uuid; v_b uuid := current_setting('test.ws_b')::uuid; v_ws uuid;
 begin
@@ -122,5 +124,6 @@ begin
 end $$;
 
 reset role;
-select 'OK: isolamento entre workspaces' as resultado;
+select pass('OK: isolamento entre workspaces');
+select * from finish();
 rollback;

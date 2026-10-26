@@ -41,9 +41,11 @@ select lives_ok(
   $$ insert into public.financial_transactions (type, category, description, amount, due_date) values ('income', 'Projeto', 'Recebimento de A', 100, current_date) $$,
   'A cria lançamento'
 );
+-- a pasta dos arquivos é o id do workspace (migração 020), criado no cadastro
 select lives_ok(
-  $$ insert into storage.objects (bucket_id, name) values ('proofs', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/comprovante.pdf') $$,
-  'A envia arquivo para a própria pasta'
+  format($f$ insert into storage.objects (bucket_id, name) values ('proofs', '%s/comprovante.pdf') $f$,
+         (select workspace_id from public.workspace_members where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')),
+  'A envia arquivo para a pasta do próprio workspace'
 );
 select is((select count(*) from public.clients), 1::bigint, 'A vê o próprio cliente');
 

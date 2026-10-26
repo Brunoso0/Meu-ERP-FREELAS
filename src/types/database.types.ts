@@ -348,8 +348,64 @@ export interface Goal {
   created_at: string
 }
 
+export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer'
+
+/** A empresa: dados, cobrança e nota. Todo dado do sistema pertence a um workspace (migração 020). */
+export interface Workspace {
+  id: string
+  name: string
+  created_by: string | null
+  created_at: string
+  company_name: string | null
+  document: string | null
+  email: string | null
+  phone: string | null
+  pix_key: string | null
+  pix_qr_image: string | null
+  signature_image: string | null
+  billing_provider: BillingProvider
+  billing_fine_pct: number
+  billing_interest_pct: number
+  billing_discount_pct: number
+  billing_discount_days: number
+  billing_types: BillingType
+  billing_notify: boolean
+  nfse_services: NfseService[]
+  nfse_observations: string | null
+  nfse_regime: NfseRegime
+  nfse_taxes: NfseTaxes
+}
+
+export interface WorkspaceMember {
+  workspace_id: string
+  user_id: string
+  role: WorkspaceRole
+  created_at: string
+}
+
+/** Linha devolvida por list_workspace_members (nome e e-mail vêm do perfil). */
+export interface MemberInfo {
+  user_id: string
+  role: WorkspaceRole
+  full_name: string | null
+  email: string | null
+  joined_at: string
+}
+
+export interface WorkspaceInvite {
+  id: string
+  workspace_id: string
+  email: string
+  role: Exclude<WorkspaceRole, 'owner'>
+  invited_by: string | null
+  expires_at: string
+  accepted_at: string | null
+  created_at: string
+}
+
 export interface Tables {
   profiles: Profile
+  workspaces: Workspace
   clients: Client
   freelancers: Freelancer
   proposals: Proposal
