@@ -107,3 +107,28 @@ export const getInvite = (token: string) => rpc<InviteInfo | null>('get_workspac
 
 /** Devolve o id do workspace em que a pessoa entrou. */
 export const acceptInvite = (token: string) => rpc<string>('accept_workspace_invite', { p_token: token })
+
+export const createWorkspace = (name: string) => rpc<string>('create_workspace', { p_name: name })
+
+/** Apaga primeiro os arquivos do Storage (o SQL não pode) e depois o workspace inteiro. */
+export async function deleteWorkspace(workspaceId: string, confirmName: string): Promise<void> {
+  if (!supabase) throw demoOnly()
+  await removeFolder(workspaceId)
+  await rpc('delete_workspace', { p_workspace: workspaceId, p_confirm_name: confirmName })
+}
+
+async function removeFolder(prefix: string): Promise<void> {
+  if (!supabase) throw demoOnly()
+  const bucket = supabase.storage.from('proofs')
+  const { data, error } = await bucket.list(prefix, { limit: 1000 })
+  if (error) throw error
+  const files: string[] = []
+  for (const item of data ?? []) {
+    if (item.id) files.push(`${prefix}/${item.name}`)
+    else await removeFolder(`${prefix}/${item.name}`)
+  }
+  if (files.length) {
+    const { error: rmError } = await bucket.remove(files)
+    if (rmError) throw rmError
+  }
+}

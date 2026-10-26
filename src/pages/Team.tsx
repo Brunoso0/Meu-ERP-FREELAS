@@ -6,7 +6,7 @@ import { Avatar, Badge, Button, Card, Field, Input, PageHeader, Select, Skeleton
 import { confirm } from '@/components/ui/confirm'
 import { MY_WORKSPACES_KEY, useActiveWorkspace } from '@/hooks/useWorkspace'
 import {
-  changeMemberRole, createInvite, inviteLink, leaveWorkspace, listInvites, listMembers,
+  changeMemberRole, createInvite, createWorkspace, deleteWorkspace, inviteLink, leaveWorkspace, listInvites, listMembers,
   removeMember, revokeInvite, roleHint, roleLabel, transferOwnership,
 } from '@/lib/workspace'
 import { useAuth } from '@/hooks/useAuth'
@@ -82,6 +82,40 @@ export default function Team() {
         if (next) await switchTo(next.workspace.id)
       })
       .catch((e) => toast.error('Não foi possível sair', { description: message(e) }))
+  }
+
+  const [newName, setNewName] = useState('')
+  const [confirmName, setConfirmName] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function onCreate() {
+    if (!newName.trim()) return
+    setBusy(true)
+    await createWorkspace(newName.trim())
+      .then(async (id) => {
+        setNewName('')
+        await qc.invalidateQueries({ queryKey: MY_WORKSPACES_KEY })
+        await switchTo(id)
+        toast.success('Workspace criado')
+      })
+      .catch((e) => toast.error('Não foi possível criar', { description: message(e) }))
+      .finally(() => setBusy(false))
+  }
+
+  async function onDelete() {
+    if (!workspace) return
+    if (!(await confirm({ title: `Excluir ${workspace.name} para sempre?`, description: 'Clientes, propostas, projetos, financeiro, arquivos e integrações deste workspace são apagados e não dá para desfazer. Todos os membros perdem o acesso.', confirmLabel: 'Excluir tudo' }))) return
+    setBusy(true)
+    await deleteWorkspace(wsId, confirmName)
+      .then(async () => {
+        setConfirmName('')
+        const next = all.find((m) => m.workspace.id !== wsId)
+        if (next) await switchTo(next.workspace.id)
+        await qc.invalidateQueries({ queryKey: MY_WORKSPACES_KEY })
+        toast.success('Workspace excluído')
+      })
+      .catch((e) => toast.error('Não foi possível excluir', { description: message(e) }))
+      .finally(() => setBusy(false))
   }
 
   // papéis que a pessoa pode dar: o administrador só o dono concede
@@ -186,6 +220,28 @@ export default function Team() {
 
       {role && role !== 'owner' && (
         <Button variant="danger" onClick={onLeave}><LogOut className="h-4 w-4" />Sair deste workspace</Button>
+      )}
+
+      <Card className="mt-6 p-4">
+        <h3 className="mb-1 text-sm font-semibold">Criar outro workspace</h3>
+        <p className="mb-3 text-xs text-slate-500">Outra empresa ou cliente, com dados separados. Você será o dono.</p>
+        <div className="flex gap-2">
+          <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome do workspace" maxLength={120} />
+          <Button onClick={onCreate} disabled={busy || !newName.trim()}>Criar</Button>
+        </div>
+      </Card>
+
+      {role === 'owner' && workspace && (
+        <Card className="mt-6 border-red-200 p-4 dark:border-red-900">
+          <h3 className="mb-1 text-sm font-semibold text-red-600">Excluir este workspace</h3>
+          <p className="mb-3 text-xs text-slate-500">Para confirmar, digite <strong>{workspace.name}</strong>.</p>
+          <div className="flex gap-2">
+            <Input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} placeholder={workspace.name} />
+            <Button variant="danger" onClick={onDelete} disabled={busy || confirmName.trim() !== workspace.name}>
+              <Trash2 className="h-4 w-4" />Excluir
+            </Button>
+          </div>
+        </Card>
       )}
     </div>
   )
