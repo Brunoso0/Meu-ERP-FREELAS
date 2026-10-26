@@ -63,10 +63,14 @@ interface Item {
 }
 
 async function digest(userId: string, day: string) {
+  // cada pessoa recebe as demandas de todos os workspaces em que trabalha (leitores não recebem)
+  const { data: memberships } = await admin.from('workspace_members').select('workspace_id').eq('user_id', userId).in('role', ['owner', 'admin', 'member'])
+  const workspaceIds = (memberships ?? []).map((m) => m.workspace_id)
+  if (workspaceIds.length === 0) return { today: [], late: [] }
   const { data: tasks } = await admin
     .from('tasks')
     .select('title, status, priority, scheduled_date, due_date, project_id')
-    .eq('user_id', userId)
+    .in('workspace_id', workspaceIds)
     .neq('status', 'done')
     .or(`scheduled_date.eq.${day},due_date.lte.${day}`)
   const ids = [...new Set((tasks ?? []).map((t) => t.project_id).filter(Boolean))]

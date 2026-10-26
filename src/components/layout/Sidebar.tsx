@@ -11,6 +11,7 @@ import { isSupabaseConfigured } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useUI } from '@/store/ui'
 import { mainNav, toolsNav, type NavItem } from './nav'
+import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 
 function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   return (
@@ -101,6 +102,8 @@ export function Sidebar() {
             </button>
           )}
         </div>
+
+        <WorkspaceSwitcher collapsed={collapsed} />
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden p-2">
           {mainNav.map((item) => (

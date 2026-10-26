@@ -5,6 +5,7 @@ import { isoDay } from './utils'
 export type MockDB = { [K in keyof Tables]: Tables[K][] }
 
 export const DEMO_USER_ID = 'demo-user'
+export const DEMO_WORKSPACE_ID = 'demo-workspace'
 
 /**
  * Dados fictícios do modo demo. As datas são relativas a "hoje" para que
@@ -156,6 +157,16 @@ export function buildSeed(): MockDB {
       billing_provider: 'simple', billing_fine_pct: 2, billing_interest_pct: 1, billing_discount_pct: 0, billing_discount_days: 0, billing_types: 'UNDEFINED', billing_notify: true, reminder_email: false, reminder_push: true, reminder_hour: 7, created_at: created(365) },
   ]
 
+  const workspaces: MockDB['workspaces'] = [
+    {
+      id: DEMO_WORKSPACE_ID, name: 'Demo Serviços Digitais', created_by: u, created_at: created(365),
+      company_name: 'Demo Serviços Digitais', document: '00.000.000/0001-00', email: 'demo@meuerp.example', phone: '(11) 90000-0000',
+      pix_key: 'demo@meuerp.example', pix_qr_image: null, signature_image: null,
+      billing_provider: 'simple', billing_fine_pct: 2, billing_interest_pct: 1, billing_discount_pct: 0, billing_discount_days: 0, billing_types: 'UNDEFINED', billing_notify: true,
+      nfse_services: [], nfse_observations: null, nfse_regime: 'mei', nfse_taxes: {},
+    },
+  ]
+
   const quotes: MockDB['quotes'] = [
     {
       id: 'q1', user_id: u, quote_number: 1, client_id: 'c2', customer_name: null, title: 'Atualização do cadastro de clientes',
@@ -167,7 +178,7 @@ export function buildSeed(): MockDB {
   // todo orçamento tem o seu lançamento no financeiro
   tx({ type: 'income', category: 'Orçamento', description: 'Orçamento #ORC-0001 — Atualização do cadastro de clientes', amount: 630, due_date: isoDay(addDays(now, 6)), payment_date: null, status: 'pending', client_id: 'c2', freelancer_id: null, project_id: null, quote_id: 'q1' })
 
-  return { profiles, clients, freelancers, proposals, quotes, quote_recurrences: [], projects, tasks, calendar_events, financial_transactions, contracts, goals }
+  return { profiles, workspaces, clients, freelancers, proposals, quotes, quote_recurrences: [], projects, tasks, calendar_events, financial_transactions, contracts, goals }
 }
 
 function toDateTime(day: string) {
