@@ -1,3 +1,4 @@
+import { activeWorkspaceId } from '@/store/workspace'
 import { isoDay } from './utils'
 import { listRows, updateRow } from './db'
 import { supabase } from './supabase'
@@ -234,7 +235,7 @@ const clearedCharge: Partial<FinancialTransaction> = {
 
 async function call<T>(action: string, body: Record<string, unknown> = {}): Promise<T> {
   if (!supabase) return demoAction(action, body)
-  const { data, error } = await supabase.functions.invoke('billing', { body: { action, ...body } })
+  const { data, error } = await supabase.functions.invoke('billing', { body: { action, workspaceId: activeWorkspaceId(), ...body } })
   if (error) {
     const context = (error as { context?: Response }).context
     if (context?.status === 404) throw new Error('A função de cobrança (billing) ainda não foi publicada no Supabase.')
@@ -246,7 +247,7 @@ async function call<T>(action: string, body: Record<string, unknown> = {}): Prom
 
 export async function getBillingConnection(): Promise<BillingConnection | null> {
   if (!supabase) return demoConnection()
-  const { data, error } = await supabase.rpc('get_billing_status')
+  const { data, error } = await supabase.rpc('get_billing_status', { p_workspace: activeWorkspaceId() })
   if (error) throw new Error(error.message)
   return ((data as BillingConnection[] | null) ?? []).find((c) => c.provider === 'asaas') ?? null
 }

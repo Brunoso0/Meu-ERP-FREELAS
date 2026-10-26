@@ -8,6 +8,7 @@ import { companySchema, companySections, type CompanySectionId } from '@/compone
 import { FormFields, initialValues, payloadOf } from '@/components/forms/EntityForm'
 import { Button, Card, PageHeader, Skeleton } from '@/components/ui/primitives'
 import { useTable, useUpdate } from '@/hooks/useData'
+import { useActiveWorkspace } from '@/hooks/useWorkspace'
 import { cn } from '@/lib/utils'
 
 const allFields = companySections.flatMap((s) => s.fields)
@@ -24,6 +25,7 @@ export default function Company() {
   const profiles = useTable('profiles')
   const profile = profiles.data?.[0]
   const update = useUpdate('profiles')
+  const { can } = useActiveWorkspace()
   const [params, setParams] = useSearchParams()
   const current = isSection(params.get('secao')) ? (params.get('secao') as CompanySectionId) : 'dados'
   const section = companySections.find((s) => s.id === current)!
@@ -90,6 +92,11 @@ export default function Company() {
   return (
     <>
       <PageHeader title="Minha empresa" description="Seus dados como emitente, a forma de cobrança, a nota fiscal, os lembretes e a segurança." />
+      {!can('admin') && (
+        <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+          Os dados da empresa, a cobrança e a nota fiscal só o dono ou um administrador altera. Os seus lembretes você ajusta normalmente.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[230px_1fr]">
         <nav ref={nav} aria-label="Seções" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:sticky lg:top-20 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">

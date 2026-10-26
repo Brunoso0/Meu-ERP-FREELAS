@@ -208,7 +208,13 @@ export async function updateRow<T extends TableName>(
 }
 
 async function updateProfile(id: string, patch: Partial<Profile>): Promise<Profile> {
-  const { company, personal } = splitProfilePatch(patch)
+  // a tela manda o formulário inteiro; só o que mudou vai ao banco (quem não é admin
+  // consegue salvar os próprios lembretes sem esbarrar nos dados da empresa)
+  const [current] = (await listRows('profiles')) as Profile[]
+  const changed = Object.fromEntries(
+    Object.entries(patch).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify((current as unknown as Record<string, unknown>)?.[key])),
+  ) as Partial<Profile>
+  const { company, personal } = splitProfilePatch(changed)
   const workspaceId = activeWorkspaceId()
   if (Object.keys(company).length > 0) {
     if (!workspaceId) throw new Error('Nenhuma empresa selecionada.')
@@ -251,7 +257,7 @@ async function cancelOpenCharge(id: string) {
     throw new Error('Este recebimento tem nota fiscal emitida. Cancele a nota antes de excluir o lançamento.')
   }
   if (!data?.gateway_charge_id || data.status === 'paid') return
-  const { error } = await supabase.functions.invoke('billing', { body: { action: 'cancel-charge', transactionId: id } })
+  const { error } = await supabase.functions.invoke('billing', { body: { action: 'cancel-charge', workspaceId: activeWorkspaceId(), transactionId: id } })
   if (error) {
     const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
     throw new Error(`A cobrança no Asaas não foi cancelada, então o lançamento não foi excluído. ${detail?.message ?? error.message}`)

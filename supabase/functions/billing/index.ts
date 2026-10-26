@@ -98,16 +98,16 @@ interface Integration {
   key: string
 }
 
-async function integration(userId: string): Promise<Integration> {
-  const { data: row } = await admin.from('billing_integrations').select('environment, webhook_id').eq('user_id', userId).eq('provider', 'asaas').maybeSingle()
+async function integration(workspaceId: string): Promise<Integration> {
+  const { data: row } = await admin.from('billing_integrations').select('environment, webhook_id').eq('workspace_id', workspaceId).eq('provider', 'asaas').maybeSingle()
   if (!row) throw new Problem('Conecte a sua conta do Asaas em Minha empresa → Forma de cobrança.')
-  const { data: key, error } = await admin.rpc('billing_read_api_key', { p_user: userId, p_provider: 'asaas' })
+  const { data: key, error } = await admin.rpc('billing_read_api_key', { p_workspace: workspaceId, p_provider: 'asaas' })
   if (error || !key) throw new Problem('Não encontrei a chave do Asaas. Conecte a conta de novo em Minha empresa.')
   return { environment: row.environment as Env, webhook_id: row.webhook_id, key: key as string }
 }
 
 /** Cria (ou recria) o webhook que avisa o app quando um pagamento muda. */
-async function setupWebhook(userId: string, env: Env, key: string, email: string | null) {
+async function setupWebhook(workspaceId: string, env: Env, key: string, email: string | null) {
   const existing = await asaas(env, key, 'GET', '/webhooks?limit=100').catch(() => null)
   for (const hook of existing?.data ?? []) {
     if (hook.url === WEBHOOK_URL) await asaas(env, key, 'DELETE', `/webhooks/${hook.id}`).catch(() => null)
@@ -124,10 +124,10 @@ async function setupWebhook(userId: string, env: Env, key: string, email: string
     sendType: 'SEQUENTIALLY',
     events: WEBHOOK_EVENTS,
   })
-  await admin.from('billing_integrations').update({ webhook_id: hook.id, webhook_token_hash: await sha256(token) }).eq('user_id', userId).eq('provider', 'asaas')
+  await admin.from('billing_integrations').update({ webhook_id: hook.id, webhook_token_hash: await sha256(token) }).eq('workspace_id', workspaceId).eq('provider', 'asaas')
 }
 
-async function connect(userId: string, body: Record<string, unknown>) {
+async function connect(workspaceId: string, body: Record<string, unknown>) {
   const env = body.environment === 'sandbox' ? 'sandbox' : 'production'
   const key = String(body.apiKey ?? '').trim()
   if (!/^\$aact_/.test(key) || key.length < 30 || key.length > 400) throw new Problem('Cole a chave de API completa, que começa com $aact_.')
@@ -137,51 +137,51 @@ async function connect(userId: string, body: Record<string, unknown>) {
   const account = await asaas(env, key, 'GET', '/myAccount/commercialInfo')
   const name = account?.companyName || account?.name || null
   const email = account?.email || null
-  const { error } = await admin.rpc('billing_save_api_key', { p_user: userId, p_provider: 'asaas', p_environment: env, p_key: key, p_account_name: name, p_account_email: email })
+  const { error } = await admin.rpc('billing_save_api_key', { p_workspace: workspaceId, p_provider: 'asaas', p_environment: env, p_key: key, p_account_name: name, p_account_email: email })
   if (error) throw new Problem(`Não foi possível guardar a chave: ${error.message}`, 500)
-  await admin.from('profiles').update({ billing_provider: 'asaas' }).eq('id', userId)
+  await admin.from('workspaces').update({ billing_provider: 'asaas' }).eq('id', workspaceId)
 
   let webhookError: string | null = null
   try {
-    const { data: profile } = await admin.from('profiles').select('email').eq('id', userId).maybeSingle()
-    await setupWebhook(userId, env, key, profile?.email || email)
+    const { data: profile } = await admin.from('workspaces').select('email').eq('id', workspaceId).maybeSingle()
+    await setupWebhook(workspaceId, env, key, profile?.email || email)
   } catch (error) {
     webhookError = error instanceof Error ? error.message : String(error)
   }
   return { connected: true, environment: env, account_name: name, account_email: email, webhook: !webhookError, webhookError }
 }
 
-async function disconnect(userId: string) {
+async function disconnect(workspaceId: string) {
   try {
-    const current = await integration(userId)
+    const current = await integration(workspaceId)
     if (current.webhook_id) await asaas(current.environment, current.key, 'DELETE', `/webhooks/${current.webhook_id}`).catch(() => null)
   } catch {
     // já não havia conexão: segue limpando
   }
-  await admin.rpc('billing_forget', { p_user: userId, p_provider: 'asaas' })
-  await admin.from('profiles').update({ billing_provider: 'simple' }).eq('id', userId)
+  await admin.rpc('billing_forget', { p_workspace: workspaceId, p_provider: 'asaas' })
+  await admin.from('workspaces').update({ billing_provider: 'simple' }).eq('id', workspaceId)
   return { connected: false }
 }
 
 // ---------- cobranças ----------
 
-async function transactionOf(userId: string, id: unknown) {
-  const { data: tx } = await admin.from('financial_transactions').select('*').eq('id', String(id ?? '')).eq('user_id', userId).maybeSingle()
+async function transactionOf(workspaceId: string, id: unknown) {
+  const { data: tx } = await admin.from('financial_transactions').select('*').eq('id', String(id ?? '')).eq('workspace_id', workspaceId).maybeSingle()
   if (!tx) throw new Problem('Lançamento não encontrado.', 404)
   return tx
 }
 
 /** Id do cliente no Asaas: reaproveita o já criado, procura pelo CPF/CNPJ ou cadastra. */
-async function customerId(userId: string, current: Integration, clientId: string) {
+async function customerId(workspaceId: string, current: Integration, clientId: string) {
   const { data: known } = await admin.from('gateway_customers').select('external_id').eq('client_id', clientId).eq('provider', 'asaas').eq('environment', current.environment).maybeSingle()
   if (known) return known.external_id as string
 
-  const { data: client } = await admin.from('clients').select('*').eq('id', clientId).eq('user_id', userId).maybeSingle()
+  const { data: client } = await admin.from('clients').select('*').eq('id', clientId).eq('workspace_id', workspaceId).maybeSingle()
   if (!client) throw new Problem('Cliente do lançamento não encontrado.')
   const document = onlyDigits(client.document)
   if (document.length !== 11 && document.length !== 14) throw new Problem(`Cadastre o CPF ou CNPJ de ${client.company_name || client.name} para gerar a cobrança.`)
 
-  const { data: profile } = await admin.from('profiles').select('billing_notify').eq('id', userId).maybeSingle()
+  const { data: profile } = await admin.from('workspaces').select('billing_notify').eq('id', workspaceId).maybeSingle()
   const found = await asaas(current.environment, current.key, 'GET', `/customers?cpfCnpj=${document}&limit=1`)
   let id: string | undefined = found?.data?.[0]?.id
   if (!id) {
@@ -196,7 +196,7 @@ async function customerId(userId: string, current: Integration, clientId: string
     })
     id = created.id
   }
-  await admin.from('gateway_customers').upsert({ user_id: userId, client_id: clientId, provider: 'asaas', environment: current.environment, external_id: id })
+  await admin.from('gateway_customers').upsert({ workspace_id: workspaceId, client_id: clientId, provider: 'asaas', environment: current.environment, external_id: id })
   return id!
 }
 
@@ -237,17 +237,17 @@ function chargeFields(current: Integration, payment: Record<string, any>) {
   }
 }
 
-async function createCharge(userId: string, body: Record<string, unknown>) {
-  const tx = await transactionOf(userId, body.transactionId)
+async function createCharge(workspaceId: string, body: Record<string, unknown>) {
+  const tx = await transactionOf(workspaceId, body.transactionId)
   if (tx.type !== 'income') throw new Problem('Só recebimentos podem virar cobrança.')
   if (tx.status === 'paid') throw new Problem('Este lançamento já está pago.')
   if (tx.gateway_charge_id) throw new Problem('Este lançamento já tem uma cobrança no Asaas.')
   if (!tx.client_id) throw new Problem('Escolha o cliente do lançamento antes de gerar a cobrança.')
   if (tx.due_date < today()) throw new Problem('O vencimento deste lançamento já passou. Edite a data de vencimento e gere a cobrança de novo.')
 
-  const current = await integration(userId)
-  const { data: profile } = await admin.from('profiles').select('*').eq('id', userId).maybeSingle()
-  const customer = await customerId(userId, current, tx.client_id)
+  const current = await integration(workspaceId)
+  const { data: profile } = await admin.from('workspaces').select('*').eq('id', workspaceId).maybeSingle()
+  const customer = await customerId(workspaceId, current, tx.client_id)
   const discount = Number(profile?.billing_discount_pct) || 0
   const payment = await asaas(current.environment, current.key, 'POST', '/payments', {
     customer,
@@ -272,10 +272,10 @@ async function createCharge(userId: string, body: Record<string, unknown>) {
 }
 
 /** Busca de novo o QR Code Pix (ex.: depois de cadastrar a chave Pix no Asaas). */
-async function refreshPix(userId: string, body: Record<string, unknown>) {
-  const tx = await transactionOf(userId, body.transactionId)
+async function refreshPix(workspaceId: string, body: Record<string, unknown>) {
+  const tx = await transactionOf(workspaceId, body.transactionId)
   if (!tx.gateway_charge_id || tx.status === 'paid') return { transaction: tx, pixWarning: null }
-  const current = await integration(userId)
+  const current = await integration(workspaceId)
   const payment = await asaas(current.environment, current.key, 'GET', `/payments/${tx.gateway_charge_id}`)
   const pix = await pixOf(current, tx.gateway_charge_id, tx.due_date, payment.billingType)
   const { data: saved } = await admin.from('financial_transactions').update(pix.fields).eq('id', tx.id).select().single()
@@ -300,22 +300,22 @@ async function dropCharge(current: Integration, tx: Record<string, any>) {
  *   antiga, que ficou errada, é cancelada; uma nova é gerada quando você pedir.
  * - Só a descrição mudou: atualiza só ela, sem mexer numa cobrança que pode estar vencida.
  */
-async function updateCharge(userId: string, body: Record<string, unknown>) {
-  const tx = await transactionOf(userId, body.transactionId)
+async function updateCharge(workspaceId: string, body: Record<string, unknown>) {
+  const tx = await transactionOf(workspaceId, body.transactionId)
   if (!tx.gateway_charge_id || tx.status === 'paid') return { transaction: tx }
-  const current = await integration(userId)
+  const current = await integration(workspaceId)
   const payment = await asaas(current.environment, current.key, 'GET', `/payments/${tx.gateway_charge_id}`)
-  if (PAID.has(payment.status)) return { transaction: await applyPayment(userId, tx, payment) }
+  if (PAID.has(payment.status)) return { transaction: await applyPayment(workspaceId, tx, payment) }
 
   if (!tx.client_id) {
     return { transaction: await dropCharge(current, tx), notice: 'O lançamento ficou sem cliente, então a cobrança no Asaas foi cancelada.' }
   }
-  const expected = await customerId(userId, current, tx.client_id)
+  const expected = await customerId(workspaceId, current, tx.client_id)
   const pastDue = tx.due_date < today()
   if (payment.customer !== expected) {
     await dropCharge(current, tx)
-    if (pastDue) return { transaction: (await transactionOf(userId, tx.id)), notice: 'O cliente mudou e o vencimento já passou: a cobrança antiga foi cancelada. Gere uma nova, com outra data.' }
-    const created = await createCharge(userId, body)
+    if (pastDue) return { transaction: (await transactionOf(workspaceId, tx.id)), notice: 'O cliente mudou e o vencimento já passou: a cobrança antiga foi cancelada. Gere uma nova, com outra data.' }
+    const created = await createCharge(workspaceId, body)
     return { ...created, notice: 'O cliente mudou: a cobrança antiga foi cancelada e outra foi criada no nome do novo cliente.' }
   }
 
@@ -347,10 +347,10 @@ const clearedCharge = {
   gateway_synced_at: null,
 }
 
-async function cancelCharge(userId: string, body: Record<string, unknown>) {
-  const tx = await transactionOf(userId, body.transactionId)
+async function cancelCharge(workspaceId: string, body: Record<string, unknown>) {
+  const tx = await transactionOf(workspaceId, body.transactionId)
   if (!tx.gateway_charge_id) return { transaction: tx }
-  const current = await integration(userId)
+  const current = await integration(workspaceId)
   try {
     await asaas(current.environment, current.key, 'DELETE', `/payments/${tx.gateway_charge_id}`)
   } catch (error) {
@@ -362,41 +362,41 @@ async function cancelCharge(userId: string, body: Record<string, unknown>) {
 }
 
 /** Recebimento por fora (dinheiro, transferência): dá baixa no Asaas para o cliente não pagar de novo. */
-async function receiveInCash(userId: string, body: Record<string, unknown>) {
-  const tx = await transactionOf(userId, body.transactionId)
+async function receiveInCash(workspaceId: string, body: Record<string, unknown>) {
+  const tx = await transactionOf(workspaceId, body.transactionId)
   if (!tx.gateway_charge_id) throw new Problem('Este lançamento não tem cobrança no Asaas.')
-  const current = await integration(userId)
+  const current = await integration(workspaceId)
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.paymentDate)) ? String(body.paymentDate) : today()
   const payment = await asaas(current.environment, current.key, 'POST', `/payments/${tx.gateway_charge_id}/receiveInCash`, {
     paymentDate: date,
     value: Number(tx.amount),
     notifyCustomer: false,
   })
-  return { transaction: await applyPayment(userId, tx, { ...payment, paymentDate: date }) }
+  return { transaction: await applyPayment(workspaceId, tx, { ...payment, paymentDate: date }) }
 }
 
 /** Desfaz uma baixa por fora. Pagamento recebido pelo próprio Asaas só pode ser estornado lá. */
-async function undoReceiveInCash(userId: string, body: Record<string, unknown>) {
-  const tx = await transactionOf(userId, body.transactionId)
+async function undoReceiveInCash(workspaceId: string, body: Record<string, unknown>) {
+  const tx = await transactionOf(workspaceId, body.transactionId)
   if (!tx.gateway_charge_id) return { transaction: tx }
-  const current = await integration(userId)
+  const current = await integration(workspaceId)
   const payment = await asaas(current.environment, current.key, 'GET', `/payments/${tx.gateway_charge_id}`)
   if (payment.status !== 'RECEIVED_IN_CASH') {
     if (PAID.has(payment.status)) throw new Problem('Este pagamento foi recebido pelo Asaas e não pode ser desfeito aqui. Se precisar devolver, faça o estorno no painel do Asaas.')
-    return { transaction: await applyPayment(userId, tx, payment, 'PAYMENT_RECEIVED_IN_CASH_UNDONE') }
+    return { transaction: await applyPayment(workspaceId, tx, payment, 'PAYMENT_RECEIVED_IN_CASH_UNDONE') }
   }
   const undone = await asaas(current.environment, current.key, 'POST', `/payments/${tx.gateway_charge_id}/undoReceivedInCash`)
-  return { transaction: await applyPayment(userId, tx, undone, 'PAYMENT_RECEIVED_IN_CASH_UNDONE') }
+  return { transaction: await applyPayment(workspaceId, tx, undone, 'PAYMENT_RECEIVED_IN_CASH_UNDONE') }
 }
 
-async function refreshCharge(userId: string, body: Record<string, unknown>) {
-  const tx = await transactionOf(userId, body.transactionId)
+async function refreshCharge(workspaceId: string, body: Record<string, unknown>) {
+  const tx = await transactionOf(workspaceId, body.transactionId)
   if (!tx.gateway_charge_id) return { transaction: tx }
-  const current = await integration(userId)
+  const current = await integration(workspaceId)
   try {
     const payment = await asaas(current.environment, current.key, 'GET', `/payments/${tx.gateway_charge_id}`)
     if (payment.deleted) return { transaction: (await admin.from('financial_transactions').update(clearedCharge).eq('id', tx.id).select().single()).data }
-    return { transaction: await applyPayment(userId, tx, payment) }
+    return { transaction: await applyPayment(workspaceId, tx, payment) }
   } catch (error) {
     if (error instanceof Problem && error.status === 404) {
       return { transaction: (await admin.from('financial_transactions').update(clearedCharge).eq('id', tx.id).select().single()).data }
@@ -473,8 +473,8 @@ function invoiceTaxes(regime: Regime, raw: Record<string, unknown>, nbsCode: str
  * etapas do gerador (as mesmas do Emissor Nacional): serviço com o código de
  * tributação nacional, descrição, deduções e os tributos do regime escolhido.
  */
-async function issueInvoice(userId: string, body: Record<string, unknown>) {
-  const tx = await transactionOf(userId, body.transactionId)
+async function issueInvoice(workspaceId: string, body: Record<string, unknown>) {
+  const tx = await transactionOf(workspaceId, body.transactionId)
   if (tx.type !== 'income') throw new Problem('Nota fiscal só para recebimentos.')
   if (tx.status !== 'paid') throw new Problem('Emita a nota depois que o pagamento estiver registrado.')
   if (tx.nfse_id && LIVE_INVOICE.has(tx.nfse_status)) throw new Problem('Este recebimento já tem nota fiscal.')
@@ -495,10 +495,10 @@ async function issueInvoice(userId: string, body: Record<string, unknown>) {
   if (!Number.isFinite(deductions) || deductions < 0 || deductions >= value) throw new Problem('As deduções precisam ser menores que o valor do serviço.')
   const taxes = invoiceTaxes(regime, (body.taxes ?? {}) as Record<string, unknown>, nbsCode)
 
-  const current = await integration(userId)
+  const current = await integration(workspaceId)
   await ensureInvoiceEvents(current)
   // ligada à cobrança quando o pagamento veio pelo Asaas; senão, ao cliente
-  const origin = tx.gateway_charge_id ? { payment: tx.gateway_charge_id } : { customer: await customerId(userId, current, tx.client_id) }
+  const origin = tx.gateway_charge_id ? { payment: tx.gateway_charge_id } : { customer: await customerId(workspaceId, current, tx.client_id) }
   const scheduled = await asaas(current.environment, current.key, 'POST', '/invoices', {
     ...origin,
     serviceDescription: description,
@@ -530,8 +530,8 @@ async function issueInvoice(userId: string, body: Record<string, unknown>) {
  * que sai o regime que vai impresso na nota. `configured: false` quando a
  * conta ainda não tem a configuração de nota fiscal.
  */
-async function fiscalInfo(userId: string) {
-  const current = await integration(userId)
+async function fiscalInfo(workspaceId: string) {
+  const current = await integration(workspaceId)
   try {
     const info = await asaas(current.environment, current.key, 'GET', '/fiscalInfo/')
     return {
@@ -551,10 +551,10 @@ async function fiscalInfo(userId: string) {
 }
 
 /** Busca na tabela de códigos de tributação nacional (ou NBS) do Asaas. */
-async function searchServiceCodes(userId: string, body: Record<string, unknown>) {
+async function searchServiceCodes(workspaceId: string, body: Record<string, unknown>) {
   const term = String(body.term ?? '').trim().slice(0, 80)
   if (term.length < 2) return { data: [] }
-  const current = await integration(userId)
+  const current = await integration(workspaceId)
   if (body.kind === 'nbs') {
     const list = await asaas(current.environment, current.key, 'GET', `/fiscalInfo/nbsCodes?limit=20&codeDescription=${encodeURIComponent(term)}`)
     return { data: (list?.data ?? []).map((i: Record<string, string>) => ({ code: i.nbsCode, description: i.codeDescription })) }
@@ -564,19 +564,19 @@ async function searchServiceCodes(userId: string, body: Record<string, unknown>)
   return { data: (list?.data ?? []).map((i: Record<string, string>) => ({ code: i.code, description: i.description })) }
 }
 
-async function refreshInvoice(userId: string, body: Record<string, unknown>) {
-  const tx = await transactionOf(userId, body.transactionId)
+async function refreshInvoice(workspaceId: string, body: Record<string, unknown>) {
+  const tx = await transactionOf(workspaceId, body.transactionId)
   if (!tx.nfse_id) return { transaction: tx }
-  const current = await integration(userId)
+  const current = await integration(workspaceId)
   const invoice = await asaas(current.environment, current.key, 'GET', `/invoices/${tx.nfse_id}`)
   const { data: saved } = await admin.from('financial_transactions').update(invoiceFields(invoice)).eq('id', tx.id).select().single()
   return { transaction: saved }
 }
 
-async function cancelInvoice(userId: string, body: Record<string, unknown>) {
-  const tx = await transactionOf(userId, body.transactionId)
+async function cancelInvoice(workspaceId: string, body: Record<string, unknown>) {
+  const tx = await transactionOf(workspaceId, body.transactionId)
   if (!tx.nfse_id) return { transaction: tx }
-  const current = await integration(userId)
+  const current = await integration(workspaceId)
   const invoice = await asaas(current.environment, current.key, 'POST', `/invoices/${tx.nfse_id}/cancel`)
   const patch = invoiceFields(invoice)
   // o PDF de uma nota cancelada não serve mais como nota do lançamento
@@ -588,7 +588,7 @@ async function cancelInvoice(userId: string, body: Record<string, unknown>) {
 // ---------- situação do pagamento (ação manual e webhook) ----------
 
 /** Leva a situação do Asaas para o lançamento e, se ele é de um orçamento, para o orçamento. */
-async function applyPayment(userId: string, tx: Record<string, any>, payment: Record<string, any>, event?: string) {
+async function applyPayment(workspaceId: string, tx: Record<string, any>, payment: Record<string, any>, event?: string) {
   const patch: Record<string, unknown> = {
     gateway_status: payment.status ?? tx.gateway_status,
     gateway_net_value: payment.netValue ?? tx.gateway_net_value,
@@ -605,25 +605,25 @@ async function applyPayment(userId: string, tx: Record<string, any>, payment: Re
   if (payment.invoiceUrl) patch.gateway_invoice_url = payment.invoiceUrl
   if (payment.bankSlipUrl) patch.gateway_bank_slip_url = payment.bankSlipUrl
 
-  const { data: saved, error } = await admin.from('financial_transactions').update(patch).eq('id', tx.id).eq('user_id', userId).select().single()
+  const { data: saved, error } = await admin.from('financial_transactions').update(patch).eq('id', tx.id).eq('workspace_id', workspaceId).select().single()
   if (error) throw new Problem(error.message, 500)
-  if (saved.quote_id) await refreshQuote(userId, saved.quote_id)
+  if (saved.quote_id) await refreshQuote(workspaceId, saved.quote_id)
   return saved
 }
 
 /** Mesma regra do app (statusFromParts): nada pago = pendente; tudo = pago; parte = parcialmente pago. */
-async function refreshQuote(userId: string, quoteId: string) {
-  const { data: parts } = await admin.from('financial_transactions').select('status').eq('quote_id', quoteId).eq('user_id', userId)
+async function refreshQuote(workspaceId: string, quoteId: string) {
+  const { data: parts } = await admin.from('financial_transactions').select('status').eq('quote_id', quoteId).eq('workspace_id', workspaceId)
   if (!parts?.length) return
   const paid = parts.filter((p) => p.status === 'paid').length
   const status = paid === 0 ? 'pending' : paid === parts.length ? 'paid' : 'partial'
-  await admin.from('quotes').update({ status }).eq('id', quoteId).eq('user_id', userId)
+  await admin.from('quotes').update({ status }).eq('id', quoteId).eq('workspace_id', workspaceId)
 }
 
 async function webhook(req: Request) {
   const token = req.headers.get('asaas-access-token') ?? ''
   if (token.length < 32) return json(401, { error: 'unauthorized' })
-  const { data: owner } = await admin.from('billing_integrations').select('user_id').eq('provider', 'asaas').eq('webhook_token_hash', await sha256(token)).maybeSingle()
+  const { data: owner } = await admin.from('billing_integrations').select('workspace_id').eq('provider', 'asaas').eq('webhook_token_hash', await sha256(token)).maybeSingle()
   if (!owner) return json(401, { error: 'unauthorized' })
 
   const body = await req.json().catch(() => null)
@@ -633,7 +633,7 @@ async function webhook(req: Request) {
   // nota fiscal emitida, recusada ou cancelada
   if (body?.invoice?.id) {
     const invoice = body.invoice
-    const { data: nf } = await admin.from('financial_transactions').select('id, invoice_url').eq('user_id', owner.user_id).eq('nfse_id', invoice.id).maybeSingle()
+    const { data: nf } = await admin.from('financial_transactions').select('id, invoice_url').eq('workspace_id', owner.workspace_id).eq('nfse_id', invoice.id).maybeSingle()
     if (!nf) return json(200, { ignored: true })
     const patch = invoiceFields(invoice)
     if (invoice.status === 'CANCELED' && /^https:\/\//.test(nf.invoice_url ?? '')) patch.invoice_url = null
@@ -643,14 +643,14 @@ async function webhook(req: Request) {
 
   // eventos que não são de cobrança, ou de cobranças criadas fora do app: só confirma o recebimento
   if (!payment?.id) return json(200, { ignored: true })
-  const { data: tx } = await admin.from('financial_transactions').select('*').eq('user_id', owner.user_id).eq('gateway', 'asaas').eq('gateway_charge_id', payment.id).maybeSingle()
+  const { data: tx } = await admin.from('financial_transactions').select('*').eq('workspace_id', owner.workspace_id).eq('gateway', 'asaas').eq('gateway_charge_id', payment.id).maybeSingle()
   if (!tx) return json(200, { ignored: true })
 
   if (event === 'PAYMENT_DELETED') {
     await admin.from('financial_transactions').update(clearedCharge).eq('id', tx.id)
     return json(200, { ok: true })
   }
-  await applyPayment(owner.user_id, tx, payment, event)
+  await applyPayment(owner.workspace_id, tx, payment, event)
   return json(200, { ok: true })
 }
 
@@ -683,7 +683,7 @@ function shiftDays(date: string, days: number) {
 const quoteNumber = (n: number) => `#ORC-${String(n ?? 0).padStart(4, '0')}`
 
 async function generateMonthly(rec: Record<string, any>, due: string) {
-  const query = admin.from('quotes').select('*').eq('user_id', rec.user_id)
+  const query = admin.from('quotes').select('*').eq('workspace_id', rec.workspace_id)
   const { data: source } = rec.last_quote_id
     ? await query.eq('id', rec.last_quote_id).maybeSingle()
     : await query.eq('recurrence_id', rec.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
@@ -693,6 +693,7 @@ async function generateMonthly(rec: Record<string, any>, due: string) {
     .from('quotes')
     .insert({
       user_id: rec.user_id,
+      workspace_id: rec.workspace_id,
       client_id: source.client_id,
       customer_name: source.customer_name,
       title: source.title,
@@ -714,6 +715,7 @@ async function generateMonthly(rec: Record<string, any>, due: string) {
     .from('financial_transactions')
     .insert({
       user_id: rec.user_id,
+      workspace_id: rec.workspace_id,
       type: 'income',
       category: 'Mensalidade',
       description: `Orçamento ${quoteNumber(quote.quote_number)} — ${quote.title}`,
@@ -729,10 +731,10 @@ async function generateMonthly(rec: Record<string, any>, due: string) {
   if (txError) throw new Problem(`Orçamento ${quoteNumber(quote.quote_number)} criado, mas o lançamento não: ${txError.message}`, 500)
 
   let lastError: string | null = null
-  const { data: profile } = await admin.from('profiles').select('billing_provider').eq('id', rec.user_id).maybeSingle()
+  const { data: profile } = await admin.from('workspaces').select('billing_provider').eq('id', rec.workspace_id).maybeSingle()
   if (profile?.billing_provider === 'asaas' && tx.client_id) {
     try {
-      await createCharge(rec.user_id, { transactionId: tx.id })
+      await createCharge(rec.workspace_id, { transactionId: tx.id })
     } catch (e) {
       lastError = `Mensalidade gerada, mas a cobrança no Asaas não: ${e instanceof Error ? e.message : 'erro desconhecido'}`
     }
@@ -783,9 +785,14 @@ async function cron(req: Request) {
 
 // ---------- entrada ----------
 
-const actions: Record<string, (userId: string, body: Record<string, unknown>) => Promise<unknown>> = {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const ROLE_RANK: Record<string, number> = { viewer: 1, member: 2, admin: 3, owner: 4 }
+// conectar o Asaas e mexer na nota fiscal é do administrador; cobrar e dar baixa, do membro
+const ADMIN_ACTIONS = new Set(['connect', 'disconnect', 'fiscal-info', 'search-service-codes', 'issue-invoice', 'refresh-invoice', 'cancel-invoice'])
+
+const actions: Record<string, (workspaceId: string, body: Record<string, unknown>) => Promise<unknown>> = {
   connect,
-  disconnect: (userId) => disconnect(userId),
+  disconnect: (workspaceId) => disconnect(workspaceId),
   'create-charge': createCharge,
   'update-charge': updateCharge,
   'cancel-charge': cancelCharge,
@@ -796,7 +803,7 @@ const actions: Record<string, (userId: string, body: Record<string, unknown>) =>
   'issue-invoice': issueInvoice,
   'refresh-invoice': refreshInvoice,
   'cancel-invoice': cancelInvoice,
-  'fiscal-info': (userId) => fiscalInfo(userId),
+  'fiscal-info': (workspaceId) => fiscalInfo(workspaceId),
   'search-service-codes': searchServiceCodes,
 }
 
@@ -813,9 +820,19 @@ Deno.serve(async (req) => {
     if (!auth?.user) return json(401, { error: 'unauthorized', message: 'Entre no sistema para usar a cobrança.' })
 
     const body = await req.json().catch(() => ({}))
-    const action = actions[String(body.action ?? '')]
+    const name = String(body.action ?? '')
+    const action = actions[name]
     if (!action) return json(400, { error: 'invalid_action', message: 'Ação desconhecida.' })
-    return json(200, await action(auth.user.id, body))
+
+    // tudo acontece no workspace que o app informa, e só para quem é membro dele com o papel exigido
+    const workspaceId = String(body.workspaceId ?? '')
+    if (!UUID.test(workspaceId)) return json(400, { error: 'invalid_workspace', message: 'Empresa não informada. Recarregue a página.' })
+    const { data: member } = await admin.from('workspace_members').select('role').eq('workspace_id', workspaceId).eq('user_id', auth.user.id).maybeSingle()
+    const needed = ADMIN_ACTIONS.has(name) ? 'admin' : 'member'
+    if (!member || (ROLE_RANK[member.role] ?? 0) < ROLE_RANK[needed]) {
+      return json(403, { error: 'forbidden', message: needed === 'admin' ? 'Só o dono ou um administrador pode fazer isso.' : 'Seu papel neste workspace não permite alterar cobranças.' })
+    }
+    return json(200, await action(workspaceId, body))
   } catch (error) {
     if (error instanceof Problem) return json(error.status, { error: 'billing_failed', message: error.message })
     console.error(error)
