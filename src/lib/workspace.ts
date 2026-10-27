@@ -1,4 +1,4 @@
-import type { MemberInfo, Workspace, WorkspaceInvite, WorkspaceRole } from '@/types/database.types'
+import type { BusinessType, MemberInfo, TeamSize, Workspace, WorkspaceInvite, WorkspaceRole } from '@/types/database.types'
 import { listRows } from './db'
 import { DEMO_USER_ID } from './mock-data'
 import { supabase } from './supabase'
@@ -131,4 +131,46 @@ async function removeFolder(prefix: string): Promise<void> {
     const { error: rmError } = await bucket.remove(files)
     if (rmError) throw rmError
   }
+}
+
+export const businessTypeLabel: Record<BusinessType, string> = {
+  mei: 'MEI',
+  me: 'ME (Microempresa)',
+  epp: 'EPP (Empresa de Pequeno Porte)',
+  outra_pj: 'Outra empresa (CNPJ)',
+  pf: 'Sem CNPJ (pessoa física / autônomo)',
+}
+
+export const teamSizeLabel: Record<TeamSize, string> = {
+  solo: 'Só eu',
+  '2-5': '2 a 5 pessoas',
+  '6-15': '6 a 15 pessoas',
+  '16+': 'Mais de 15 pessoas',
+}
+
+export interface BusinessProfile {
+  business_type: BusinessType
+  team_size: TeamSize
+  company_name?: string
+  document?: string
+  segment?: string
+}
+
+/** Grava a entrevista (ou a edição do perfil do negócio) no workspace. */
+export async function saveBusinessProfile(workspaceId: string, profile: BusinessProfile, markDone = true): Promise<void> {
+  if (!supabase) throw demoOnly()
+  const name = profile.company_name?.trim()
+  const patch: Record<string, unknown> = {
+    business_type: profile.business_type,
+    team_size: profile.team_size,
+    segment: profile.segment?.trim() || null,
+  }
+  if (profile.document !== undefined) patch.document = profile.document.trim() || null
+  if (name) {
+    patch.company_name = name
+    patch.name = name
+  }
+  if (markDone) patch.onboarded_at = new Date().toISOString()
+  const { error } = await supabase.from('workspaces').update(patch).eq('id', workspaceId)
+  describe(error)
 }

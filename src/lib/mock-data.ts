@@ -164,6 +164,7 @@ export function buildSeed(): MockDB {
       pix_key: 'demo@meuerp.example', pix_qr_image: null, signature_image: null,
       billing_provider: 'simple', billing_fine_pct: 2, billing_interest_pct: 1, billing_discount_pct: 0, billing_discount_days: 0, billing_types: 'UNDEFINED', billing_notify: true,
       nfse_services: [], nfse_observations: null, nfse_regime: 'mei', nfse_taxes: {},
+      business_type: 'mei', team_size: 'solo', segment: null, onboarded_at: new Date().toISOString(),
     },
   ]
 

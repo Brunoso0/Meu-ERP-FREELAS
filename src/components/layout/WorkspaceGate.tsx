@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useMyWorkspaces } from '@/hooks/useWorkspace'
 import { useWorkspaceStore } from '@/store/workspace'
+import { Onboarding } from './Onboarding'
 
 /**
  * Só deixa o app abrir depois de saber em qual workspace a pessoa está:
@@ -40,6 +41,10 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
       </div>
     )
   }
+
+  // entrevista do primeiro acesso: só o dono responde, e só no workspace que ainda não foi descrito
+  const active = mine.find((m) => m.workspace.id === activeId)
+  if (active && active.role === 'owner' && !active.workspace.onboarded_at) return <Onboarding workspace={active.workspace} />
 
   return <>{children}</>
 }
