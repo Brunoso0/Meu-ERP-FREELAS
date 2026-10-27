@@ -63,6 +63,7 @@ const COMPANY_FIELDS = [
   'company_name', 'document', 'email', 'phone', 'pix_key', 'pix_qr_image', 'signature_image',
   'billing_provider', 'billing_fine_pct', 'billing_interest_pct', 'billing_discount_pct', 'billing_discount_days',
   'billing_types', 'billing_notify', 'nfse_services', 'nfse_observations', 'nfse_regime', 'nfse_taxes',
+  'business_type', 'team_size', 'segment', 'onboarded_at',
 ] as const
 
 function mergeProfile(profile: Profile, workspace: Workspace | null | undefined): Profile {

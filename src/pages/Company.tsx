@@ -9,6 +9,7 @@ import { FormFields, initialValues, payloadOf } from '@/components/forms/EntityF
 import { Button, Card, PageHeader, Skeleton } from '@/components/ui/primitives'
 import { useTable, useUpdate } from '@/hooks/useData'
 import { useActiveWorkspace } from '@/hooks/useWorkspace'
+import { BusinessProfileCard } from '@/components/BusinessProfileCard'
 import { cn } from '@/lib/utils'
 
 const allFields = companySections.flatMap((s) => s.fields)
@@ -97,6 +98,8 @@ export default function Company() {
           Os dados da empresa, a cobrança e a nota fiscal só o dono ou um administrador altera. Os seus lembretes você ajusta normalmente.
         </p>
       )}
+
+      <BusinessProfileCard />
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[230px_1fr]">
         <nav ref={nav} aria-label="Seções" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:sticky lg:top-20 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">

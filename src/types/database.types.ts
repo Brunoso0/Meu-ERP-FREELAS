@@ -351,6 +351,9 @@ export interface Goal {
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer'
 
 /** A empresa: dados, cobrança e nota. Todo dado do sistema pertence a um workspace (migração 020). */
+export type BusinessType = 'mei' | 'me' | 'epp' | 'outra_pj' | 'pf'
+export type TeamSize = 'solo' | '2-5' | '6-15' | '16+'
+
 export interface Workspace {
   id: string
   name: string
@@ -374,6 +377,10 @@ export interface Workspace {
   nfse_observations: string | null
   nfse_regime: NfseRegime
   nfse_taxes: NfseTaxes
+  business_type: BusinessType | null
+  team_size: TeamSize | null
+  segment: string | null
+  onboarded_at: string | null
 }
 
 export interface WorkspaceMember {
