@@ -1,5 +1,7 @@
 import {
   Briefcase,
+  Handshake,
+  Home,
   Calculator,
   CalendarDays,
   FilePlus,
@@ -23,7 +25,9 @@ export interface NavItem {
 }
 
 export const mainNav: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/', label: 'Início', icon: Home },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/atendimentos', label: 'Atendimentos', icon: Handshake },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/propostas', label: 'Propostas', icon: FileText },
   { to: '/projetos', label: 'Projetos', icon: Briefcase },

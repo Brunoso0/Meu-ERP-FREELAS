@@ -11,6 +11,9 @@ import { isSupabaseConfigured } from '@/lib/supabase'
 import { useUI } from '@/store/ui'
 import { useWorkspaceStore } from '@/store/workspace'
 import Login from '@/pages/Login'
+const QuickAccess = lazy(() => import('@/pages/QuickAccess'))
+const Engagement = lazy(() => import('@/pages/Engagement'))
+const Engagements = lazy(() => import('@/pages/Engagements'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Clients = lazy(() => import('@/pages/Clients'))
 const ClientView = lazy(() => import('@/pages/ClientView'))
@@ -81,7 +84,11 @@ export default function App() {
         <WorkspaceGate>
         <Routes>
           <Route element={<AppLayout />}>
-            <Route index element={<Dashboard />} />
+            <Route index element={<QuickAccess />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="atendimentos" element={<Engagements />} />
+            <Route path="atendimentos/novo" element={<Engagement />} />
+            <Route path="atendimentos/:id" element={<Engagement />} />
             <Route path="clientes" element={<Clients />} />
             <Route path="clientes/:id" element={<ClientView />} />
             <Route path="projetos" element={<Projects />} />
