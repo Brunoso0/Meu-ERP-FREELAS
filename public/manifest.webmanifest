@@ -4,7 +4,7 @@
   "description": "Clientes, propostas, contratos, demandas e financeiro do meu trabalho como freelancer.",
   "lang": "pt-BR",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/app/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
@@ -15,8 +15,8 @@
     { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Financeiro", "url": "/financeiro", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Demandas", "url": "/demandas", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Nova proposta", "url": "/ferramentas/proposta", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Financeiro", "url": "/app/financeiro", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Demandas", "url": "/app/demandas", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Nova proposta", "url": "/app/ferramentas/proposta", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

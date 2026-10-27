@@ -61,8 +61,36 @@ function securityHeaders(): Plugin {
   }
 }
 
+/**
+ * No dev, /app/qualquer-tela abre o sistema (app/index.html); sem isto o Vite
+ * devolveria a landing page da raiz. Em produção quem faz isso é o _redirects.
+ */
+function appFallback(): Plugin {
+  return {
+    name: 'app-fallback',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const path = (req.url ?? '').split('?')[0]
+        if ((path === '/app' || path.startsWith('/app/')) && !/\.[a-z0-9]+$/i.test(path)) {
+          req.url = '/app/index.html' + (req.url ?? '').slice(path.length)
+        }
+        next()
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), serviceWorkerAssets(), securityHeaders()],
+  plugins: [react(), appFallback(), serviceWorkerAssets(), securityHeaders()],
+  build: {
+    rollupOptions: {
+      // a landing page (raiz) e o sistema (/app) saem no mesmo build
+      input: {
+        landing: fileURLToPath(new URL('./index.html', import.meta.url)),
+        app: fileURLToPath(new URL('./app/index.html', import.meta.url)),
+      },
+    },
+  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

@@ -1,26 +1,318 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="robots" content="noindex, nofollow" />
-    <meta name="referrer" content="no-referrer" />
-    <title>Meu ERP Freelas</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Freelas" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meu ERP Freelas — seu freela com cara de empresa</title>
+<meta name="description" content="Clientes, propostas, assinatura online, cobrança, contratos, projetos e financeiro num painel só. Para freelancers e pequenos times. Crie sua conta grátis e teste o Profissional por 14 dias, sem cartão.">
+<meta name="theme-color" content="#0B0C14">
+<meta property="og:title" content="Meu ERP Freelas — seu freela com cara de empresa">
+<meta property="og:description" content="Do primeiro contato ao projeto pronto, num painel só. Conta grátis e 14 dias do Profissional, sem cartão.">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="/landing/sites-incriveis.css">
+<link rel="stylesheet" href="/landing/landing.css">
+</head>
+<body>
+
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+<header class="barra">
+  <a class="marca" href="/" aria-label="Meu ERP Freelas, início">
+    <img src="/favicon.svg" width="28" height="28" alt="">
+    <span>Meu ERP Freelas</span>
+  </a>
+  <nav class="barra-links" aria-label="Seções">
+    <a href="#como-funciona">Como funciona</a>
+    <a href="#planos">Planos</a>
+  </nav>
+  <div class="barra-acoes">
+    <a class="entrar" href="/app/">Entrar</a>
+    <a class="botao botao-pequeno" href="/app/?cadastro">Criar conta grátis</a>
+  </div>
+</header>
+
+<main id="conteudo">
+
+  <!-- Cena 1 · A partida -->
+  <section class="partida" data-fx-fundo="#0B0C14" data-fx-tinta="#ECEDF5" data-cta-visivel>
+    <div class="partida-texto">
+      <p class="rotulo" data-fx="surgir">Para freelancers, MEI e pequenos times</p>
+      <h1 data-fx="palavras" data-fx-duracao="900">Seu freela com cara de empresa.</h1>
+      <p class="lead" data-fx="surgir" data-fx-atraso="700">Clientes, propostas, assinatura, cobrança, contratos, projetos e financeiro num painel só. Do primeiro contato ao projeto pronto.</p>
+      <div class="cta" data-fx="subir" data-fx-atraso="900">
+        <a class="botao" href="/app/?cadastro">Criar conta grátis</a>
+        <p class="cta-nota">Teste o Profissional por <strong>14 dias</strong>, sem cartão.</p>
+      </div>
+    </div>
+    <div class="partida-painel" data-painel="ignicao" aria-hidden="true"></div>
+  </section>
+
+  <!-- Cena 2 · Cinco lugares -->
+  <section class="dor" data-fx-fundo="#F4F2EC" data-fx-tinta="#15161F">
+    <div class="dor-texto">
+      <p class="rotulo" data-fx="surgir">Hoje</p>
+      <h2 data-fx="subir">Seu negócio mora em cinco lugares.</h2>
+      <p data-fx="surgir" data-fx-atraso="150">A conversa no WhatsApp, o valor na planilha, o prazo no bloco de notas, o contrato numa pasta do computador e a cobrança na memória.</p>
+      <p class="dor-fecho" data-fx="surgir" data-fx-atraso="300">Funciona. Até o dia em que um cliente some no meio do caminho.</p>
+    </div>
+    <div class="dor-mesa" aria-hidden="true">
+      <div class="papel zap" data-fx-paralaxe="0.08">
+        <span class="zap-nome">Cliente</span>
+        <p>Oi! E aquele orçamento do site? Consegue me mandar hoje?</p>
+        <span class="zap-hora">21:47</span>
+      </div>
+      <div class="papel planilha" data-fx-paralaxe="0.18">
+        <table>
+          <tr><th>cliente</th><th>serviço</th><th>valor</th><th>pago?</th></tr>
+          <tr><td>Ana</td><td>site</td><td>2.000</td><td>???</td></tr>
+          <tr><td>Rafa</td><td>logo</td><td>800</td><td>sim</td></tr>
+          <tr><td>Studio M</td><td>posts</td><td>1.200/mês</td><td></td></tr>
+        </table>
+      </div>
+      <div class="papel postit" data-fx-paralaxe="0.3">cobrar sexta?!</div>
+      <div class="papel arquivo" data-fx-paralaxe="0.12">contrato_final_v3_AGORA_VAI.docx</div>
+      <div class="papel nota" data-fx-paralaxe="0.24">
+        <strong>entrega</strong>
+        <span>terça? quarta??</span>
+        <span>ver com o cliente</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cena 3 · A virada (pico) -->
+  <section id="como-funciona" class="virada" data-fx-fixa data-fx-altura="5" data-fx-fundo="#0B0C14" data-fx-tinta="#ECEDF5">
+    <div class="fx-palco">
+      <div class="virada-grade">
+        <div class="virada-texto">
+          <p class="rotulo">Um atendimento, do começo ao fim</p>
+          <h2>Você sempre sabe o próximo passo.</h2>
+          <ol class="etapas">
+            <li class="etapa" data-etapa-n="1">
+              <span class="etapa-num">01</span>
+              <h3>Cliente</h3>
+              <p>Cadastre quem chegou ou escolha alguém que já é cliente. Contato, documento e histórico ficam juntos.</p>
+            </li>
+            <li class="etapa" data-etapa-n="2">
+              <span class="etapa-num">02</span>
+              <h3>Proposta</h3>
+              <p>Monte a proposta com escopo, etapas, prazo e investimento. Ela sai numerada e com os dados da sua empresa.</p>
+            </li>
+            <li class="etapa" data-etapa-n="3">
+              <span class="etapa-num">03</span>
+              <h3>Assinatura</h3>
+              <p>O cliente recebe um link, lê e assina ali mesmo, com o dedo ou o mouse. Sem imprimir, sem escanear.</p>
+            </li>
+            <li class="etapa" data-etapa-n="4">
+              <span class="etapa-num">04</span>
+              <h3>Cobrança</h3>
+              <p>Gere a cobrança por Pix, boleto ou cartão pela sua conta Asaas e acompanhe o pagamento no financeiro.</p>
+            </li>
+            <li class="etapa" data-etapa-n="5">
+              <span class="etapa-num">05</span>
+              <h3>Contrato</h3>
+              <p>O contrato sai da proposta aprovada e também é assinado pelo link.</p>
+            </li>
+            <li class="etapa" data-etapa-n="6">
+              <span class="etapa-num">06</span>
+              <h3>Projeto</h3>
+              <p>Aprovado, vira projeto, com demandas, prazos e agenda.</p>
+            </li>
+            <li class="etapa" data-etapa-n="7">
+              <span class="etapa-num">07</span>
+              <h3>Pronto</h3>
+              <p>Entregue. O financeiro sabe quanto entrou e o resultado aparece nas suas metas.</p>
+            </li>
+          </ol>
+        </div>
+        <div class="virada-painel" data-painel="rolagem" aria-hidden="true"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cena 4 · Tudo no lugar -->
+  <section class="gaveta" data-fx-fundo="#F4F2EC" data-fx-tinta="#15161F">
+    <div class="gaveta-cabeca">
+      <p class="rotulo" data-fx="surgir">E o resto do dia a dia</p>
+      <h2 data-fx="subir">Tudo no seu lugar.</h2>
+      <p data-fx="surgir" data-fx-atraso="120">O que vem antes, durante e depois do projeto, arrumado como uma boa papelaria: cada coisa na sua gaveta.</p>
+    </div>
+    <div class="gaveta-grade">
+      <article class="gaveta-item g-demandas" data-fx="crescer">
+        <h3>Demandas</h3>
+        <p>Kanban ou tabela, com prioridade e dia de cada tarefa.</p>
+        <div class="mini-kanban" aria-hidden="true">
+          <div><span>A fazer</span><i></i><i></i><i></i></div>
+          <div><span>Fazendo</span><i></i><i></i></div>
+          <div><span>Feito</span><i></i><i></i><i></i><i></i></div>
+        </div>
+      </article>
+      <article class="gaveta-item g-agenda" data-fx="crescer" data-fx-atraso="80">
+        <h3>Agenda</h3>
+        <p>Entregas, reuniões e vencimentos no mesmo calendário.</p>
+        <div class="mini-agenda" aria-hidden="true"><i></i><i></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i><i class="on"></i><i></i><i></i></div>
+      </article>
+      <article class="gaveta-item g-financeiro" data-fx="crescer" data-fx-atraso="160">
+        <h3>Financeiro</h3>
+        <p>A receber, despesas, comprovantes e nota fiscal de cada lançamento.</p>
+        <div class="mini-barras" aria-hidden="true"><i style="--h:.45"></i><i style="--h:.7"></i><i style="--h:.55"></i><i style="--h:.85"></i><i style="--h:.65"></i><i style="--h:1"></i></div>
+      </article>
+      <article class="gaveta-item g-metas" data-fx="crescer" data-fx-atraso="240">
+        <h3>Metas e lucratividade</h3>
+        <p>Quanto você quer ganhar, quanto já entrou e o que sobra depois dos custos.</p>
+        <div class="mini-meta" aria-hidden="true"><i></i></div>
+      </article>
+      <article class="gaveta-item g-ferramentas" data-fx="crescer" data-fx-atraso="320">
+        <h3>Ferramentas</h3>
+        <ul class="fichas">
+          <li>Busca de leads</li>
+          <li>Calculadora de preço</li>
+          <li>Gerador de orçamentos</li>
+          <li>Gerador de propostas</li>
+          <li>Gerador de contratos</li>
+          <li>Gerador de notas fiscais</li>
+        </ul>
+      </article>
+      <article class="gaveta-item g-celular" data-fx="crescer" data-fx-atraso="400">
+        <h3>No celular, como app</h3>
+        <p>Instale na tela inicial e entre com a digital ou o rosto.</p>
+        <div class="mini-celular" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 11v3m-3.5-4a3.5 3.5 0 0 1 7 0v1.5m-9.5 0V10a6 6 0 0 1 9-5.2M18 8.5c.3.5.5 1 .5 1.5v3m-12 2.5a12 12 0 0 0 1.5 4m4.5-6.5c0 2.5.5 4.5 1.5 6.5m3.5-4.5c-.2 1.2-.5 2.3-1 3.4"/></svg></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- Cena 5 · O que o seu cliente vê -->
+  <section class="cliente" data-fx-fixa data-fx-altura="3" data-fx-etapas="3" data-fx-fundo="#10121F" data-fx-tinta="#ECEDF5">
+    <div class="fx-palco">
+      <div class="cliente-grade">
+        <div class="cliente-texto">
+          <p class="rotulo">Do lado de lá</p>
+          <h2>O que o seu cliente vê.</h2>
+          <div class="cliente-passos">
+            <p class="fx-etapa">Uma proposta de verdade: capa, escopo, cronograma e investimento, com o nome e os dados da sua empresa.</p>
+            <p class="fx-etapa">Ele assina pelo link, no celular ou no computador, com o dedo ou o mouse.</p>
+            <p class="fx-etapa">Ficam registrados nome, CPF ou CNPJ, assinatura, data e hora.<strong class="destaque">Você trabalha sozinho. O cliente vê uma empresa.</strong></p>
+          </div>
+        </div>
+        <div class="doc" aria-hidden="true">
+          <div class="doc-capa">
+            <span class="doc-empresa">Sua Empresa</span>
+            <span class="doc-tipo">Proposta comercial</span>
+            <strong class="doc-titulo">Novo site institucional</strong>
+            <span class="doc-num">#PROP-0001</span>
+          </div>
+          <div class="doc-corpo">
+            <div class="doc-linha"><span>Design de interface</span><span>R$ 6.500,00</span></div>
+            <div class="doc-linha"><span>Desenvolvimento</span><span>R$ 9.500,00</span></div>
+            <div class="doc-linha"><span>Integração com CMS</span><span>R$ 2.500,00</span></div>
+            <div class="doc-linha doc-total"><span>Investimento total</span><span>R$ 18.500,00</span></div>
+            <div class="doc-assinatura">
+              <svg viewBox="0 0 240 60" class="doc-rubrica"><path d="M8 42c14-22 22-30 28-26s-10 30-2 30 18-34 26-32-6 26 2 26 12-16 20-18 2 14 10 14 16-10 26-12 18 4 30 2 24-8 40-10"/></svg>
+              <span>Assine aqui, com o dedo ou o mouse</span>
+            </div>
+            <div class="doc-botao"><span class="fazer">Assinar proposta</span><span class="feito">Proposta assinada</span></div>
+          </div>
+          <div class="doc-carimbo">Assinada</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cena 6 · Sozinho hoje, com time amanhã -->
+  <section class="equipe" data-fx-fundo="#F4F2EC" data-fx-tinta="#15161F">
+    <div class="equipe-texto">
+      <p class="rotulo" data-fx="surgir">Quando crescer</p>
+      <h2 data-fx="subir">Sozinho hoje. Com time amanhã.</h2>
+      <p data-fx="surgir" data-fx-atraso="120">Convide assistente, sócio ou contador para o mesmo espaço de trabalho, sem trocar de sistema. Cada um entra com o acesso certo.</p>
+    </div>
+    <ul class="papeis">
+      <li data-fx="esquerda"><span class="avatar">D</span><div><h3>Dono</h3><p>Tudo, inclusive plano, cobrança e transferência da posse.</p></div></li>
+      <li data-fx="direita" data-fx-atraso="100"><span class="avatar">A</span><div><h3>Administrador</h3><p>Membros, integrações (Asaas) e nota fiscal.</p></div></li>
+      <li data-fx="esquerda" data-fx-atraso="200"><span class="avatar">M</span><div><h3>Membro</h3><p>Clientes, propostas, projetos, demandas, agenda e financeiro.</p></div></li>
+      <li data-fx="direita" data-fx-atraso="300"><span class="avatar">C</span><div><h3>Leitura (contador)</h3><p>Vê e exporta o financeiro, as notas e os comprovantes, sem alterar nada.</p></div></li>
+    </ul>
+  </section>
+
+  <!-- Cena 7 · Planos e partida final -->
+  <section id="planos" class="planos" data-fx-fundo="#0B0C14" data-fx-tinta="#ECEDF5">
+    <div class="planos-cabeca">
+      <p class="rotulo" data-fx="surgir">Planos</p>
+      <h2 data-fx="subir">Comece grátis. Teste o Profissional por 14 dias.</h2>
+      <p data-fx="surgir" data-fx-atraso="120">Sem cartão para começar. No fim do teste, você escolhe o plano ou continua no grátis.</p>
+    </div>
+    <div class="planos-grade">
+      <article class="plano" data-fx="subir">
+        <h3>Grátis</h3>
+        <p class="preco"><span>R$ 0</span></p>
+        <p class="plano-para">Para organizar os primeiros clientes.</p>
+        <ul>
+          <li>Projetos, demandas, agenda e financeiro</li>
+          <li>Até 5 clientes ativos</li>
+          <li>5 propostas e orçamentos por mês</li>
+          <li>100 MB para comprovantes</li>
+        </ul>
+        <a class="botao botao-contorno" href="/app/?cadastro">Criar conta grátis</a>
+      </article>
+      <article class="plano" data-fx="subir" data-fx-atraso="120">
+        <h3>Essencial</h3>
+        <p class="preco"><span data-fx="contar" data-fx-fim="29.9" data-fx-decimais="2" data-fx-prefixo="R$ ">R$ 29,90</span><small>/mês</small></p>
+        <p class="plano-para">Para vender, assinar e cobrar sem planilha.</p>
+        <ul>
+          <li>Clientes, propostas e orçamentos sem limite</li>
+          <li>Assinatura online de proposta e contrato</li>
+          <li>Cobrança pelo Asaas e mensalidades</li>
+          <li>Lembretes por e-mail</li>
+          <li>Busca de leads: 20 por mês</li>
+          <li>Equipe e contador convidado</li>
+          <li>1 GB para comprovantes</li>
+        </ul>
+        <a class="botao botao-contorno" href="/app/?cadastro">Criar conta grátis</a>
+      </article>
+      <article class="plano plano-destaque" data-fx="subir" data-fx-atraso="240">
+        <p class="selo">14 dias grátis, sem cartão</p>
+        <h3>Profissional</h3>
+        <p class="preco"><span data-fx="contar" data-fx-fim="59.9" data-fx-decimais="2" data-fx-prefixo="R$ ">R$ 59,90</span><small>/mês</small></p>
+        <p class="plano-para">Para quem já fatura como empresa.</p>
+        <ul>
+          <li>Tudo do Essencial</li>
+          <li>Nota fiscal de serviço (NFS-e)</li>
+          <li>Busca de leads: 100 por mês</li>
+          <li>Equipe maior e contador convidado</li>
+          <li>5 GB para comprovantes</li>
+        </ul>
+        <a class="botao" href="/app/?cadastro">Testar 14 dias grátis</a>
+      </article>
+    </div>
+
+    <div class="final" data-cta-visivel>
+      <h2 class="final-titulo" data-fx="crescer">Seu próximo cliente vai ver uma empresa.</h2>
+      <a class="botao botao-grande" href="/app/?cadastro" data-fx="subir" data-fx-atraso="150">Criar conta grátis</a>
+      <p class="cta-nota" data-fx="surgir" data-fx-atraso="250">14 dias do Profissional, sem cartão. Leva um minuto.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="rodape">
+  <a class="marca" href="/"><img src="/favicon.svg" width="24" height="24" alt=""><span>Meu ERP Freelas</span></a>
+  <nav aria-label="Rodapé">
+    <a href="https://wa.me/5574991226010" rel="noopener">WhatsApp (74) 99122-6010</a>
+    <a href="/app/">Entrar</a>
+    <a href="/app/?cadastro">Criar conta</a>
+  </nav>
+  <p>© 2026 Meu ERP Freelas</p>
+</footer>
+
+<div class="cta-fixo" aria-hidden="false">
+  <a class="botao" href="/app/?cadastro">Criar conta grátis</a>
+  <span>14 dias do Profissional, sem cartão</span>
+</div>
+
+<script src="/landing/sites-incriveis.js" defer></script>
+<script src="/landing/landing.js" defer></script>
+</body>
 </html>

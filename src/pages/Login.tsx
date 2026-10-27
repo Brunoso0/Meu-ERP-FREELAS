@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { ArrowRight, Eye, EyeOff, Fingerprint, Loader2, Lock, Mail, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { APP_BASE, appUrl } from '@/lib/app-base'
 import { cn } from '@/lib/utils'
 import { biometricAvailable, biometricDevice, enableBiometric, isBiometricCancel, markActive, signInWithBiometric, takeExpiredNotice } from '@/lib/session'
 
@@ -38,10 +39,11 @@ export default function Login() {
   const [biometricBusy, setBiometricBusy] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const asked = useRef(false)
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  // a landing page abre direto no cadastro (/app/?cadastro)
+  const [mode, setMode] = useState<'login' | 'signup'>(() => (new URLSearchParams(window.location.search).has('cadastro') ? 'signup' : 'login'))
   const [sentTo, setSentTo] = useState<string | null>(null)
   const signup = mode === 'signup'
-  const invited = window.location.pathname.startsWith('/convite/')
+  const invited = window.location.pathname.startsWith(`${APP_BASE}/convite/`)
 
   useEffect(() => {
     if (takeExpiredNotice()) toast.info('Sua sessão expirou', { description: device ? 'Entre de novo com a biometria ou com a sua senha.' : 'Entre de novo com a sua senha.' })
@@ -118,7 +120,7 @@ export default function Login() {
     if (!supabase) return
     if (!(await trigger('email'))) return void toast.error('Digite o seu e-mail acima', { description: 'O link para criar uma nova senha vai para ele.' })
     const email = getValues('email')
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: appUrl('/') })
     if (error) return void toast.error('Não foi possível enviar o link', { description: error.message })
     toast.success('Link enviado', { description: `Se ${email} tiver conta, você recebe um e-mail para criar uma nova senha.` })
   }

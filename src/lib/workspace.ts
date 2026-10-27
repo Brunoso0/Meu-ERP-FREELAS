@@ -1,4 +1,5 @@
 import type { BusinessType, MemberInfo, TeamSize, Workspace, WorkspaceInvite, WorkspaceRole } from '@/types/database.types'
+import { appUrl } from './app-base'
 import { listRows } from './db'
 import { DEMO_USER_ID } from './mock-data'
 import { supabase } from './supabase'
@@ -78,7 +79,7 @@ async function rpc<T = unknown>(name: string, args: Record<string, unknown>): Pr
   return data as T
 }
 
-export const inviteLink = (token: string) => `${window.location.origin}/convite/${token}`
+export const inviteLink = (token: string) => appUrl(`/convite/${token}`)
 
 export const createInvite = (workspaceId: string, email: string, role: Exclude<WorkspaceRole, 'owner'>) =>
   rpc<{ id: string; token: string; email: string; role: string; expires_at: string }>('create_workspace_invite', { p_workspace: workspaceId, p_email: email, p_role: role })

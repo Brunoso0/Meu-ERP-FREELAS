@@ -164,11 +164,21 @@ O indicador no topo da tela mostra **Supabase** em verde quando a conexão está
 
 - **Minha empresa** (seu nome no rodapé do menu) é uma tela com quatro seções: **Dados da Empresa** (nome, CNPJ, contatos e assinatura), **Integrações** (Pix fixo ou Asaas), **Dados Fiscais** (catálogo de serviços da nota) e **Lembretes**. Trocar de seção não perde o que foi digitado, e "Salvar alterações" grava tudo junto. Em Integrações ficam a **chave Pix** e a **imagem do QR Code Pix** (a que o app do seu banco gera). Os orçamentos mostram o que estiver cadastrado: QR, chave, ou os dois. O QR é uma imagem fixa: o app mostra o valor ao lado e pede que o cliente o informe ao pagar.
 - **Cláusulas e serviços do contrato.** Ficam em [`src/lib/contract.ts`](src/lib/contract.ts). As que vêm no projeto foram escritas para serviços de manutenção de sistemas e edição de listas de dados; ajuste a lista `serviceKinds` e os textos para a sua atividade. São um modelo-base, não uma revisão jurídica.
-- **Nome e cor.** O nome aparece em `index.html` e em `src/components/layout/Sidebar.tsx`; a cor de destaque é a paleta `brand` em `tailwind.config.js`.
+- **Nome e cor.** O nome aparece em `app/index.html`, na landing page (`index.html`) e em `src/components/layout/Sidebar.tsx`; a cor de destaque é a paleta `brand` em `tailwind.config.js`.
 
 ## Publicar na internet
 
 O app é um site estático: qualquer hospedagem de arquivos serve. Abaixo, o caminho pelo **Cloudflare Pages**, que é gratuito e dá um endereço `seu-nome.pages.dev`.
+
+O mesmo build gera duas coisas:
+- **Landing page na raiz `/`.** O arquivo é o `index.html` da raiz do projeto, com estilos e scripts em `public/landing/`. O roteiro e as decisões dela estão em [`landing/BRIEF.md`](landing/BRIEF.md).
+- **O sistema em `/app`.** A página de entrada é `app/index.html`.
+
+O `public/_redirects` faz duas coisas:
+- Abre qualquer tela do sistema a partir de `/app/...`.
+- Leva os endereços antigos, de antes da landing, para `/app`. Por exemplo, `/assinar/...` e `/convite/...` já enviados aos clientes, e `/financeiro`.
+
+Em outra hospedagem, reproduza essas regras. Só a landing aparece em buscadores; o `/app` sai com `noindex`.
 
 1. Gere o site com o `.env.local` já preenchido (o build escreve em `dist/_headers` o endereço do seu Supabase, que a política de segurança do site precisa liberar):
    ```bash
@@ -189,7 +199,9 @@ Se o código está no GitHub, o Cloudflare pode fazer o build e publicar sozinho
 
 A partir daí, cada push na `main` vai para o ar em cerca de um minuto. No Cloudflare, o build da `main` falha se `VITE_SUPABASE_URL` não estiver cadastrada, para não publicar um site que não conecta; as prévias de outros ramos sem a variável saem em modo demo. Para ter um site de prévia ligado ao banco de testes, cadastre as mesmas variáveis no ambiente **Preview** do Pages, com os dados do projeto de testes.
 
-No Supabase, em **Authentication → URL Configuration**, coloque o endereço publicado em **Site URL**, para que e-mails de redefinição de senha apontem para o lugar certo.
+No Supabase, em **Authentication → URL Configuration**:
+- Em **Site URL**, coloque o endereço publicado do sistema (por exemplo `https://seu-nome.pages.dev/app/`), para que os e-mails de redefinição de senha apontem para o lugar certo.
+- Em **Redirect URLs**, inclua `https://seu-nome.pages.dev/app/**`. A confirmação de cadastro, o login com Google e GitHub e o aceite de convite voltam para telas dentro de `/app`.
 
 ## Como usar no dia a dia
 
