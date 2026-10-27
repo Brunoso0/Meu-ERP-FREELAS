@@ -12,6 +12,11 @@ export interface PlanUsage {
   status: SubscriptionStatus
   trial_ends_at: string | null
   extra_members: number
+  current_period_end: string | null
+  cancel_at_period_end: boolean
+  past_due_since: string | null
+  has_subscription: boolean
+  pending_plan: PlanId | null
   /** Limite ausente = sem limite. */
   limits: Partial<Record<PlanCounter, number>> & Partial<Record<PlanFeature, boolean>>
   usage: Record<PlanCounter, number>
@@ -49,6 +54,11 @@ const DEMO: PlanUsage = {
   status: 'courtesy',
   trial_ends_at: null,
   extra_members: 0,
+  current_period_end: null,
+  cancel_at_period_end: false,
+  past_due_since: null,
+  has_subscription: false,
+  pending_plan: null,
   limits: { signature: true, billing: true, nfse: true, reminders: true },
   usage: { members: 1, viewers: 0, clients: 0, proposals_month: 0, quotes_month: 0, leads_month: 0, storage_mb: 0 },
 }
@@ -61,6 +71,8 @@ export function usePlan() {
     queryKey: ['plan-usage', id],
     enabled: !!id,
     staleTime: 60_000,
+    // voltando da página de pagamento, confere se o plano já mudou
+    refetchOnWindowFocus: 'always',
     queryFn: async () => {
       if (!supabase) return DEMO
       const { data, error } = await supabase.rpc('plan_usage', { p_workspace: id })
