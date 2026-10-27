@@ -34,7 +34,7 @@ const admin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY
 const ASAAS_URL = { production: 'https://api.asaas.com/v3', sandbox: 'https://api-sandbox.asaas.com/v3' } as const
 type Env = keyof typeof ASAAS_URL
 const WEBHOOK_URL = `${SUPABASE_URL}/functions/v1/billing`
-const WEBHOOK_NAME = 'Meu ERP Freelas'
+const WEBHOOK_NAME = 'Krono'
 const WEBHOOK_EVENTS = [
   'PAYMENT_CREATED',
   'PAYMENT_UPDATED',
@@ -78,7 +78,7 @@ function randomToken() {
 async function asaas(env: Env, key: string, method: string, path: string, body?: unknown) {
   const response = await fetch(`${ASAAS_URL[env]}${path}`, {
     method,
-    headers: { access_token: key, 'Content-Type': 'application/json', 'User-Agent': 'MeuERPFreelas/1.0' },
+    headers: { access_token: key, 'Content-Type': 'application/json', 'User-Agent': 'Krono/1.0' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const data = await response.json().catch(() => null)

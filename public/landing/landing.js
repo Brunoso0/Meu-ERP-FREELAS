@@ -1,5 +1,5 @@
 /*
- * Landing page do Meu ERP Freelas: o movimento-assinatura "o painel que liga".
+ * Landing page do Krono: o movimento-assinatura "o painel que liga".
  *
  * Na abertura o painel dá a partida sozinho (ponteiros varrem até o fim e
  * voltam, as luzes acendem). Na virada ele obedece à rolagem: cada etapa do

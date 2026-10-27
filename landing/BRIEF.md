@@ -1,4 +1,4 @@
-# Brief — landing page do Meu ERP Freelas
+# Brief — landing page do Krono
 
 Entrevista feita com o Bruno em 27/10/2026. Respostas anotadas do jeito que ele falou.
 
@@ -29,12 +29,12 @@ Entrevista feita com o Bruno em 27/10/2026. Respostas anotadas do jeito que ele 
    - Logotipo: o "F" branco sobre quadrado índigo (`public/favicon.svg`).
    - Cor da marca: índigo `#4F46E5` / `#6366F1`.
    - Não há números reais nem depoimentos: a página fica sem eles.
-   - Planos (preços do Bruno; recursos do PDF "Plano: Meu ERP Freelas como SaaS", 24/10/2026):
+   - Planos (preços do Bruno; recursos do PDF "Plano: Krono como SaaS", 24/10/2026):
      - Grátis.
      - Essencial: R$ 29,90/mês.
      - Profissional: R$ 59,90/mês.
      - Teste de 14 dias do Profissional, sem cartão.
-   - Nome provisório: **Meu ERP Freelas** (o nome definitivo vem depois).
+   - Nome provisório: **Krono** (o nome definitivo vem depois).
    - Contato: WhatsApp (74) 99122-6010. O e-mail com domínio próprio ainda não existe.
    - Endereço: a landing fica na raiz `/` e o sistema vai para `/app`.
 

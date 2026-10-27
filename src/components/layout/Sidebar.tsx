@@ -90,7 +90,7 @@ export function Sidebar() {
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-xs font-bold text-white">
             F
           </span>
-          {!collapsed && <span className="truncate text-sm font-semibold tracking-tight">Meu ERP Freelas</span>}
+          {!collapsed && <span className="truncate text-sm font-semibold tracking-tight">Krono</span>}
           {narrow && (
             <button
               type="button"

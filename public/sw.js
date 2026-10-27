@@ -1,5 +1,5 @@
 /*
- * Service worker do Meu ERP Freelas.
+ * Service worker do Krono.
  *
  * Guarda só a "casca" do app (HTML, JS, CSS, ícones) para ele abrir rápido e
  * funcionar instalado. Os dados continuam vindo do Supabase a cada uso: nada
@@ -83,7 +83,7 @@ self.addEventListener('push', (event) => {
     data = { body: event.data ? event.data.text() : '' }
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Meu ERP Freelas', {
+    self.registration.showNotification(data.title || 'Krono', {
       body: data.body || '',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',

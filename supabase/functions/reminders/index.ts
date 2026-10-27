@@ -187,7 +187,7 @@ function emailHtml(d: Digest, day: string, name: string) {
         <tr><td style="padding:14px 32px;border-top:1px solid #f0ebf7;font-family:${FONT}">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
             <td style="font-size:11px;color:#8b7fa3">Para parar, desligue o e-mail em Minha empresa → Lembretes.</td>
-            <td align="right"><span style="display:inline-block;padding:3px 10px;border-radius:999px;background:${PURPLE};background-image:${GRADIENT};color:#ffffff;font-size:10px;font-weight:700;white-space:nowrap">Meu ERP Freelas</span></td>
+            <td align="right"><span style="display:inline-block;padding:3px 10px;border-radius:999px;background:${PURPLE};background-image:${GRADIENT};color:#ffffff;font-size:10px;font-weight:700;white-space:nowrap">Krono</span></td>
           </tr></table>
         </td></tr>
       </table>
@@ -204,7 +204,7 @@ async function sendEmail(to: string, d: Digest, day: string, name: string): Prom
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: Deno.env.get('RESEND_FROM') || 'Meu ERP Freelas <onboarding@resend.dev>',
+      from: Deno.env.get('RESEND_FROM') || 'Krono <onboarding@resend.dev>',
       to: [to],
       subject: `Demandas de hoje: ${summary(d)}`,
       html: emailHtml(d, day, name),

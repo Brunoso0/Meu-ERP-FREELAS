@@ -35,7 +35,7 @@ const json = (status: number, body: unknown) =>
 
 const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
 
-const RP_NAME = 'Meu ERP Freelas'
+const RP_NAME = 'Krono'
 /**
  * Onde o app roda. A credencial fica presa ao domínio em que foi criada.
  * APP_ORIGINS (segredo da função) lista os endereços de cada ambiente,

@@ -1,4 +1,4 @@
-# Meu ERP Freelas
+# Krono
 
 Um ERP para o freelancer que trabalha sozinho: clientes, propostas, demandas num kanban semanal, agenda, financeiro, metas e geradores de orçamento, proposta e contrato em PDF.
 

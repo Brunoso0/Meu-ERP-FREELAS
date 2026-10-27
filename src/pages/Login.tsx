@@ -140,9 +140,9 @@ export default function Login() {
           <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
           <div className="relative">
             <div className="mb-6 flex items-center gap-3.5 sm:mb-10">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-xl font-black tracking-wider text-white shadow-lg shadow-indigo-500/30">F</div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-xl font-black tracking-wider text-white shadow-lg shadow-indigo-500/30">K</div>
               <div>
-                <span className="block text-lg font-bold tracking-tight text-white">Meu ERP Freelas</span>
+                <span className="block text-lg font-bold tracking-tight text-white">Krono</span>
                 <span className="text-xs font-medium text-indigo-400">Gestão & Produtividade</span>
               </div>
             </div>
