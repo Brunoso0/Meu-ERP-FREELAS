@@ -3,12 +3,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { ArrowRight, Eye, EyeOff, Fingerprint, Loader2, Lock, Mail } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Fingerprint, Loader2, Lock, Mail, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { biometricAvailable, biometricDevice, enableBiometric, isBiometricCancel, markActive, signInWithBiometric, takeExpiredNotice } from '@/lib/session'
 
 const schema = z.object({
+  name: z.string().optional(),
   email: z.string().email('E-mail inválido'),
   password: z.string().min(6, 'Mínimo de 6 caracteres'),
 })
@@ -22,7 +23,7 @@ const input = 'w-full rounded-2xl bg-transparent py-3.5 pl-11 text-sm text-white
 const socialButton =
   'group flex items-center justify-center gap-2 rounded-2xl border border-slate-700/60 bg-slate-900/90 px-4 py-3 text-sm font-medium shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-indigo-500/50 hover:bg-slate-800 active:scale-[0.98]'
 
-/** Sistema de uso individual: só login. Contas são criadas no painel do Supabase. */
+/** Entrar ou criar conta. Quem chega por um link de convite (/convite/…) volta a ele depois de entrar. */
 export default function Login() {
   const {
     register,
@@ -33,6 +34,10 @@ export default function Login() {
   const [biometricBusy, setBiometricBusy] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const asked = useRef(false)
+  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [sentTo, setSentTo] = useState<string | null>(null)
+  const signup = mode === 'signup'
+  const invited = window.location.pathname.startsWith('/convite/')
 
   useEffect(() => {
     if (takeExpiredNotice()) toast.info('Sua sessão expirou', { description: device ? 'Entre de novo com a biometria ou com a sua senha.' : 'Entre de novo com a sua senha.' })
@@ -59,6 +64,21 @@ export default function Login() {
   const submit = handleSubmit(async (values) => {
     if (!supabase) return
     markActive()
+    if (signup) {
+      const name = values.name?.trim()
+      if (!name) return void toast.error('Informe o seu nome')
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        // o e-mail de confirmação traz a pessoa de volta para cá (inclusive para o link de convite)
+        options: { data: { full_name: name }, emailRedirectTo: window.location.origin + window.location.pathname },
+      })
+      if (error) return void toast.error('Não foi possível criar a conta', { description: error.message })
+      // e-mail já cadastrado: o Supabase não revela (devolve uma conta sem identidades)
+      if (data.user && data.user.identities?.length === 0) return void toast.error('Este e-mail já tem conta', { description: 'Entre com a sua senha.' })
+      if (!data.session) setSentTo(values.email)
+      return
+    }
     const { data, error } = await supabase.auth.signInWithPassword(values)
     if (error) return void toast.error('Não foi possível entrar', { description: error.message })
     // oferece a biometria uma vez por login, só onde o aparelho tem digital/rosto e ainda não foi ativada
@@ -133,9 +153,27 @@ export default function Login() {
         {/* formulário */}
         <div className="flex flex-col justify-center bg-slate-950/20 p-6 sm:p-12 lg:col-span-7">
           <div className="mb-8">
-            <h1 className="mb-1.5 text-2xl font-bold tracking-tight text-white">Bem-vindo de volta!</h1>
-            <p className="text-sm font-light text-slate-400">Insira suas credenciais ou escolha sua conta social favorita.</p>
+            <h1 className="mb-1.5 text-2xl font-bold tracking-tight text-white">{signup ? 'Crie a sua conta' : 'Bem-vindo de volta!'}</h1>
+            <p className="text-sm font-light text-slate-400">
+              {signup ? 'Leva um minuto e você já pode usar.' : 'Insira suas credenciais ou escolha sua conta social favorita.'}
+            </p>
           </div>
+
+          {invited && (
+            <p className="mb-6 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-3 text-sm text-indigo-200">
+              Você recebeu um convite. {signup ? 'Crie a conta' : 'Entre'} com o e-mail que foi convidado e o convite abre em seguida.
+            </p>
+          )}
+
+          {sentTo ? (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 text-center">
+              <Mail className="mx-auto mb-3 h-6 w-6 text-indigo-400" />
+              <h2 className="mb-1 text-lg font-semibold text-white">Confirme o seu e-mail</h2>
+              <p className="mb-4 text-sm text-slate-400">Enviamos um link para <strong className="text-slate-200">{sentTo}</strong>. Abra-o para ativar a conta e depois volte a entrar.</p>
+              <button type="button" onClick={() => { setSentTo(null); setMode('login') }} className="text-sm font-semibold text-indigo-400 hover:text-indigo-300">Já confirmei, quero entrar</button>
+            </div>
+          ) : (
+          <>
 
           <div className="mb-6 grid grid-cols-3 gap-3">
             <button type="button" onClick={() => soon('Login com Google')} className={socialButton} aria-label="Entrar com Google">
@@ -168,6 +206,17 @@ export default function Login() {
           </div>
 
           <form onSubmit={submit} className="space-y-4" noValidate>
+            {signup && (
+              <div>
+                <label htmlFor="login-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                  Seu nome
+                </label>
+                <div className={field}>
+                  <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <input id="login-name" type="text" autoComplete="name" maxLength={120} {...register('name')} className={cn(input, 'pr-4')} />
+                </div>
+              </div>
+            )}
             <div>
               <label htmlFor="login-email" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">
                 E-mail profissional
@@ -201,7 +250,7 @@ export default function Login() {
                 <input
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
+                  autoComplete={signup ? 'new-password' : 'current-password'}
                   {...register('password')}
                   aria-invalid={Boolean(errors.password)}
                   className={cn(input, 'pr-12')}
@@ -225,16 +274,16 @@ export default function Login() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Autenticando…
+                  <Loader2 className="h-4 w-4 animate-spin" /> {signup ? 'Criando…' : 'Autenticando…'}
                 </>
               ) : (
                 <>
-                  Acessar Plataforma <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                  {signup ? 'Criar conta' : 'Acessar Plataforma'} <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
                 </>
               )}
             </button>
 
-            {device && (
+            {device && !signup && (
               <button
                 type="button"
                 onClick={biometric}
@@ -248,11 +297,13 @@ export default function Login() {
           </form>
 
           <p className="mt-8 text-center text-xs font-light text-slate-500">
-            Ainda não tem cadastro?{' '}
-            <button type="button" onClick={() => soon('Cadastro')} className="font-semibold text-indigo-400 transition-colors hover:text-indigo-300">
-              Criar conta grátis
+            {signup ? 'Já tem conta?' : 'Ainda não tem cadastro?'}{' '}
+            <button type="button" onClick={() => setMode(signup ? 'login' : 'signup')} className="font-semibold text-indigo-400 transition-colors hover:text-indigo-300">
+              {signup ? 'Entrar' : 'Criar conta grátis'}
             </button>
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>
