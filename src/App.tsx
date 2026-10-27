@@ -11,6 +11,7 @@ import { isSupabaseConfigured } from '@/lib/supabase'
 import { useUI } from '@/store/ui'
 import { useWorkspaceStore } from '@/store/workspace'
 import Login from '@/pages/Login'
+import { PlanGate } from '@/components/PlanGate'
 import ResetPassword from '@/pages/ResetPassword'
 const QuickAccess = lazy(() => import('@/pages/QuickAccess'))
 const Engagement = lazy(() => import('@/pages/Engagement'))
@@ -109,7 +110,7 @@ export default function App() {
             <Route path="ferramentas/proposta" element={<ProposalGenerator />} />
             <Route path="ferramentas/contrato" element={<ContractGenerator />} />
             <Route path="ferramentas/leads" element={<LeadFinder />} />
-            <Route path="ferramentas/nota-fiscal" element={<InvoiceGenerator />} />
+            <Route path="ferramentas/nota-fiscal" element={<PlanGate feature="nfse" title="Nota fiscal (NFS-e)"><InvoiceGenerator /></PlanGate>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

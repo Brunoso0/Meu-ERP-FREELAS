@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { supabase } from './supabase'
+import { activeWorkspaceId } from '@/store/workspace'
 
 export type LeadScope = 'city' | 'region' | 'other_region' | 'country' | 'international'
 export type LeadTarget = 'no_website' | 'no_presence' | 'social_only' | 'few_reviews' | 'any'
@@ -110,7 +111,7 @@ export async function searchLeads(search: LeadSearch): Promise<LeadResult> {
     return { leads: demoLeads(search), engine: 'demo' }
   }
 
-  const { data, error } = await supabase.functions.invoke('find-leads', { body: search })
+  const { data, error } = await supabase.functions.invoke('find-leads', { body: { ...search, workspace_id: activeWorkspaceId() } })
   if (error) {
     // a função devolve { message } nos erros que o usuário consegue resolver
     const context = (error as { context?: Response }).context

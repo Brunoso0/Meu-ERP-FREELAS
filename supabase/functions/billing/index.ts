@@ -790,6 +790,9 @@ const ROLE_RANK: Record<string, number> = { viewer: 1, member: 2, admin: 3, owne
 // conectar o Asaas e mexer na nota fiscal é do administrador; cobrar e dar baixa, do membro
 const ADMIN_ACTIONS = new Set(['connect', 'disconnect', 'fiscal-info', 'search-service-codes', 'issue-invoice', 'refresh-invoice', 'cancel-invoice'])
 
+/** Ações que o plano precisa liberar. */
+const PLAN_FEATURE: Record<string, 'billing' | 'nfse'> = { connect: 'billing', 'create-charge': 'billing', 'issue-invoice': 'nfse' }
+
 const actions: Record<string, (workspaceId: string, body: Record<string, unknown>) => Promise<unknown>> = {
   connect,
   disconnect: (workspaceId) => disconnect(workspaceId),
@@ -831,6 +834,14 @@ Deno.serve(async (req) => {
     const needed = ADMIN_ACTIONS.has(name) ? 'admin' : 'member'
     if (!member || (ROLE_RANK[member.role] ?? 0) < ROLE_RANK[needed]) {
       return json(403, { error: 'forbidden', message: needed === 'admin' ? 'Só o dono ou um administrador pode fazer isso.' : 'Seu papel neste workspace não permite alterar cobranças.' })
+    }
+    // o plano libera a cobrança (Essencial) e a nota fiscal (Profissional); consultar e cancelar o que já existe segue livre
+    const needsFeature = PLAN_FEATURE[name]
+    if (needsFeature) {
+      const { data: allowed } = await admin.rpc('plan_feature', { p_workspace: workspaceId, p_key: needsFeature })
+      if (!allowed) {
+        return json(403, { error: 'plan_required', message: needsFeature === 'nfse' ? 'A nota fiscal é do plano Profissional. Faça upgrade em Minha empresa → Plano.' : 'A cobrança pelo Asaas é do plano Essencial ou superior. Faça upgrade em Minha empresa → Plano.' })
+      }
     }
     return json(200, await action(workspaceId, body))
   } catch (error) {

@@ -14,6 +14,7 @@ import { buildContractMarkdown } from '@/lib/contract'
 import { contractIsSigned, defaultContractParams, engagementOf, ENGAGEMENT_STEPS, proposalIsSigned } from '@/lib/engagement'
 import { contractStatus, projectStatus, quoteStatus } from '@/lib/labels'
 import { itemsTotal } from '@/lib/proposal'
+import { usePlan } from '@/lib/plan'
 import { signatureLink } from '@/lib/proposal-share'
 import { cn, formatCurrency, formatDate, formatProposalNumber, formatQuoteNumber, maskCpfCnpj, maskPhone } from '@/lib/utils'
 import type { Client, Contract, Proposal } from '@/types/database.types'
@@ -253,6 +254,7 @@ function Footer({ onBack, children }: { onBack?: () => void; children?: React.Re
 function SignatureStep({ proposal, client, onBack, onNext }: { proposal: Proposal; client?: Client; onBack: () => void; onNext: () => void }) {
   const update = useUpdate('proposals')
   const qc = useQueryClient()
+  const canSign = usePlan().has('signature')
   const signed = proposalIsSigned(proposal)
   const awaiting = !signed && proposal.status === 'awaiting_signature' && !!proposal.share_token
 
@@ -299,12 +301,12 @@ function SignatureStep({ proposal, client, onBack, onNext }: { proposal: Proposa
           <LinkBox url={signatureLink(proposal.share_token)} phone={client?.phone} message={`Olá${client ? `, ${client.name.split(' ')[0]}` : ''}! Segue a proposta "${proposal.title}" para você ler e assinar:`} />
         </div>
       ) : (
-        <p className="text-sm text-slate-600 dark:text-slate-300">A proposta <strong>{formatProposalNumber(proposal.proposal_number)}</strong> ({formatCurrency(proposal.total_amount)}) está pronta como rascunho. Gere o link para o cliente assinar.</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">A proposta <strong>{formatProposalNumber(proposal.proposal_number)}</strong> ({formatCurrency(proposal.total_amount)}) está pronta como rascunho. Gere o link para o cliente assinar.{!canSign && ' A assinatura online é do plano Essencial: com o plano atual, envie o PDF e marque como assinada quando receber.'}</p>
       )}
 
       <Footer onBack={onBack}>
         <Link to={`/propostas/${proposal.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800"><ExternalLink className="h-4 w-4" />Ver proposta / PDF</Link>
-        {!signed && !awaiting && <Button onClick={generate} loading={update.isPending}>Gerar link de assinatura</Button>}
+        {!signed && !awaiting && <Button onClick={generate} loading={update.isPending} disabled={!canSign}>Gerar link de assinatura</Button>}
         {!signed && <Button variant="secondary" onClick={markSigned} loading={update.isPending}>Já recebi assinada por fora</Button>}
         {signed && <Button onClick={onNext}>Continuar <ArrowRight className="h-4 w-4" /></Button>}
       </Footer>
@@ -361,6 +363,7 @@ function ContractStep({ e, onBack, onNext }: { e: ReturnType<typeof engagementOf
   const update = useUpdate('contracts')
   const qc = useQueryClient()
   const navigate = useNavigate()
+  const canSign = usePlan().has('signature')
   const signed = !!contract && contractIsSigned(contract)
   const awaiting = !!contract && contract.status === 'awaiting_signature' && !!contract.share_token
 
@@ -415,7 +418,7 @@ function ContractStep({ e, onBack, onNext }: { e: ReturnType<typeof engagementOf
         {!contract && <Button variant="secondary" onClick={() => navigate('/ferramentas/contrato', { state: { proposalId: proposal.id } })}>Escolher cláusulas</Button>}
         {!contract && <Button onClick={generate} loading={insert.isPending}>Gerar contrato padrão</Button>}
         {contract && contract.status === 'draft' && (
-          <Button onClick={() => patch(contract, { share_token: contract.share_token ?? crypto.randomUUID(), status: 'awaiting_signature' })} loading={update.isPending}>Gerar link de assinatura</Button>
+          <Button onClick={() => patch(contract, { share_token: contract.share_token ?? crypto.randomUUID(), status: 'awaiting_signature' })} loading={update.isPending} disabled={!canSign} title={canSign ? undefined : 'Assinatura online: plano Essencial ou superior'}>Gerar link de assinatura</Button>
         )}
         {contract && !signed && (
           <Button variant="secondary" loading={update.isPending} onClick={() => patch(contract, { status: 'signed', signed_at: new Date().toISOString(), signature_method: 'manual', signer_name: client?.name ?? null })}>

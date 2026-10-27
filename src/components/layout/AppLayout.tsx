@@ -7,6 +7,7 @@ import { PaymentChoiceDialog } from '@/components/quotes/PaymentChoice'
 import { ConfirmDialog } from '@/components/ui/confirm'
 import { useRecurrenceCatchUp } from '@/hooks/useRecurrenceCatchUp'
 import { CommandPalette } from './CommandPalette'
+import { TrialBanner } from '@/components/TrialBanner'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 
@@ -17,6 +18,7 @@ export function AppLayout() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
+        <TrialBanner />
         <main className="safe-x safe-bottom mx-auto w-full max-w-[1400px] flex-1">
           <div className="px-4 py-5 md:px-6 md:py-6">
             <Suspense fallback={<Skeleton className="h-64 w-full" />}>

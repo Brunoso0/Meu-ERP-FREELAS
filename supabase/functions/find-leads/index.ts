@@ -277,6 +277,23 @@ Deno.serve(async (req) => {
     return json(400, { error: 'invalid_request', message: 'Informe onde buscar e o perfil das empresas.' })
   }
 
+  // a cota mensal vale por workspace e segue o plano; a função do banco confere se a pessoa é membro
+  const workspaceId = clean(body.workspace_id, 40)
+  if (!/^[0-9a-f-]{36}$/i.test(workspaceId)) return json(400, { error: 'invalid_workspace', message: 'Empresa não informada. Recarregue a página.' })
+  const quota = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/consume_plan_quota`, {
+    method: 'POST',
+    headers: { Authorization: authorization, apikey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_workspace: workspaceId, p_api: 'leads', p_calls: 1 }),
+  })
+  if (!quota.ok) return json(403, { error: 'forbidden', message: 'Você não tem acesso a esta empresa.' })
+  const used = await quota.json().catch(() => null)
+  if (!used?.ok) {
+    return json(402, {
+      error: 'plan_limit',
+      message: used?.limit ? `Você usou as ${used.limit} buscas de leads do mês no seu plano. Faça upgrade em Minha empresa → Plano.` : 'A busca de leads é do plano Essencial ou superior. Faça upgrade em Minha empresa → Plano.',
+    })
+  }
+
   const model = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash'
   const international = scope === 'international'
 
