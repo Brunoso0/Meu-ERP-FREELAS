@@ -11,6 +11,7 @@ import { isSupabaseConfigured } from '@/lib/supabase'
 import { useUI } from '@/store/ui'
 import { useWorkspaceStore } from '@/store/workspace'
 import Login from '@/pages/Login'
+import ResetPassword from '@/pages/ResetPassword'
 const QuickAccess = lazy(() => import('@/pages/QuickAccess'))
 const Engagement = lazy(() => import('@/pages/Engagement'))
 const Engagements = lazy(() => import('@/pages/Engagements'))
@@ -38,7 +39,7 @@ const PublicContract = lazy(() => import('@/pages/PublicContract'))
 
 export default function App() {
   const theme = useUI((s) => s.theme)
-  const { session, ready } = useAuth()
+  const { session, ready, recovering, doneRecovering } = useAuth()
   useSessionGuard(session)
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function App() {
     lastUserId.current = userId
   }, [userId, queryClient])
 
-  const needsLogin = isSupabaseConfigured && !session
+  const needsLogin = isSupabaseConfigured && (!session || recovering)
   // o link de assinatura é aberto pelo cliente, que não tem (nem precisa de) login
   const isPublicPage = useLocation().pathname.startsWith('/assinar/')
 
@@ -78,6 +79,8 @@ export default function App() {
         <div className="flex min-h-screen items-center justify-center">
           <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
         </div>
+      ) : recovering ? (
+        <ResetPassword onDone={doneRecovering} />
       ) : needsLogin ? (
         <Login />
       ) : (

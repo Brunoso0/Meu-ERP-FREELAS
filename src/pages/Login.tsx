@@ -30,6 +30,8 @@ export default function Login() {
   const {
     register,
     handleSubmit,
+    trigger,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { email: biometricDevice()?.email ?? '' } })
   const device = biometricDevice()
@@ -109,6 +111,16 @@ export default function Login() {
       options: { redirectTo: window.location.origin + window.location.pathname },
     })
     if (error) toast.error('Não foi possível entrar', { description: error.message })
+  }
+
+  /** Esqueceu a senha: manda o link por e-mail; ele volta para esta página e abre a tela de nova senha. */
+  const forgot = async () => {
+    if (!supabase) return
+    if (!(await trigger('email'))) return void toast.error('Digite o seu e-mail acima', { description: 'O link para criar uma nova senha vai para ele.' })
+    const email = getValues('email')
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
+    if (error) return void toast.error('Não foi possível enviar o link', { description: error.message })
+    toast.success('Link enviado', { description: `Se ${email} tiver conta, você recebe um e-mail para criar uma nova senha.` })
   }
 
   const emailField = register('email')
@@ -234,7 +246,7 @@ export default function Login() {
                 <label htmlFor="login-password" className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
                   Senha
                 </label>
-                <button type="button" onClick={() => soon('Recuperação de senha')} className="text-xs font-medium text-indigo-400 transition-colors hover:text-indigo-300">
+                <button type="button" onClick={forgot} className="text-xs font-medium text-indigo-400 transition-colors hover:text-indigo-300">
                   Esqueceu a senha?
                 </button>
               </div>
