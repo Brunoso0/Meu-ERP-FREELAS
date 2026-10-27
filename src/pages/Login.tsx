@@ -18,6 +18,8 @@ type Values = z.infer<typeof schema>
 /** Logins por Google, Apple e GitHub ainda não existem: os botões só avisam. */
 const soon = (what: string) => toast.info(`${what} em breve`, { description: 'Por enquanto, entre com e-mail e senha ou com a biometria.' })
 
+type Social = 'google' | 'github'
+
 const field = 'login-field relative rounded-2xl border border-slate-800 bg-slate-900/90 transition-all'
 const input = 'w-full rounded-2xl bg-transparent py-3.5 pl-11 text-sm text-white placeholder-slate-500 focus:outline-none'
 const socialButton =
@@ -98,6 +100,17 @@ export default function Login() {
     }
   })
 
+  /** Entrar com Google/GitHub: vai ao provedor e volta para esta mesma página (inclusive um link de convite). */
+  const social = async (provider: Social) => {
+    if (!supabase) return
+    markActive()
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin + window.location.pathname },
+    })
+    if (error) toast.error('Não foi possível entrar', { description: error.message })
+  }
+
   const emailField = register('email')
 
   return (
@@ -156,7 +169,7 @@ export default function Login() {
           <>
 
           <div className="mb-6 grid grid-cols-3 gap-3">
-            <button type="button" onClick={() => soon('Login com Google')} className={socialButton} aria-label="Entrar com Google">
+            <button type="button" onClick={() => void social('google')} className={socialButton} aria-label="Entrar com Google">
               <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -171,7 +184,7 @@ export default function Login() {
               </svg>
               <span className="hidden text-xs font-medium text-slate-300 group-hover:text-white sm:inline">Apple</span>
             </button>
-            <button type="button" onClick={() => soon('Login com GitHub')} className={socialButton} aria-label="Entrar com GitHub">
+            <button type="button" onClick={() => void social('github')} className={socialButton} aria-label="Entrar com GitHub">
               <svg className="h-4 w-4 text-slate-200 group-hover:text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                 <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z" />
               </svg>
