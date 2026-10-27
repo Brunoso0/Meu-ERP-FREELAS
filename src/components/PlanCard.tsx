@@ -74,7 +74,7 @@ export function PlanCard() {
             <div key={p.id} className={cn('flex flex-col rounded-lg border p-4', current && 'border-brand-500 ring-1 ring-brand-500/30')}>
               <div className="flex items-baseline justify-between">
                 <h3 className="font-semibold">{p.name}</h3>
-                <p className="text-sm"><strong className="tabular text-base">{p.price === 0 ? 'R$ 0' : `R$ ${p.price}`}</strong>{p.price > 0 && <span className="text-slate-500">/mês</span>}</p>
+                <p className="text-sm"><strong className="tabular text-base">{p.price === 0 ? 'R$ 0' : `R$ ${p.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}</strong>{p.price > 0 && <span className="text-slate-500">/mês</span>}</p>
               </div>
               <p className="mt-1 text-xs text-slate-500">{p.tagline}</p>
               <ul className="mt-3 flex-1 space-y-1.5 text-sm">

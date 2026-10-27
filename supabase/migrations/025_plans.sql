@@ -27,10 +27,10 @@ insert into public.plans (id, name, price_cents, extra_member_cents, sort, limit
   ('free', 'Grátis', 0, 0, 1,
     '{"members":1,"viewers":0,"clients":5,"proposals_month":5,"quotes_month":5,"leads_month":0,"storage_mb":100,
       "signature":false,"billing":false,"nfse":false,"reminders":false}'),
-  ('essential', 'Essencial', 2900, 0, 2,
+  ('essential', 'Essencial', 2990, 0, 2,
     '{"members":2,"viewers":1,"leads_month":20,"storage_mb":1024,
       "signature":true,"billing":true,"nfse":false,"reminders":true}'),
-  ('pro', 'Profissional', 5900, 1000, 3,
+  ('pro', 'Profissional', 5990, 1000, 3,
     '{"members":5,"viewers":1,"leads_month":100,"storage_mb":5120,
       "signature":true,"billing":true,"nfse":true,"reminders":true}')
 on conflict (id) do update

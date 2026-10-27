@@ -30,8 +30,8 @@ export const planNames: Record<PlanId, string> = { free: 'Grátis', essential: '
 /** O que cada plano oferece, para a tela de planos (os números reais vêm do banco). */
 export const planCatalog: PlanInfo[] = [
   { id: 'free', name: 'Grátis', price: 0, tagline: 'Para começar e organizar o básico', features: ['Só você no workspace', 'Até 5 clientes ativos', '5 propostas e 5 orçamentos por mês', 'Projetos, demandas, agenda e financeiro', '100 MB de comprovantes'] },
-  { id: 'essential', name: 'Essencial', price: 29, tagline: 'Para fechar e cobrar sem sair do sistema', features: ['2 pessoas + 1 contador (leitura)', 'Clientes, propostas e orçamentos ilimitados', 'Assinatura online de proposta e contrato', 'Cobrança pelo Asaas e mensalidades', '20 buscas de leads por mês', 'Lembretes por e-mail', '1 GB de comprovantes'] },
-  { id: 'pro', name: 'Profissional', price: 59, tagline: 'Para quem tem equipe e emite nota', features: ['5 pessoas + 1 contador (leitura)', 'Pessoa extra por R$ 10/mês', 'Tudo do Essencial', 'Nota fiscal (NFS-e)', '100 buscas de leads por mês', '5 GB de comprovantes'] },
+  { id: 'essential', name: 'Essencial', price: 29.9, tagline: 'Para fechar e cobrar sem sair do sistema', features: ['2 pessoas + 1 contador (leitura)', 'Clientes, propostas e orçamentos ilimitados', 'Assinatura online de proposta e contrato', 'Cobrança pelo Asaas e mensalidades', '20 buscas de leads por mês', 'Lembretes por e-mail', '1 GB de comprovantes'] },
+  { id: 'pro', name: 'Profissional', price: 59.9, tagline: 'Para quem tem equipe e emite nota', features: ['5 pessoas + 1 contador (leitura)', 'Pessoa extra por R$ 10/mês', 'Tudo do Essencial', 'Nota fiscal (NFS-e)', '100 buscas de leads por mês', '5 GB de comprovantes'] },
 ]
 
 export const featureMinPlan: Record<PlanFeature, string> = { signature: 'Essencial', billing: 'Essencial', nfse: 'Profissional', reminders: 'Essencial' }
