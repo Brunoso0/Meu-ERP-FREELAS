@@ -10,6 +10,7 @@ import { Button, Card, PageHeader, Skeleton } from '@/components/ui/primitives'
 import { useTable, useUpdate } from '@/hooks/useData'
 import { useActiveWorkspace } from '@/hooks/useWorkspace'
 import { BusinessProfileCard } from '@/components/BusinessProfileCard'
+import { PlanCard } from '@/components/PlanCard'
 import { cn } from '@/lib/utils'
 
 const allFields = companySections.flatMap((s) => s.fields)
@@ -99,6 +100,7 @@ export default function Company() {
         </p>
       )}
 
+      <PlanCard />
       <BusinessProfileCard />
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[230px_1fr]">

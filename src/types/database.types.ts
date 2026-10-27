@@ -352,6 +352,8 @@ export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer'
 
 /** A empresa: dados, cobrança e nota. Todo dado do sistema pertence a um workspace (migração 020). */
 export type BusinessType = 'mei' | 'me' | 'epp' | 'outra_pj' | 'pf'
+export type PlanId = 'free' | 'essential' | 'pro'
+export type SubscriptionStatus = 'none' | 'trialing' | 'active' | 'past_due' | 'canceled' | 'courtesy'
 export type TeamSize = 'solo' | '2-5' | '6-15' | '16+'
 
 export interface Workspace {
@@ -381,6 +383,11 @@ export interface Workspace {
   team_size: TeamSize | null
   segment: string | null
   onboarded_at: string | null
+  plan_id: PlanId
+  subscription_status: SubscriptionStatus
+  trial_ends_at: string | null
+  current_period_end: string | null
+  extra_members: number
 }
 
 export interface WorkspaceMember {

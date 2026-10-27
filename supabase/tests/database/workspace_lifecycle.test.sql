@@ -16,6 +16,17 @@ declare v_ws uuid;
 begin
   v_ws := public.create_workspace('Empresa Nova');
   perform set_config('test.ws', v_ws::text, true);
+end $$;
+
+-- o workspace novo nasce no plano Grátis: aqui ele vira Profissional para poder convidar
+reset role;
+update public.workspaces set plan_id = 'pro', subscription_status = 'courtesy' where id = current_setting('test.ws')::uuid;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}';
+
+do $$
+declare v_ws uuid := current_setting('test.ws')::uuid;
+begin
   insert into public.clients (name, workspace_id) values ('Cliente da Nova', v_ws);
   perform public.create_workspace_invite(v_ws, 'beto@teste.local', 'member');
 end $$;

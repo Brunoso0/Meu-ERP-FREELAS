@@ -65,7 +65,12 @@ interface Item {
 async function digest(userId: string, day: string) {
   // cada pessoa recebe as demandas de todos os workspaces em que trabalha (leitores não recebem)
   const { data: memberships } = await admin.from('workspace_members').select('workspace_id').eq('user_id', userId).in('role', ['owner', 'admin', 'member'])
-  const workspaceIds = (memberships ?? []).map((m) => m.workspace_id)
+  // lembretes por e-mail são do plano Essencial para cima
+  const workspaceIds: string[] = []
+  for (const m of memberships ?? []) {
+    const { data: allowed } = await admin.rpc('plan_feature', { p_workspace: m.workspace_id, p_key: 'reminders' })
+    if (allowed) workspaceIds.push(m.workspace_id)
+  }
   if (workspaceIds.length === 0) return { today: [], late: [] }
   const { data: tasks } = await admin
     .from('tasks')
