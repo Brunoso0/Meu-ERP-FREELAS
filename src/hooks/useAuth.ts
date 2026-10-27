@@ -7,6 +7,7 @@ import { clearSessionMarks } from '@/lib/session'
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(!supabase)
+  const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
     if (!supabase) return
@@ -14,13 +15,19 @@ export function useAuth() {
       setSession(data.session)
       setReady(true)
     })
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next))
+    const { data } = supabase.auth.onAuthStateChange((event, next) => {
+      setSession(next)
+      // o link do e-mail de recuperação entra logado: antes de seguir, a pessoa define a nova senha
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+    })
     return () => data.subscription.unsubscribe()
   }, [])
 
   return {
     session,
     ready,
+    recovering,
+    doneRecovering: () => setRecovering(false),
     signOut: () => {
       clearSessionMarks()
       return supabase?.auth.signOut()
