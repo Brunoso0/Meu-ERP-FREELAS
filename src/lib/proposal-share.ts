@@ -1,4 +1,5 @@
 import type { Client, Contract, Profile, Proposal } from '@/types/database.types'
+import { appUrl } from './app-base'
 import { listRows, updateRow } from './db'
 import { registerContractInstallments } from './recurrence'
 import { supabase } from './supabase'
@@ -39,7 +40,7 @@ const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 
 /** Endereço que o cliente abre para ler e assinar a proposta ou o contrato. */
 export const signatureLink = (token: string, kind: 'proposal' | 'contract' = 'proposal') =>
-  `${window.location.origin}/assinar/${kind === 'contract' ? 'contrato/' : ''}${token}`
+  appUrl(`/assinar/${kind === 'contract' ? 'contrato/' : ''}${token}`)
 
 const proposalLinkIsOpen = (p: Proposal) => p.status === 'awaiting_signature' || p.status === 'signed' || (p.status === 'approved' && !!p.signed_at)
 const contractLinkIsOpen = (c: Contract) => c.status === 'awaiting_signature' || (c.signature_method === 'link' && (c.status === 'signed' || c.status === 'active'))

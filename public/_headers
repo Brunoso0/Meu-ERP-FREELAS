@@ -9,6 +9,9 @@
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
   Cross-Origin-Opener-Policy: same-origin
+
+# O sistema não aparece em buscadores; só a landing page da raiz.
+/app/*
   X-Robots-Tag: noindex, nofollow
 
 # O service worker precisa ser conferido a cada visita, senão uma versão antiga fica presa no aparelho.

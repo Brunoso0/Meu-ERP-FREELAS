@@ -1,5 +1,5 @@
 /*
- * Service worker do Meu ERP Freelas.
+ * Service worker do Krono.
  *
  * Guarda só a "casca" do app (HTML, JS, CSS, ícones) para ele abrir rápido e
  * funcionar instalado. Os dados continuam vindo do Supabase a cada uso: nada
@@ -10,7 +10,8 @@
 const VERSION = '__VERSION__'
 const ASSETS = ['__ASSETS__']
 const CACHE = `erp-shell-${VERSION}`
-const SHELL = '/'
+// o sistema mora em /app; a landing page da raiz não passa pelo cache
+const SHELL = '/app/'
 
 self.addEventListener('install', (event) => {
   const files = ASSETS.filter((path) => path.startsWith('/'))
@@ -65,7 +66,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
 
-  if (request.mode === 'navigate') {
+  if (request.mode === 'navigate' && (url.pathname === '/app' || url.pathname.startsWith('/app/'))) {
     event.respondWith(page(request))
   } else if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/') || url.pathname === '/favicon.svg') {
     event.respondWith(asset(request))
@@ -82,7 +83,7 @@ self.addEventListener('push', (event) => {
     data = { body: event.data ? event.data.text() : '' }
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Meu ERP Freelas', {
+    self.registration.showNotification(data.title || 'Krono', {
       body: data.body || '',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
@@ -97,6 +98,8 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const target = new URL(event.notification.data?.url || '/', self.location.origin)
+  // os lembretes mandam a tela sem o /app na frente
+  if (!target.pathname.startsWith('/app')) target.pathname = '/app' + target.pathname
   if (target.origin !== self.location.origin) return
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {

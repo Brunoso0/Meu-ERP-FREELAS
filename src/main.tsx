@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TooltipProvider } from '@/components/ui/overlays'
 import { registerServiceWorker } from '@/lib/pwa'
+import { APP_BASE } from '@/lib/app-base'
 import App from './App'
 import './index.css'
 
@@ -17,7 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={150}>
-        <BrowserRouter>
+        <BrowserRouter basename={APP_BASE}>
           <App />
         </BrowserRouter>
       </TooltipProvider>

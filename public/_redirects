@@ -1,0 +1,21 @@
+# O sistema mora em /app: qualquer tela dele abre o app/index.html (o React Router decide o resto).
+/app/*  /app/index.html  200
+
+# Endereços de antes da landing page (links de assinatura e convite já enviados, favoritos, app instalado).
+/assinar/*  /app/assinar/:splat  301
+/convite/*  /app/convite/:splat  301
+/dashboard  /app/dashboard  301
+/atendimentos  /app/atendimentos  301
+/atendimentos/*  /app/atendimentos/:splat  301
+/clientes  /app/clientes  301
+/clientes/*  /app/clientes/:splat  301
+/projetos  /app/projetos  301
+/propostas  /app/propostas  301
+/propostas/*  /app/propostas/:splat  301
+/demandas  /app/demandas  301
+/agenda  /app/agenda  301
+/financeiro  /app/financeiro  301
+/metas  /app/metas  301
+/minha-empresa  /app/minha-empresa  301
+/equipe  /app/equipe  301
+/ferramentas/*  /app/ferramentas/:splat  301
