@@ -128,26 +128,6 @@ export default function Login() {
             </p>
           </div>
 
-          {/* no celular fica de fora: a tela abre direto no formulário */}
-          <div className="relative mt-10 hidden border-t border-slate-800/60 pt-6 lg:block">
-            <div className="mb-2 flex items-center gap-3">
-              <div className="flex -space-x-2">
-                {[
-                  ['MA', 'from-pink-500 to-rose-500'],
-                  ['RT', 'from-amber-500 to-orange-500'],
-                  ['LM', 'from-emerald-500 to-teal-500'],
-                ].map(([initials, colors]) => (
-                  <span key={initials} className={cn('flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br text-[10px] font-bold text-white ring-2 ring-slate-900', colors)}>
-                    {initials}
-                  </span>
-                ))}
-              </div>
-              <div className="text-xs font-medium text-slate-300">
-                <strong className="text-white">+4.500</strong> freelas ativos
-              </div>
-            </div>
-            <p className="text-xs font-light text-slate-500">"A melhor ferramenta para gerenciar meus orçamentos."</p>
-          </div>
         </div>
 
         {/* formulário */}
