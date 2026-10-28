@@ -428,5 +428,8 @@ verify_jwt = true
 [functions.billing]
 verify_jwt = false
 
+[functions.subscription]
+verify_jwt = false
+
 [functions.reminders]
 verify_jwt = false
