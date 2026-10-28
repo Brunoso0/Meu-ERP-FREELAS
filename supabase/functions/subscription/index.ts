@@ -18,6 +18,11 @@
 //   SUBSCRIPTION_WEBHOOK_TOKEN   texto aleatório de 32+ caracteres, o mesmo
 //                                cadastrado no webhook do Asaas
 //
+// Eventos que o webhook do Asaas deve enviar (marque só estes):
+//   PAYMENT_CONFIRMED, PAYMENT_RECEIVED, PAYMENT_OVERDUE, PAYMENT_REFUNDED,
+//   PAYMENT_REFUND_IN_PROGRESS, PAYMENT_CHARGEBACK_REQUESTED,
+//   SUBSCRIPTION_DELETED, SUBSCRIPTION_INACTIVATED
+//
 // Publicar com "Verify JWT" DESLIGADO (o Asaas não manda JWT; a função valida
 // o usuário por conta própria).
 // =====================================================================
@@ -207,6 +212,9 @@ const addMonth = (isoDate: string) => {
   return d.toISOString()
 }
 
+// avisos que deixam a conta em atraso: boleto/Pix vencido, estorno (pedido ou concluído) e chargeback de cartão
+const PAST_DUE_EVENTS = new Set(['PAYMENT_OVERDUE', 'PAYMENT_REFUND_IN_PROGRESS', 'PAYMENT_REFUNDED', 'PAYMENT_CHARGEBACK_REQUESTED'])
+
 async function webhook(req: Request) {
   const expected = Deno.env.get('SUBSCRIPTION_WEBHOOK_TOKEN') ?? ''
   const token = req.headers.get('asaas-access-token') ?? ''
@@ -241,7 +249,7 @@ async function webhook(req: Request) {
         current_period_end: ws.current_period_end && ws.current_period_end > paidUntil ? ws.current_period_end : paidUntil,
       })
       .eq('id', ws.id)
-  } else if (event === 'PAYMENT_OVERDUE' || event === 'PAYMENT_REFUNDED') {
+  } else if (PAST_DUE_EVENTS.has(event)) {
     // a contagem dos 7 dias de tolerância começa no primeiro aviso de atraso
     await admin.from('workspaces').update({ past_due_since: new Date().toISOString() }).eq('id', ws.id).is('past_due_since', null)
     await admin.from('workspaces').update({ subscription_status: 'past_due' }).eq('id', ws.id)
