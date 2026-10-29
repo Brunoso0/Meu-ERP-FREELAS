@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Download, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { ChevronDown, Download, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { Avatar } from '@/components/ui/primitives'
 import { Tip } from '@/components/ui/overlays'
 import { useTable } from '@/hooks/useData'
@@ -10,7 +10,7 @@ import { useInstallApp } from '@/lib/pwa'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useUI } from '@/store/ui'
-import { mainNav, toolsNav, type NavItem } from './nav'
+import { mainNav, moreNav, toolsNav, type NavItem } from './nav'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 
 function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
@@ -36,6 +36,42 @@ function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
         </NavLink>
       </div>
     </Tip>
+  )
+}
+
+/** Grupo que abre e fecha; começa aberto só se a tela atual está dentro dele. */
+function NavGroup({ id, title, items, collapsed, pathname }: { id: string; title: string; items: NavItem[]; collapsed: boolean; pathname: string }) {
+  const inside = items.some((i) => pathname === i.to || pathname.startsWith(`${i.to}/`))
+  const key = `krono-menu-${id}`
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem(key) === '1' } catch { return false }
+  })
+  const toggle = () => {
+    setOpen(!open)
+    try { localStorage.setItem(key, open ? '0' : '1') } catch { /* sem armazenamento: vale só nesta visita */ }
+  }
+  if (collapsed) {
+    return (
+      <>
+        <div className="mx-2 my-3 border-t" />
+        {items.map((item) => <NavRow key={item.to} item={item} collapsed />)}
+      </>
+    )
+  }
+  const shown = open || inside
+  return (
+    <>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={shown}
+        className="mt-4 flex w-full items-center justify-between rounded-md px-2.5 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+      >
+        {title}
+        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', shown && 'rotate-180')} />
+      </button>
+      {shown && items.map((item) => <NavRow key={item.to} item={item} collapsed={false} />)}
+    </>
   )
 }
 
@@ -109,14 +145,8 @@ export function Sidebar() {
           {mainNav.map((item) => (
             <NavRow key={item.to} item={item} collapsed={collapsed} />
           ))}
-          {collapsed ? (
-            <div className="mx-2 my-3 border-t" />
-          ) : (
-            <p className="px-2.5 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Ferramentas</p>
-          )}
-          {toolsNav.map((item) => (
-            <NavRow key={item.to} item={item} collapsed={collapsed} />
-          ))}
+          <NavGroup id="more" title="Mais opções" items={moreNav} collapsed={collapsed} pathname={pathname} />
+          <NavGroup id="tools" title="Ferramentas" items={toolsNav} collapsed={collapsed} pathname={pathname} />
         </nav>
 
         <div className="space-y-1 border-t p-2">

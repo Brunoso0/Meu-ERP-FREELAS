@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, FilePlus, FileText, Handshake, LayoutDashboard, QrCode, ScrollText, type LucideIcon } from 'lucide-react'
+import { ArrowRight, Check, FilePlus, FileText, Handshake, LayoutDashboard, QrCode, ScrollText, type LucideIcon } from 'lucide-react'
 import { Badge, Card, PageHeader } from '@/components/ui/primitives'
 import { stepSummary } from '@/components/EngagementProgress'
 import { useTable } from '@/hooks/useData'
@@ -46,6 +46,43 @@ function ActionCard({ action }: { action: QuickAction }) {
 }
 
 /** Tela inicial: os caminhos mais usados, sem passar pelo painel de números. */
+interface Step { done: boolean; title: string; hint: string; to: string }
+
+/** "Comece por aqui": some sozinho quando a conta já fez o básico. */
+function GettingStarted({ steps }: { steps: Step[] }) {
+  const done = steps.filter((s) => s.done).length
+  if (done === steps.length) return null
+  const next = steps.find((s) => !s.done)
+  return (
+    <Card className="mb-6 p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-base font-semibold">Comece por aqui</h2>
+        <span className="text-xs text-slate-500">{done} de {steps.length} feitos</span>
+      </div>
+      <p className="mt-1 text-sm text-slate-500">Quatro passos curtos para o Krono começar a trabalhar por você.</p>
+      <ol className="mt-4 space-y-2">
+        {steps.map((s) => (
+          <li key={s.title}>
+            <Link
+              to={s.to}
+              className={cn('flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:border-brand-400', s === next && 'border-brand-500 bg-brand-50/60 dark:bg-brand-600/10', s.done && 'opacity-60')}
+            >
+              <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs', s.done ? 'border-brand-600 bg-brand-600 text-white' : 'text-slate-400')}>
+                {s.done ? <Check className="h-3.5 w-3.5" /> : steps.indexOf(s) + 1}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className={cn('block text-sm font-medium', s.done && 'line-through')}>{s.title}</span>
+                <span className="block text-xs text-slate-500">{s.hint}</span>
+              </span>
+              {s === next && <ArrowRight className="h-4 w-4 shrink-0 text-brand-600" />}
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </Card>
+  )
+}
+
 export default function QuickAccess() {
   const navigate = useNavigate()
   const proposals = useTable('proposals')
@@ -53,6 +90,7 @@ export default function QuickAccess() {
   const quotes = useTable('quotes')
   const contracts = useTable('contracts')
   const projects = useTable('projects')
+  const transactions = useTable('financial_transactions')
   const profile = useTable('profiles').data?.[0]
 
   const open = (proposals.data ?? [])
@@ -60,6 +98,14 @@ export default function QuickAccess() {
     .filter(isOpenEngagement)
     .sort((a, b) => b.proposal.created_at.localeCompare(a.proposal.created_at))
     .slice(0, 4)
+
+  const ready = [proposals, clients, transactions].every((t) => !t.isLoading) && !!profile
+  const steps: Step[] = [
+    { done: !!(profile?.company_name?.trim() && (profile.pix_key || profile.document)), title: 'Conte quem é você', hint: 'Nome da empresa e Pix. Eles saem nas suas propostas e cobranças.', to: '/minha-empresa' },
+    { done: (clients.data?.length ?? 0) > 0, title: 'Cadastre seu primeiro cliente', hint: 'Quem você atende ou quer atender.', to: '/clientes' },
+    { done: (proposals.data?.length ?? 0) > 0, title: 'Faça seu primeiro atendimento', hint: 'Da proposta à cobrança, passo a passo.', to: '/atendimentos/novo' },
+    { done: (transactions.data ?? []).some((t) => t.type === 'income' && t.status === 'paid'), title: 'Receba seu primeiro pagamento', hint: 'Marque como pago no Financeiro e veja o dinheiro entrar.', to: '/financeiro' },
+  ]
 
   const firstName = (profile?.full_name ?? '').split(' ')[0]
 
@@ -70,10 +116,12 @@ export default function QuickAccess() {
         description="O que você quer fazer agora?"
         actions={
           <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">
-            <LayoutDashboard className="h-4 w-4" /> Ver o dashboard
+            <LayoutDashboard className="h-4 w-4" /> Ver o resumo
           </Link>
         }
       />
+
+      {ready && <GettingStarted steps={steps} />}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {actions.map((a) => (

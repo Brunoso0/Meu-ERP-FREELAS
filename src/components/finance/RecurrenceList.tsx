@@ -56,7 +56,7 @@ export function RecurrenceList({ transactions, clients }: { transactions: Financ
     <Card className="mt-4">
       <div className="flex flex-wrap items-end justify-between gap-2 border-b px-5 py-3.5">
         <div>
-          <h2 className="text-sm font-semibold">Recorrências</h2>
+          <h2 className="text-sm font-semibold">Mensalidades</h2>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Mensalidades em andamento e por quanto tempo ainda continuam.</p>
         </div>
         {income.length > 0 && (
