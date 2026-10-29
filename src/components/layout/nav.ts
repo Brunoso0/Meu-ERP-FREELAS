@@ -24,16 +24,21 @@ export interface NavItem {
   icon: LucideIcon
 }
 
+/** O dia a dia: o que um usuário novo precisa ver primeiro. */
 export const mainNav: NavItem[] = [
   { to: '/', label: 'Início', icon: Home },
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/atendimentos', label: 'Atendimentos', icon: Handshake },
   { to: '/clientes', label: 'Clientes', icon: Users },
+  { to: '/agenda', label: 'Agenda', icon: CalendarDays },
+  { to: '/financeiro', label: 'Financeiro', icon: Wallet },
+]
+
+/** Cada etapa do atendimento e os números, para quem quer ir direto a uma delas. */
+export const moreNav: NavItem[] = [
   { to: '/propostas', label: 'Propostas', icon: FileText },
   { to: '/projetos', label: 'Projetos', icon: Briefcase },
   { to: '/demandas', label: 'Demandas', icon: Kanban },
-  { to: '/agenda', label: 'Agenda', icon: CalendarDays },
-  { to: '/financeiro', label: 'Financeiro', icon: Wallet },
+  { to: '/dashboard', label: 'Resumo', icon: LayoutDashboard },
   { to: '/metas', label: 'Metas & Relatórios', icon: Target },
 ]
 

@@ -14,7 +14,7 @@ import { useUI } from '@/store/ui'
 import type { Client } from '@/types/database.types'
 
 interface Money {
-  /** LTV: tudo que o cliente já pagou. */
+  /** ltv: tudo que o cliente já pagou (na tela aparece como "Já pagou"). */
   ltv: number
   /** Em aberto (pendente ou atrasado). */
   open: number
@@ -50,7 +50,7 @@ export default function Clients() {
   const sortOptions: SortOption<Client>[] = [
     ...sortPair<Client>('created', ['Cadastro mais recente', 'Cadastro mais antigo'], (c) => c.created_at),
     ...sortPair<Client>('name', ['Nome Z–A', 'Nome A–Z'], (c) => c.name).reverse(),
-    ...sortPair<Client>('ltv', ['Maior LTV', 'Menor LTV'], (c) => moneyOf(c).ltv),
+    ...sortPair<Client>('ltv', ['Mais pagou', 'Menos pagou'], (c) => moneyOf(c).ltv),
     ...sortPair<Client>('open', ['Maior valor a receber', 'Menor valor a receber'], (c) => moneyOf(c).open),
   ]
 
@@ -96,7 +96,7 @@ export default function Clients() {
     { header: 'CPF / CNPJ', priority: 3, cell: (c) => <span className="tabular whitespace-nowrap text-slate-600 dark:text-slate-300">{c.document ?? '—'}</span> },
     { header: 'Status', cell: (c) => <Badge tone={clientStatus[c.status].tone}>{clientStatus[c.status].label}</Badge> },
     {
-      header: 'LTV',
+      header: 'Já pagou',
       className: 'text-right',
       cell: (c) => {
         const m = moneyOf(c)
@@ -151,7 +151,7 @@ export default function Clients() {
     <>
       <PageHeader
         title="Clientes"
-        description={`${clients.data?.length ?? 0} cadastrados · LTV total ${formatCurrency(sum([...totals.values()].map((m) => m.ltv)))}`}
+        description={`${clients.data?.length ?? 0} cadastrados · total já recebido ${formatCurrency(sum([...totals.values()].map((m) => m.ltv)))}`}
         actions={
           <Button onClick={() => openModal({ type: 'client' })}>
             <Plus className="h-4 w-4" /> Novo cliente

@@ -366,7 +366,7 @@ export default function Finance() {
         <Summary label={range ? 'Saldo do período' : 'Saldo'} value={summary.balance} hint={range ? 'Recebido menos pago dentro do período' : 'Tudo que entrou menos tudo que saiu'} loading={loading} />
         <Summary label="A receber" value={summary.receivable} hint="Clientes, vence no período e ainda não foi pago" loading={loading} />
         <Summary label="A pagar" value={summary.payable} hint="Despesas que vencem no período e ainda não foram pagas" loading={loading} />
-        <Summary label={isCurrent ? 'Lucro líquido projetado' : 'Resultado do período'} value={summary.profit} hint="Entradas menos saídas com vencimento no período" tone={summary.profit >= 0 ? 'good' : 'bad'} loading={loading} />
+        <Summary label={isCurrent ? 'Lucro previsto' : 'Resultado do período'} value={summary.profit} hint="Entradas menos saídas com vencimento no período" tone={summary.profit >= 0 ? 'good' : 'bad'} loading={loading} />
       </div>
 
       <FinanceCharts transactions={all} clients={clients.data ?? []} range={range} loading={loading} />
@@ -443,7 +443,7 @@ export default function Finance() {
                         { value: 'contract', label: 'Contratos' },
                       ]
                     : []),
-                  { value: 'recurrence', label: 'Recorrências' },
+                  { value: 'recurrence', label: 'Mensalidades' },
                   { value: 'manual', label: 'Lançados à mão' },
                 ],
               },

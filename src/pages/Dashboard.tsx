@@ -129,7 +129,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <PageHeader title="Dashboard" description={`Visão geral de ${data.monthLabel}.`} />
+      <PageHeader title="Resumo" description={`Visão geral de ${data.monthLabel}.`} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
