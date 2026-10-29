@@ -279,8 +279,14 @@ export async function uploadProof(file: File): Promise<string> {
   const uid = session.session?.user.id
   if (!uid) throw new Error('Sessão expirada. Entre novamente.')
   // a pasta é o workspace; sem ele (cadastro antigo) vale o id da pessoa, que é o mesmo do workspace dela
-  const path = `${activeWorkspaceId() ?? uid}/${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`
+  const workspace = activeWorkspaceId() ?? uid
+  const path = `${workspace}/${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`
+  // o plano limita o espaço; pergunta antes para explicar o motivo em vez de mostrar um erro técnico
+  const noRoom = 'O espaço de comprovantes do seu plano acabou. Apague arquivos antigos ou escolha um plano maior em Minha empresa.'
+  const { data: room } = await supabase.rpc('storage_has_room', { p_workspace: workspace, p_bytes: file.size })
+  if (room === false) throw new Error(noRoom)
   const { error } = await supabase.storage.from('proofs').upload(path, file)
+  if (error && /row-level security/i.test(error.message)) throw new Error(noRoom)
   fail(error)
   return path
 }
