@@ -10,10 +10,18 @@ import { Button, Card, PageHeader, Skeleton } from '@/components/ui/primitives'
 import { useTable, useUpdate } from '@/hooks/useData'
 import { useActiveWorkspace } from '@/hooks/useWorkspace'
 import { BusinessProfileCard } from '@/components/BusinessProfileCard'
+import { PaymentMethods } from '@/components/PaymentMethods'
 import { PlanCard } from '@/components/PlanCard'
 import { cn } from '@/lib/utils'
 
 const allFields = companySections.flatMap((s) => s.fields)
+const tabs = [
+  { id: 'empresa', label: 'Empresa' },
+  { id: 'planos', label: 'Planos e assinatura' },
+  { id: 'pagamento', label: 'Formas de pagamento' },
+] as const
+type Tab = (typeof tabs)[number]['id']
+const isTab = (id: string | null): id is Tab => tabs.some((t) => t.id === id)
 const isSection = (id: string | null): id is CompanySectionId => companySections.some((s) => s.id === id)
 
 /**
@@ -29,6 +37,8 @@ export default function Company() {
   const update = useUpdate('profiles')
   const { can } = useActiveWorkspace()
   const [params, setParams] = useSearchParams()
+  const tab: Tab = isTab(params.get('aba')) ? (params.get('aba') as Tab) : 'empresa'
+  const goTab = (id: Tab) => setParams(id === 'empresa' ? {} : { aba: id }, { replace: true })
   const current = isSection(params.get('secao')) ? (params.get('secao') as CompanySectionId) : 'dados'
   const section = companySections.find((s) => s.id === current)!
   const nav = useRef<HTMLElement>(null)
@@ -100,10 +110,29 @@ export default function Company() {
         </p>
       )}
 
-      <PlanCard />
-      <BusinessProfileCard />
+      <div role="tablist" aria-label="Minha empresa" className="mb-5 flex gap-1 overflow-x-auto border-b">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => goTab(t.id)}
+            className={cn(
+              '-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+              tab === t.id ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[230px_1fr]">
+      {tab === 'planos' && <PlanCard />}
+      {tab === 'pagamento' && <PaymentMethods />}
+      {tab === 'empresa' && <BusinessProfileCard />}
+
+      <div className={cn('grid grid-cols-1 items-start gap-4 lg:grid-cols-[230px_1fr]', tab !== 'empresa' && 'hidden')}>
         <nav ref={nav} aria-label="Seções" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:sticky lg:top-20 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">
           {companySections.map((s) => {
             const Icon = s.icon

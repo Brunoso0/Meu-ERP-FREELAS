@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, FilePlus, FileText, Handshake, QrCode, ScrollText, type LucideIcon } from 'lucide-react'
+import { ArrowRight, Briefcase, FilePlus, FileText, Handshake, Kanban, QrCode, ScrollText, type LucideIcon } from 'lucide-react'
 import { Badge, Card, PageHeader } from '@/components/ui/primitives'
 import { GettingStarted } from '@/components/GettingStarted'
 import { stepSummary } from '@/components/EngagementProgress'
@@ -20,6 +20,14 @@ const actions: QuickAction[] = [
   { to: '/ferramentas/proposta', title: 'Criar proposta', description: 'Escopo, prazos e valores num documento pronto para enviar.', icon: FilePlus },
   { to: '/ferramentas/orcamento', title: 'Criar orçamento', description: 'Um orçamento rápido, com cobrança por Pix.', icon: QrCode },
   { to: '/ferramentas/contrato', title: 'Criar contrato', description: 'Parta de uma proposta, escolha as cláusulas e exporte.', icon: ScrollText },
+]
+
+/** Atalhos para consultar o que já existe (as ações acima criam coisas novas). */
+const lookups: { to: string; label: string; icon: LucideIcon }[] = [
+  { to: '/demandas', label: 'Ver demandas', icon: Kanban },
+  { to: '/projetos', label: 'Ver projetos', icon: Briefcase },
+  { to: '/propostas', label: 'Ver propostas', icon: FileText },
+  { to: '/ferramentas/orcamento', label: 'Ver orçamentos', icon: QrCode },
 ]
 
 function ActionCard({ action }: { action: QuickAction }) {
@@ -75,6 +83,19 @@ export default function QuickAccess() {
           <ActionCard key={a.to} action={a} />
         ))}
       </div>
+
+      <section className="mt-6">
+        <h2 className="mb-3 text-sm font-semibold">Consultar</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {lookups.map(({ to, label, icon: Icon }) => (
+            <Link key={to} to={to} className="group flex items-center gap-3 rounded-xl border bg-white px-4 py-3 text-sm font-medium transition-colors hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-slate-900 dark:hover:border-brand-500">
+              <Icon className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
+              <span className="flex-1">{label}</span>
+              <ArrowRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-1" />
+            </Link>
+          ))}
+        </div>
+      </section>
 
       {open.length > 0 && (
         <section className="mt-8">

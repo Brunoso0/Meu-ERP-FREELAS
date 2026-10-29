@@ -38,7 +38,14 @@ set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","r
 select throws_ok($$ select * from public.subscription_events $$, '42501', null, 'o app não lê o histórico do Asaas');
 select throws_ok($$ update public.workspaces set asaas_subscription_id = 'sub_x' where id = current_setting('test.ws')::uuid $$, '42501', null, 'o app não grava o id da assinatura');
 select is((public.plan_usage(current_setting('test.ws')::uuid) ->> 'has_subscription')::boolean, false, 'plan_usage informa se há assinatura');
+
+-- forma de pagamento (migração 029): só o servidor grava; cartão guarda no máximo bandeira e 4 dígitos
+select throws_ok($$ update public.workspaces set billing_method = 'PIX' where id = current_setting('test.ws')::uuid $$, '42501', null, 'o app não grava a forma de pagamento');
+select throws_ok($$ update public.workspaces set card_last4 = '1234' where id = current_setting('test.ws')::uuid $$, '42501', null, 'o app não grava os dados do cartão');
 reset role;
+select lives_ok($$ update public.workspaces set billing_method = 'CREDIT_CARD', card_brand = 'VISA', card_last4 = '4242' where id = current_setting('test.ws')::uuid $$, 'o servidor grava forma, bandeira e 4 dígitos');
+select throws_ok($$ update public.workspaces set card_last4 = '4242424242424242' where id = current_setting('test.ws')::uuid $$, '23514', null, 'número inteiro de cartão é recusado pelo banco');
+select throws_ok($$ update public.workspaces set billing_method = 'DINHEIRO' where id = current_setting('test.ws')::uuid $$, '23514', null, 'forma de pagamento inválida é recusada');
 select pass('assinatura ok');
 select * from finish();
 rollback;

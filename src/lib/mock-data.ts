@@ -165,7 +165,7 @@ export function buildSeed(): MockDB {
       billing_provider: 'simple', billing_fine_pct: 2, billing_interest_pct: 1, billing_discount_pct: 0, billing_discount_days: 0, billing_types: 'UNDEFINED', billing_notify: true,
       nfse_services: [], nfse_observations: null, nfse_regime: 'mei', nfse_taxes: {},
       business_type: 'mei', team_size: 'solo', segment: null, onboarded_at: new Date().toISOString(),
-      plan_id: 'pro', subscription_status: 'courtesy', trial_ends_at: null, current_period_end: null, extra_members: 0,
+      plan_id: 'pro', subscription_status: 'courtesy', trial_ends_at: null, current_period_end: null, extra_members: 0, billing_method: null, card_brand: null, card_last4: null,
     },
   ]
 

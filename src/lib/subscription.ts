@@ -27,6 +27,12 @@ async function call<T>(action: string, workspaceId: string, extra: Record<string
 export const startCheckout = (workspaceId: string, input: { plan: 'essential' | 'pro'; billingType: BillingMethod; document: string; extraMembers: number }) =>
   call<{ url?: string | null; changed?: boolean }>('checkout', workspaceId, input)
 
+export const setBillingMethod = (workspaceId: string, billingType: BillingMethod) =>
+  call<{ saved: boolean; url?: string | null }>('method', workspaceId, { billingType })
+
+/** Link da fatura em aberto, onde o cartão é cadastrado ou trocado (na página do Asaas). */
+export const cardLink = (workspaceId: string) => call<{ url: string | null }>('card', workspaceId)
+
 export const cancelSubscription = (workspaceId: string) => call<{ canceled: boolean }>('cancel', workspaceId)
 
 export const listInvoices = (workspaceId: string) => call<{ payments: Invoice[] }>('invoices', workspaceId)

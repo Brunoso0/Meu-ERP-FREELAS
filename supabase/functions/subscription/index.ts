@@ -113,7 +113,7 @@ async function checkout(ws: WorkspaceRow, ownerEmail: string, body: Record<strin
   // já existe assinatura ativa: só muda valor e forma de pagamento
   if (ws.asaas_subscription_id && ws.subscription_status === 'active' && !ws.cancel_at_period_end) {
     await asaas('PUT', `/subscriptions/${ws.asaas_subscription_id}`, { value, billingType, updatePendingPayments: true, description: `Krono — plano ${planId === 'pro' ? 'Profissional' : 'Essencial'}` })
-    await admin.from('workspaces').update({ plan_id: planId, extra_members: extra, pending_plan_id: null }).eq('id', ws.id)
+    await admin.from('workspaces').update({ plan_id: planId, extra_members: extra, pending_plan_id: null, billing_method: billingType }).eq('id', ws.id)
     return { changed: true }
   }
 
@@ -151,7 +151,7 @@ async function checkout(ws: WorkspaceRow, ownerEmail: string, body: Record<strin
   })
   await admin
     .from('workspaces')
-    .update({ asaas_subscription_id: subscription.id, pending_plan_id: planId, extra_members: extra, cancel_at_period_end: false })
+    .update({ asaas_subscription_id: subscription.id, pending_plan_id: planId, extra_members: extra, cancel_at_period_end: false, billing_method: billingType })
     .eq('id', ws.id)
 
   return { url: await firstInvoiceUrl(subscription.id) }
@@ -166,6 +166,38 @@ async function firstInvoiceUrl(subscriptionId: string) {
     await new Promise((resolve) => setTimeout(resolve, 800))
   }
   return null
+}
+
+/** Link da fatura em aberto: é nela, na página do Asaas, que a pessoa digita ou troca o cartão. */
+async function openInvoiceUrl(subscriptionId: string) {
+  for (const status of ['OVERDUE', 'PENDING']) {
+    const list = await asaas('GET', `/subscriptions/${subscriptionId}/payments?status=${status}&limit=1`)
+    const url = list?.data?.[0]?.invoiceUrl
+    if (url) return url as string
+  }
+  return null
+}
+
+/**
+ * Forma de pagamento do plano. Sem assinatura, só guarda a escolha (o checkout parte dela).
+ * Com assinatura, troca no Asaas e devolve o link da fatura em aberto. O cartão em si
+ * nunca passa por aqui: quem o recebe e guarda é o Asaas.
+ */
+async function setMethod(ws: WorkspaceRow, body: Record<string, unknown>) {
+  const billingType = String(body.billingType ?? '')
+  if (!BILLING_TYPES.has(billingType)) throw new Problem('Forma de pagamento inválida.')
+  if (ws.asaas_subscription_id) {
+    await asaas('PUT', `/subscriptions/${ws.asaas_subscription_id}`, { billingType, updatePendingPayments: true })
+  }
+  await admin.from('workspaces').update({ billing_method: billingType }).eq('id', ws.id)
+  const url = ws.asaas_subscription_id && billingType === 'CREDIT_CARD' ? await openInvoiceUrl(ws.asaas_subscription_id) : null
+  return { saved: true, url }
+}
+
+/** Link para cadastrar ou trocar o cartão (a fatura em aberto, na página do Asaas). */
+async function cardLink(ws: WorkspaceRow) {
+  if (!ws.asaas_subscription_id) throw new Problem('Contrate um plano para cadastrar o cartão.')
+  return { url: await openInvoiceUrl(ws.asaas_subscription_id) }
 }
 
 async function cancel(ws: WorkspaceRow) {
@@ -235,6 +267,12 @@ async function webhook(req: Request) {
   if (seen) return json(200, { duplicate: true })
 
   if (event === 'PAYMENT_CONFIRMED' || event === 'PAYMENT_RECEIVED') {
+    // pago no cartão: guarda só a bandeira e os 4 últimos dígitos (nunca o número nem o token)
+    const card = payment?.creditCard
+    const last4 = String(card?.creditCardNumber ?? '').replace(/\D/g, '').slice(-4)
+    const cardPatch = payment?.billingType === 'CREDIT_CARD' && last4.length === 4
+      ? { billing_method: 'CREDIT_CARD', card_last4: last4, card_brand: String(card?.creditCardBrand ?? '').slice(0, 30) || null }
+      : payment?.billingType && BILLING_TYPES.has(String(payment.billingType)) ? { billing_method: String(payment.billingType) } : {}
     const dueDate = String(payment?.dueDate ?? today())
     const paidUntil = addMonth(dueDate)
     await admin
@@ -245,6 +283,7 @@ async function webhook(req: Request) {
         pending_plan_id: null,
         past_due_since: null,
         cancel_at_period_end: false,
+        ...cardPatch,
         // não encurta um período já pago (aviso fora de ordem)
         current_period_end: ws.current_period_end && ws.current_period_end > paidUntil ? ws.current_period_end : paidUntil,
       })
@@ -261,7 +300,7 @@ async function webhook(req: Request) {
 
 // ---------- porta de entrada ----------
 
-const ACTIONS = new Set(['checkout', 'cancel', 'invoices'])
+const ACTIONS = new Set(['checkout', 'cancel', 'invoices', 'method', 'card'])
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
@@ -287,6 +326,8 @@ Deno.serve(async (req) => {
     const ws = await loadWorkspace(workspaceId)
     if (action === 'checkout') return json(200, await checkout(ws, auth.user.email ?? '', body))
     if (action === 'cancel') return json(200, await cancel(ws))
+    if (action === 'method') return json(200, await setMethod(ws, body))
+    if (action === 'card') return json(200, await cardLink(ws))
     return json(200, await invoices(ws))
   } catch (error) {
     if (error instanceof Problem) return json(error.status, { error: 'subscription_failed', message: error.message })

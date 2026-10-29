@@ -19,11 +19,11 @@ export function PlanCheckout({ plan, open, onClose }: { plan: 'essential' | 'pro
 
   useEffect(() => {
     if (open) {
-      setMethod('PIX')
+      setMethod(workspace?.billing_method ?? 'PIX')
       setDocument(workspace?.document ? maskCpfCnpj(workspace.document) : '')
       setExtra(String(workspace?.extra_members ?? 0))
     }
-  }, [open, workspace?.document, workspace?.extra_members])
+  }, [open, workspace?.document, workspace?.extra_members, workspace?.billing_method])
 
   const info = planCatalog.find((p) => p.id === plan)
   if (!info || !workspace) return null
