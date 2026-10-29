@@ -48,6 +48,66 @@ export function trialDaysLeft(u: Pick<PlanUsage, 'status' | 'trial_ends_at'> | u
   return ms > 0 ? Math.ceil(ms / 86_400_000) : null
 }
 
+/** Dias de tolerância depois do primeiro aviso de atraso (o mesmo valor de effective_plan no banco). */
+export const PAST_DUE_GRACE_DAYS = 7
+
+export interface PlanNoticeData {
+  /** Muda quando o aviso muda, para "dispensar" valer só para este aviso. */
+  key: string
+  tone: 'info' | 'warn' | 'danger'
+  text: string
+  /** Avisos de atraso e de fim do teste (a poucos dias) não podem ser dispensados. */
+  dismissible: boolean
+}
+
+const day = 86_400_000
+
+/** O aviso do topo do app conforme a situação do plano; null quando está tudo certo. */
+export function planNotice(u: PlanUsage | undefined, now = Date.now()): PlanNoticeData | null {
+  if (!u) return null
+  const trial = trialDaysLeft(u)
+  if (trial !== null) {
+    return {
+      key: `trial-${trial}`,
+      tone: trial <= 3 ? 'warn' : 'info',
+      text: trial <= 1 ? 'Último dia do teste do plano Profissional' : `Faltam ${trial} dias do teste do plano Profissional`,
+      dismissible: trial > 3,
+    }
+  }
+  if (u.status === 'trialing') {
+    return { key: 'trial-ended', tone: 'info', text: 'O teste acabou e o workspace voltou ao plano Grátis. Seus dados continuam aqui.', dismissible: true }
+  }
+  if (u.status === 'past_due') {
+    const since = u.past_due_since ? new Date(u.past_due_since).getTime() : now
+    const left = Math.max(0, PAST_DUE_GRACE_DAYS - Math.floor((now - since) / day))
+    return {
+      key: `past-due-${left}`,
+      tone: left <= 2 ? 'danger' : 'warn',
+      text: left === 0
+        ? 'Pagamento em atraso: o plano volta ao Grátis hoje se a fatura não for paga.'
+        : `Pagamento em atraso: pague em até ${left} ${left === 1 ? 'dia' : 'dias'} para não voltar ao plano Grátis.`,
+      dismissible: false,
+    }
+  }
+  if (u.status === 'canceled') {
+    const end = u.current_period_end ? new Date(u.current_period_end).getTime() : 0
+    if (u.plan !== 'free' && end > now) {
+      const left = Math.ceil((end - now) / day)
+      const date = new Date(end).toLocaleDateString('pt-BR')
+      return {
+        key: `canceled-${left <= 7 ? left : 'long'}`,
+        tone: left <= 7 ? 'warn' : 'info',
+        text: left <= 7 ? `Assinatura cancelada: o plano termina em ${left} ${left === 1 ? 'dia' : 'dias'} (${date}).` : `Assinatura cancelada: o plano vale até ${date}.`,
+        dismissible: left > 7,
+      }
+    }
+    if (u.plan === 'free' && u.chosen_plan !== 'free') {
+      return { key: 'canceled-ended', tone: 'info', text: 'A assinatura terminou e o workspace voltou ao plano Grátis. Seus dados continuam aqui.', dismissible: true }
+    }
+  }
+  return null
+}
+
 const DEMO: PlanUsage = {
   plan: 'pro',
   chosen_plan: 'pro',
