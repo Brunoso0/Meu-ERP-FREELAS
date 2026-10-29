@@ -88,8 +88,9 @@ export default function App() {
         <WorkspaceGate>
         <Routes>
           <Route element={<AppLayout />}>
-            <Route index element={<QuickAccess />} />
-            <Route path="dashboard" element={<Dashboard />} />
+            <Route index element={<Dashboard />} />
+            <Route path="acesso-rapido" element={<QuickAccess />} />
+            <Route path="dashboard" element={<Navigate to="/" replace />} />
             <Route path="atendimentos" element={<Engagements />} />
             <Route path="atendimentos/novo" element={<Engagement />} />
             <Route path="atendimentos/:id" element={<Engagement />} />

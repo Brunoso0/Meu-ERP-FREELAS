@@ -1,7 +1,6 @@
 import {
   Briefcase,
   Handshake,
-  Home,
   Calculator,
   CalendarDays,
   FilePlus,
@@ -15,6 +14,7 @@ import {
   Target,
   Users,
   Wallet,
+  Zap,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -26,7 +26,8 @@ export interface NavItem {
 
 /** O dia a dia: o que um usuário novo precisa ver primeiro. */
 export const mainNav: NavItem[] = [
-  { to: '/', label: 'Início', icon: Home },
+  { to: '/', label: 'Resumo', icon: LayoutDashboard },
+  { to: '/acesso-rapido', label: 'Acesso rápido', icon: Zap },
   { to: '/atendimentos', label: 'Atendimentos', icon: Handshake },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays },
@@ -38,7 +39,6 @@ export const moreNav: NavItem[] = [
   { to: '/propostas', label: 'Propostas', icon: FileText },
   { to: '/projetos', label: 'Projetos', icon: Briefcase },
   { to: '/demandas', label: 'Demandas', icon: Kanban },
-  { to: '/dashboard', label: 'Resumo', icon: LayoutDashboard },
   { to: '/metas', label: 'Metas & Relatórios', icon: Target },
 ]
 
