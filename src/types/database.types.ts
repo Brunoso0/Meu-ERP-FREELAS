@@ -393,6 +393,11 @@ export interface Workspace {
   trial_ends_at: string | null
   current_period_end: string | null
   extra_members: number
+  /** Forma escolhida para pagar o plano; só o servidor grava (migração 029). */
+  billing_method: 'PIX' | 'BOLETO' | 'CREDIT_CARD' | null
+  /** Bandeira e 4 últimos dígitos do cartão cadastrado no Asaas. O número do cartão nunca é guardado aqui. */
+  card_brand: string | null
+  card_last4: string | null
 }
 
 export interface WorkspaceMember {

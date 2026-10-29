@@ -12,7 +12,7 @@ export function PlanGate({ feature, title, children }: { feature: PlanFeature; t
       <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-600/20 dark:text-brand-400"><Lock className="h-5 w-5" /></span>
       <h1 className="mt-4 text-lg font-semibold">{title}</h1>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Disponível no plano {featureMinPlan[feature]} ou superior.{isOwner ? '' : ' Peça ao dono do workspace.'}</p>
-      {isOwner && <Link to="/minha-empresa" className="mt-5 inline-flex h-9 items-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700">Ver planos</Link>}
+      {isOwner && <Link to="/minha-empresa?aba=planos" className="mt-5 inline-flex h-9 items-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700">Ver planos</Link>}
     </Card>
   )
 }

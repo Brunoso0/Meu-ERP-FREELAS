@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as Dialog from '@radix-ui/react-dialog'
-import { CornerDownLeft, FileText, Kanban, Search, Users, type LucideIcon } from 'lucide-react'
+import { CornerDownLeft, CreditCard, FileText, Kanban, Search, Users, type LucideIcon } from 'lucide-react'
 import { useTable } from '@/hooks/useData'
 import { cn, formatProposalNumber } from '@/lib/utils'
 import { useUI } from '@/store/ui'
@@ -49,6 +49,8 @@ export function CommandPalette() {
   const results = useMemo<Result[]>(() => {
     const all: Result[] = [
       ...[...mainNav, ...moreNav, ...toolsNav].map((n) => ({ id: `nav-${n.to}`, label: n.label, hint: 'Ir para', icon: n.icon, run: () => navigate(n.to) })),
+      { id: 'empresa-planos', label: 'Minha empresa: Planos e assinatura', hint: 'Ir para', icon: CreditCard, run: () => navigate('/minha-empresa?aba=planos') },
+      { id: 'empresa-pagamento', label: 'Minha empresa: Formas de pagamento', hint: 'Ir para', icon: CreditCard, run: () => navigate('/minha-empresa?aba=pagamento') },
       ...companySections.map((c) => ({ id: `empresa-${c.id}`, label: `Minha empresa: ${c.label}`, hint: 'Ir para', icon: c.icon, run: () => navigate(c.id === 'dados' ? '/minha-empresa' : `/minha-empresa?secao=${c.id}`) })),
       ...(clients ?? []).map((c) => ({
         id: `client-${c.id}`,
