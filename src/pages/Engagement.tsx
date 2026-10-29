@@ -477,7 +477,7 @@ function DoneStep({ e, onBack }: { e: ReturnType<typeof engagementOf>; onBack: (
         ))}
       </ul>
       <Footer onBack={onBack}>
-        <Button variant="secondary" onClick={() => navigate('/')}>Ir para o início</Button>
+        <Button variant="secondary" onClick={() => navigate('/acesso-rapido')}>Ir para o acesso rápido</Button>
         <Button onClick={() => navigate('/atendimentos/novo')}>Novo atendimento</Button>
       </Footer>
     </StepCard>

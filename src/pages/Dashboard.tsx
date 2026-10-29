@@ -4,6 +4,7 @@ import { addHours, endOfMonth, format, isBefore, isSameDay, isSameMonth, startOf
 import { ptBR } from 'date-fns/locale'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CalendarDays, CheckCircle2, TrendingDown, TrendingUp, Video } from 'lucide-react'
+import { GettingStarted } from '@/components/GettingStarted'
 import { ChartLegend, ChartTooltip, Sparkline, useChartTheme } from '@/components/charts/theme'
 import { Pager, usePagination } from '@/components/ui/Pagination'
 import { Badge, Card, EmptyState, PageHeader, Skeleton } from '@/components/ui/primitives'
@@ -130,6 +131,8 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader title="Resumo" description={`Visão geral de ${data.monthLabel}.`} />
+
+      <GettingStarted />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
