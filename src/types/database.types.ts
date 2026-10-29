@@ -43,6 +43,11 @@ export interface NfseTaxes {
   ir?: number
 }
 
+/**
+ * O "perfil" que as telas veem: o que é pessoal vem da tabela profiles (nome, foto,
+ * lembretes) e os dados da empresa vêm do workspace ativo (ver mergeProfile em db.ts).
+ * Desde a migração 028 a tabela profiles não tem mais as colunas da empresa.
+ */
 export interface Profile {
   id: string
   full_name: string | null
