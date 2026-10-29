@@ -116,6 +116,10 @@ export function PlanCard() {
         })}
       </div>
 
+      {usage.limits.storage_mb !== undefined && (usage.usage.storage_mb ?? 0) >= usage.limits.storage_mb && (
+        <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">O espaço de comprovantes acabou: novos anexos ficam bloqueados até você apagar arquivos antigos ou escolher um plano maior. Nada foi apagado.</p>
+      )}
+
       <div className="mt-6 grid gap-3 lg:grid-cols-3">
         {planCatalog.map((p) => {
           const current = p.id === usage.plan
