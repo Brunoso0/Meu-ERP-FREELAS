@@ -13,6 +13,7 @@ declare v_a uuid; v_b uuid;
 begin
   select workspace_id into v_a from public.workspace_members where user_id = 'aaaaaaaa-0000-0000-0000-00000000000a';
   select workspace_id into v_b from public.workspace_members where user_id = 'bbbbbbbb-0000-0000-0000-00000000000b';
+  perform set_config('test.ws_a', v_a::text, true);
   insert into public.clients (id, user_id, workspace_id, name) values
     ('a1a1a1a1-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', v_a, 'Cliente A'),
     ('b1b1b1b1-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-00000000000b', v_b, 'Cliente B');
@@ -31,7 +32,7 @@ set local role authenticated;
 -- Ana, só com a senha (aal1): nada abre
 set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated","aal":"aal1"}';
 select is((select count(*) from public.clients), 0::bigint, 'aal1 com a verificação ativa não vê clientes');
-select throws_ok($$ insert into public.clients (user_id, workspace_id, name) select 'aaaaaaaa-0000-0000-0000-00000000000a', workspace_id, 'Novo' from public.workspace_members where user_id = 'aaaaaaaa-0000-0000-0000-00000000000a' $$, '42501', null, 'aal1 com a verificação ativa não grava');
+select throws_ok($$ insert into public.clients (user_id, workspace_id, name) values ('aaaaaaaa-0000-0000-0000-00000000000a', current_setting('test.ws_a')::uuid, 'Novo') $$, '42501', null, 'aal1 com a verificação ativa não grava');
 select is((select count(*) from public.profiles), 0::bigint, 'aal1 não vê nem o perfil');
 
 -- Ana, com o código (aal2): tudo como sempre
