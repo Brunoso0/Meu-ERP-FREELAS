@@ -4,6 +4,7 @@ import type { FieldDef } from './EntityForm'
 import { GatewayConnection } from '@/components/billing/GatewayConnection'
 import { NfseServicesEditor } from '@/components/billing/NfseServicesEditor'
 import { BiometricSettings } from '@/components/auth/BiometricSettings'
+import { TwoFactorSettings } from '@/components/auth/TwoFactorSettings'
 import { ReminderSettings } from '@/components/reminders/ReminderSettings'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { billingProviders, billingTypes } from '@/lib/billing'
@@ -128,9 +129,12 @@ export const companySections: CompanySection[] = [
         {
           id: 'seguranca' as const,
           label: 'Segurança',
-          description: 'Como o acesso ao app é protegido neste aparelho.',
+          description: 'Como o acesso ao app é protegido: verificação em duas etapas e biometria.',
           icon: ShieldCheck,
-          fields: [{ name: 'biometric_device', group: 'Biometria', groupHint: 'Entre no app com a digital ou o rosto neste aparelho.', label: 'Biometria', type: 'custom', render: () => <BiometricSettings /> }] as FieldDef[],
+          fields: [
+            { name: 'two_factor', group: 'Verificação em duas etapas', groupHint: 'Um código do seu celular, além da senha, para entrar.', label: 'Verificação em duas etapas', type: 'custom', render: () => <TwoFactorSettings /> },
+            { name: 'biometric_device', group: 'Biometria', groupHint: 'Entre no app com a digital ou o rosto neste aparelho.', label: 'Biometria', type: 'custom', render: () => <BiometricSettings /> },
+          ] as FieldDef[],
         },
       ]
     : []),
