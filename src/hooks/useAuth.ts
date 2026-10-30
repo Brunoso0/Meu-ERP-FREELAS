@@ -27,7 +27,13 @@ export function useAuth() {
 
   const uid = session?.user.id
   useEffect(() => {
-    if (!supabase || !uid) return
+    if (!supabase) return
+    // sem sessão não sobra nada do login anterior: o próximo login começa "sem saber" o nível
+    // (se sobrasse, o app abriria já na senha e consultaria os dados antes do código, recebendo vazio)
+    if (!uid) {
+      setMfa(null)
+      return
+    }
     let live = true
     supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data }) => {
       if (live) setMfa({ uid, pending: data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2' })

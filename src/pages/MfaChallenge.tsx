@@ -3,11 +3,13 @@ import { toast } from 'sonner'
 import { KeyRound, Loader2, ShieldCheck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { activeFactor, recoverWithCode, verifyCode } from '@/lib/mfa'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 
 /** Segundo passo do login: o código de 6 dígitos do app autenticador (ou um código de recuperação). */
 export default function MfaChallenge() {
   const { signOut } = useAuth()
+  const queryClient = useQueryClient()
   const [factorId, setFactorId] = useState<string | null>(null)
   const [recovery, setRecovery] = useState(false)
   const [code, setCode] = useState('')
@@ -30,6 +32,8 @@ export default function MfaChallenge() {
       } else if (factorId) {
         await verifyCode(factorId, code)
       }
+      // o que foi consultado antes do código voltou vazio (a sessão ainda não valia): refaz tudo
+      await queryClient.resetQueries()
       // o app libera sozinho: a sessão passou a valer como confirmada
     } catch (error) {
       toast.error(recovery ? 'Não foi possível usar o código' : 'Código não confere', { description: error instanceof Error ? error.message : undefined })
