@@ -10,7 +10,10 @@ import { FormFields, initialValues, payloadOf } from '@/components/forms/EntityF
 import { Avatar, Badge, Button, Card, PageHeader, Skeleton } from '@/components/ui/primitives'
 import { useTable, useUpdate } from '@/hooks/useData'
 import { useActiveWorkspace } from '@/hooks/useWorkspace'
-import { BusinessProfileCard } from '@/components/BusinessProfileCard'
+import { BusinessProfileFields, businessValues, BUSINESS_KEYS } from '@/components/BusinessProfileCard'
+import { MY_WORKSPACES_KEY } from '@/hooks/useWorkspace'
+import { saveBusinessProfile } from '@/lib/workspace'
+import { useQueryClient } from '@tanstack/react-query'
 import { PaymentMethods } from '@/components/PaymentMethods'
 import { PlanCard } from '@/components/PlanCard'
 import { planNames, trialDaysLeft, usePlan } from '@/lib/plan'
@@ -113,7 +116,8 @@ export default function Company() {
   const profiles = useTable('profiles')
   const profile = profiles.data?.[0]
   const update = useUpdate('profiles')
-  const { can } = useActiveWorkspace()
+  const { can, workspace } = useActiveWorkspace()
+  const qc = useQueryClient()
   const [params, setParams] = useSearchParams()
   const extra = isExtra(params.get('secao')) ? (params.get('secao') as ExtraId) : null
   const current: CompanySectionId | ExtraId = extra ?? (isSection(params.get('secao')) ? (params.get('secao') as CompanySectionId) : 'dados')
@@ -125,7 +129,7 @@ export default function Company() {
     nav.current?.querySelector('[aria-current=page]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [current])
 
-  const form = useForm<Record<string, any>>({ resolver: zodResolver(companySchema), defaultValues: initialValues(allFields, profile) })
+  const form = useForm<Record<string, any>>({ resolver: zodResolver(companySchema), defaultValues: { ...initialValues(allFields, profile), ...businessValues(workspace) } })
   const {
     handleSubmit,
     reset,
@@ -134,9 +138,16 @@ export default function Company() {
 
   // carrega o perfil quando ele chega (e não sobrescreve o que está sendo editado)
   useEffect(() => {
-    if (profile) reset(initialValues(allFields, profile))
+    if (profile) reset({ ...initialValues(allFields, profile), ...businessValues(workspace) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id])
+
+  // o perfil do negócio vem do workspace: acompanha o que foi gravado sem apagar o que está sendo editado
+  useEffect(() => {
+    const b = businessValues(workspace)
+    for (const k of BUSINESS_KEYS) form.resetField(k, { defaultValue: b[k] })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace?.id, workspace?.business_type, workspace?.team_size, workspace?.segment])
 
   // conectar ou desconectar o Asaas já grava a forma de cobrança: ela não conta como alteração pendente
   useEffect(() => {
@@ -163,9 +174,27 @@ export default function Company() {
   const save = handleSubmit(
     async (values) => {
       if (!profile) return
+      // o schema do perfil descarta o que não conhece: o perfil do negócio é lido direto do formulário
+      const biz = form.getValues()
+      const bizNow = { business_type: biz.business_type || '', team_size: biz.team_size || '', segment: String(biz.segment ?? '').trim() }
+      const was = businessValues(workspace)
+      const bizChanged = BUSINESS_KEYS.some((k) => bizNow[k] !== was[k])
+      if (bizChanged && (!bizNow.business_type || !bizNow.team_size)) {
+        toast.error('Complete o perfil do negócio', { description: 'Escolha o tipo de empresa e o tamanho da equipe.' })
+        return
+      }
       try {
         const saved = await update.mutateAsync({ id: profile.id, patch: payloadOf(allFields, values) })
-        reset(initialValues(allFields, saved))
+        if (bizChanged && workspace) {
+          try {
+            await saveBusinessProfile(workspace.id, { business_type: bizNow.business_type as any, team_size: bizNow.team_size as any, segment: bizNow.segment }, !workspace.onboarded_at)
+            await qc.invalidateQueries({ queryKey: MY_WORKSPACES_KEY })
+          } catch (e) {
+            toast.error('Não foi possível salvar o perfil do negócio', { description: e instanceof Error ? e.message : undefined })
+            return
+          }
+        }
+        reset({ ...initialValues(allFields, saved), ...bizNow })
         toast.success('Alterações salvas')
       } catch {
         // o hook já avisa e desfaz
@@ -259,6 +288,7 @@ export default function Company() {
                   </section>
                 ))
               )}
+              {!extra && current === 'dados' && !!profile && <BusinessProfileFields form={form} />}
             </Card>
 
             {isDirty && (
@@ -275,8 +305,6 @@ export default function Company() {
               </div>
             )}
           </form>
-
-          {!extra && current === 'dados' && <div className="mt-6"><BusinessProfileCard /></div>}
         </div>
       </div>
     </>
