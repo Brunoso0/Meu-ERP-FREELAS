@@ -88,7 +88,8 @@ export function PlanCard() {
         <p className="mt-2 text-sm text-slate-500">O teste acabou e o workspace voltou ao plano Grátis. Seus dados continuam aqui; para criar acima dos limites, escolha um plano.</p>
       )}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <h3 className="mt-5 text-sm font-semibold">Uso neste mês</h3>
+      <div className="mt-3 grid gap-x-8 gap-y-3 sm:grid-cols-2">
         {meters.map(({ key, label, unit }) => {
           const limit = usage.limits[key]
           if (limit === 0 && (usage.usage[key] ?? 0) === 0) {
@@ -104,7 +105,7 @@ export function PlanCard() {
             <div key={key} className="text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">{label}</span>
-                <span className="tabular font-medium">{used}{unit ? ` ${unit}` : ''} / {limit === undefined ? 'ilimitado' : `${limit}${unit ? ` ${unit}` : ''}`}</span>
+                <span className="tabular font-medium">{used}{unit ? ` ${unit}` : ''}{limit === undefined ? <span className="font-normal text-slate-400"> · ilimitado</span> : ` / ${limit}${unit ? ` ${unit}` : ''}`}</span>
               </div>
               {limit !== undefined && (
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-valuenow={used} aria-valuemax={limit} aria-label={label}>

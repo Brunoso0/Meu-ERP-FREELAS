@@ -38,6 +38,10 @@ export interface FieldDef {
   persist?: boolean
   /** Valor quando o registro ainda não tem a coluna preenchida. */
   initial?: unknown
+  /** Bloco da tela em que o campo aparece (telas de configuração agrupam os campos por assunto). */
+  group?: string
+  /** Explicação do bloco; vale a do primeiro campo do grupo que a tiver. */
+  groupHint?: string
 }
 
 /** Campos que só desenham algo na tela e não vão para o banco. */
