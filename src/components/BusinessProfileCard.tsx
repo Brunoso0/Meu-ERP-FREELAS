@@ -36,31 +36,37 @@ export function BusinessProfileCard() {
   }
 
   return (
-    <Card className="mb-4 p-5">
-      <h2 className="text-base font-semibold">Perfil do negócio</h2>
-      <p className="mb-4 mt-0.5 text-sm text-slate-500 dark:text-slate-400">Como a empresa atua. Usamos isso para adaptar o sistema e, em breve, os planos.</p>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Tipo de empresa">
-          <Select value={type} onChange={(e) => setType(e.target.value as BusinessType)} disabled={!editable}>
-            <option value="" disabled>Selecione</option>
-            {(Object.keys(businessTypeLabel) as BusinessType[]).map((t) => <option key={t} value={t}>{businessTypeLabel[t]}</option>)}
-          </Select>
-        </Field>
-        <Field label="Equipe">
-          <Select value={team} onChange={(e) => setTeam(e.target.value as TeamSize)} disabled={!editable}>
-            <option value="" disabled>Selecione</option>
-            {(Object.keys(teamSizeLabel) as TeamSize[]).map((t) => <option key={t} value={t}>{teamSizeLabel[t]}</option>)}
-          </Select>
-        </Field>
-        <Field label="O que você faz">
-          <Input value={segment} onChange={(e) => setSegment(e.target.value)} maxLength={80} disabled={!editable} placeholder="Ex.: sites e sistemas" />
-        </Field>
-      </div>
-      {editable && (
-        <div className="mt-4 flex justify-end">
-          <Button onClick={save} loading={busy} disabled={!dirty || !type || !team}>Salvar perfil</Button>
+    <Card>
+      <section className="grid gap-4 p-5 lg:grid-cols-[200px_1fr] lg:gap-8">
+        <div>
+          <h3 className="text-sm font-semibold">Perfil do negócio</h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Como a empresa atua. Usamos isso para adaptar o sistema ao seu jeito de trabalhar.</p>
         </div>
-      )}
+        <div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Tipo de empresa">
+              <Select value={type} onChange={(e) => setType(e.target.value as BusinessType)} disabled={!editable}>
+                <option value="" disabled>Selecione</option>
+                {(Object.keys(businessTypeLabel) as BusinessType[]).map((t) => <option key={t} value={t}>{businessTypeLabel[t]}</option>)}
+              </Select>
+            </Field>
+            <Field label="Equipe">
+              <Select value={team} onChange={(e) => setTeam(e.target.value as TeamSize)} disabled={!editable}>
+                <option value="" disabled>Selecione</option>
+                {(Object.keys(teamSizeLabel) as TeamSize[]).map((t) => <option key={t} value={t}>{teamSizeLabel[t]}</option>)}
+              </Select>
+            </Field>
+            <Field label="O que você faz" className="sm:col-span-2">
+              <Input value={segment} onChange={(e) => setSegment(e.target.value)} maxLength={80} disabled={!editable} placeholder="Ex.: sites e sistemas" />
+            </Field>
+          </div>
+          {editable && (
+            <div className="mt-4 flex justify-end">
+              <Button onClick={save} loading={busy} disabled={!dirty || !type || !team}>Salvar perfil</Button>
+            </div>
+          )}
+        </div>
+      </section>
     </Card>
   )
 }
