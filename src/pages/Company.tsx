@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, CreditCard, Receipt, Save, Undo2, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, CreditCard, Pencil, Receipt, Save, Undo2, type LucideIcon } from 'lucide-react'
 import { companySchema, companySections, type CompanySectionId } from '@/components/forms/companyForm'
 import { FormFields, initialValues, payloadOf } from '@/components/forms/EntityForm'
 import { Avatar, Badge, Button, Card, PageHeader, Skeleton } from '@/components/ui/primitives'
@@ -123,6 +123,10 @@ export default function Company() {
   const current: CompanySectionId | ExtraId = extra ?? (isSection(params.get('secao')) ? (params.get('secao') as CompanySectionId) : 'dados')
   const section = companySections.find((s) => s.id === current) ?? companySections[0]
   const nav = useRef<HTMLElement>(null)
+  // perfil do negócio já preenchido some do formulário; só reaparece quando a pessoa pede para editar
+  const [editBiz, setEditBiz] = useState(false)
+  const bizDone = !!(workspace?.business_type && workspace?.team_size)
+  const showBiz = !bizDone || editBiz
 
   // no celular o menu rola de lado: a seção aberta fica sempre à vista
   useEffect(() => {
@@ -195,6 +199,7 @@ export default function Company() {
           }
         }
         reset({ ...initialValues(allFields, saved), ...bizNow })
+        setEditBiz(false)
         toast.success('Alterações salvas')
       } catch {
         // o hook já avisa e desfaz
@@ -264,9 +269,16 @@ export default function Company() {
 
           {/* o formulário continua montado para não perder o que foi digitado ao passar pelas seções de plano */}
           <form onSubmit={save} noValidate className={cn(extra && 'hidden')}>
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold tracking-tight">{section.label}</h2>
-              <p className="mt-0.5 max-w-2xl text-sm text-slate-500 dark:text-slate-400">{section.description}</p>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">{section.label}</h2>
+                <p className="mt-0.5 max-w-2xl text-sm text-slate-500 dark:text-slate-400">{section.description}</p>
+              </div>
+              {current === 'dados' && !showBiz && can('admin') && (
+                <Button variant="secondary" onClick={() => setEditBiz(true)}>
+                  <Pencil className="h-4 w-4" /> Editar perfil do negócio
+                </Button>
+              )}
             </div>
             <Card className="divide-y">
               {profiles.isLoading || !profile ? (
@@ -288,7 +300,7 @@ export default function Company() {
                   </section>
                 ))
               )}
-              {!extra && current === 'dados' && !!profile && <BusinessProfileFields form={form} />}
+              {!extra && current === 'dados' && !!profile && showBiz && <BusinessProfileFields form={form} />}
             </Card>
 
             {isDirty && (
