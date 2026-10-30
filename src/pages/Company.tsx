@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { Save, Undo2 } from 'lucide-react'
+import { CreditCard, Receipt, Save, Undo2, type LucideIcon } from 'lucide-react'
 import { companySchema, companySections, type CompanySectionId } from '@/components/forms/companyForm'
 import { FormFields, initialValues, payloadOf } from '@/components/forms/EntityForm'
 import { Button, Card, PageHeader, Skeleton } from '@/components/ui/primitives'
@@ -15,13 +15,13 @@ import { PlanCard } from '@/components/PlanCard'
 import { cn } from '@/lib/utils'
 
 const allFields = companySections.flatMap((s) => s.fields)
-const tabs = [
-  { id: 'empresa', label: 'Empresa' },
-  { id: 'planos', label: 'Planos e assinatura' },
-  { id: 'pagamento', label: 'Formas de pagamento' },
-] as const
-type Tab = (typeof tabs)[number]['id']
-const isTab = (id: string | null): id is Tab => tabs.some((t) => t.id === id)
+/** Seções que não são formulário (têm botões próprios): moram no mesmo menu das demais. */
+const extraSections = [
+  { id: 'planos', label: 'Planos e assinatura', icon: Receipt },
+  { id: 'pagamento', label: 'Formas de pagamento', icon: CreditCard },
+] as const satisfies readonly { id: string; label: string; icon: LucideIcon }[]
+type ExtraId = (typeof extraSections)[number]['id']
+const isExtra = (id: string | null): id is ExtraId => extraSections.some((e) => e.id === id)
 const isSection = (id: string | null): id is CompanySectionId => companySections.some((s) => s.id === id)
 
 /**
@@ -37,10 +37,9 @@ export default function Company() {
   const update = useUpdate('profiles')
   const { can } = useActiveWorkspace()
   const [params, setParams] = useSearchParams()
-  const tab: Tab = isTab(params.get('aba')) ? (params.get('aba') as Tab) : 'empresa'
-  const goTab = (id: Tab) => setParams(id === 'empresa' ? {} : { aba: id }, { replace: true })
-  const current = isSection(params.get('secao')) ? (params.get('secao') as CompanySectionId) : 'dados'
-  const section = companySections.find((s) => s.id === current)!
+  const extra = isExtra(params.get('secao')) ? (params.get('secao') as ExtraId) : null
+  const current: CompanySectionId | ExtraId = extra ?? (isSection(params.get('secao')) ? (params.get('secao') as CompanySectionId) : 'dados')
+  const section = companySections.find((s) => s.id === current) ?? companySections[0]
   const nav = useRef<HTMLElement>(null)
 
   // no celular o menu rola de lado: a seção aberta fica sempre à vista
@@ -81,7 +80,7 @@ export default function Company() {
     [errors, Object.keys(errors).join()],
   )
 
-  const go = (id: CompanySectionId) => setParams(id === 'dados' ? {} : { secao: id }, { replace: true })
+  const go = (id: CompanySectionId | ExtraId) => setParams(id === 'dados' ? {} : { secao: id }, { replace: true })
 
   const save = handleSubmit(
     async (values) => {
@@ -110,29 +109,9 @@ export default function Company() {
         </p>
       )}
 
-      <div role="tablist" aria-label="Minha empresa" className="mb-5 flex gap-1 overflow-x-auto border-b">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => goTab(t.id)}
-            className={cn(
-              '-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-              tab === t.id ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {!extra && <BusinessProfileCard />}
 
-      {tab === 'planos' && <PlanCard />}
-      {tab === 'pagamento' && <PaymentMethods />}
-      {tab === 'empresa' && <BusinessProfileCard />}
-
-      <div className={cn('grid grid-cols-1 items-start gap-4 lg:grid-cols-[230px_1fr]', tab !== 'empresa' && 'hidden')}>
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[230px_1fr]">
         <nav ref={nav} aria-label="Seções" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:sticky lg:top-20 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">
           {companySections.map((s) => {
             const Icon = s.icon
@@ -154,9 +133,32 @@ export default function Company() {
               </button>
             )
           })}
+          {extraSections.map((e) => {
+            const Icon = e.icon
+            const active = e.id === current
+            return (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => go(e.id)}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
+                  active ? 'bg-brand-50 text-brand-700 dark:bg-brand-600/15 dark:text-brand-400' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1">{e.label}</span>
+              </button>
+            )
+          })}
         </nav>
 
-        <form onSubmit={save} noValidate>
+        {extra === 'planos' && <PlanCard />}
+        {extra === 'pagamento' && <PaymentMethods />}
+
+        {/* o formulário continua montado para não perder o que foi digitado ao passar pelas seções de plano */}
+        <form onSubmit={save} noValidate className={cn(extra && 'hidden')}>
           <Card className="overflow-hidden">
             <div className="border-b px-5 py-4">
               <h2 className="text-base font-semibold">{section.label}</h2>

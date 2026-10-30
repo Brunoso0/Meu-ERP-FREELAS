@@ -44,7 +44,7 @@ export function PlanNotice() {
     <div role="status" className={cn('flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b px-4 py-2 text-center text-xs', tones[notice.tone])}>
       <span className="flex items-center gap-1.5 font-medium"><Icon className="h-3.5 w-3.5 shrink-0" />{notice.text}</span>
       {isOwner
-        ? <Link to="/minha-empresa?aba=planos" className="font-semibold underline underline-offset-2">{notice.tone === 'info' ? 'Ver planos' : 'Resolver agora'}</Link>
+        ? <Link to="/minha-empresa?secao=planos" className="font-semibold underline underline-offset-2">{notice.tone === 'info' ? 'Ver planos' : 'Resolver agora'}</Link>
         : <span className="opacity-80">Avise o dono do workspace.</span>}
       {notice.dismissible && (
         <button type="button" onClick={dismiss} aria-label="Dispensar aviso" className="rounded p-0.5 opacity-70 hover:opacity-100"><X className="h-3.5 w-3.5" /></button>

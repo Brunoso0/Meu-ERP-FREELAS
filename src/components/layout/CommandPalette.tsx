@@ -49,8 +49,8 @@ export function CommandPalette() {
   const results = useMemo<Result[]>(() => {
     const all: Result[] = [
       ...[...mainNav, ...moreNav, ...toolsNav].map((n) => ({ id: `nav-${n.to}`, label: n.label, hint: 'Ir para', icon: n.icon, run: () => navigate(n.to) })),
-      { id: 'empresa-planos', label: 'Minha empresa: Planos e assinatura', hint: 'Ir para', icon: CreditCard, run: () => navigate('/minha-empresa?aba=planos') },
-      { id: 'empresa-pagamento', label: 'Minha empresa: Formas de pagamento', hint: 'Ir para', icon: CreditCard, run: () => navigate('/minha-empresa?aba=pagamento') },
+      { id: 'empresa-planos', label: 'Minha empresa: Planos e assinatura', hint: 'Ir para', icon: CreditCard, run: () => navigate('/minha-empresa?secao=planos') },
+      { id: 'empresa-pagamento', label: 'Minha empresa: Formas de pagamento', hint: 'Ir para', icon: CreditCard, run: () => navigate('/minha-empresa?secao=pagamento') },
       ...companySections.map((c) => ({ id: `empresa-${c.id}`, label: `Minha empresa: ${c.label}`, hint: 'Ir para', icon: c.icon, run: () => navigate(c.id === 'dados' ? '/minha-empresa' : `/minha-empresa?secao=${c.id}`) })),
       ...(clients ?? []).map((c) => ({
         id: `client-${c.id}`,
