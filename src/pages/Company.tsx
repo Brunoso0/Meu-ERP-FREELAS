@@ -62,13 +62,12 @@ function completeness(profile: Profile | undefined, businessType: string | null 
   return { items, done: items.filter((i) => i.ok).length, next: items.find((i) => !i.ok) }
 }
 
-/** Quem é a empresa, em que plano está e o quanto do cadastro já está pronto. */
-function CompanyHeader({ profile, onGo }: { profile: Profile | undefined; onGo: (id: string) => void }) {
+/** No topo do menu lateral: quem é a empresa, o plano em vigor e o quanto do cadastro está pronto. */
+function SideIdentity({ profile, onGo }: { profile: Profile | undefined; onGo: (id: string) => void }) {
   const { workspace } = useActiveWorkspace()
   const { usage } = usePlan()
-  if (!profile || !workspace) return <Skeleton className="mb-5 h-24 w-full" />
+  if (!profile || !workspace) return <Skeleton className="hidden h-28 w-full lg:block" />
   const name = profile.company_name?.trim() || workspace.name
-  const detail = [profile.document, profile.email].filter(Boolean).join('  ·  ')
   const progress = completeness(profile, workspace.business_type)
   const pct = Math.round((progress.done / progress.items.length) * 100)
   const days = trialDaysLeft(usage)
@@ -78,33 +77,28 @@ function CompanyHeader({ profile, onGo }: { profile: Profile | undefined; onGo: 
       : { label: planNames[usage.plan], tone: usage.plan === 'free' ? ('slate' as const) : ('green' as const) }
     : null
   return (
-    <Card className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-4 p-5">
-      <div className="flex min-w-0 flex-1 items-center gap-4">
-        <Avatar name={name} className="h-12 w-12 text-sm" />
+    <div className="hidden rounded-xl border bg-white p-4 lg:block dark:bg-slate-900">
+      <div className="flex items-center gap-3">
+        <Avatar name={name} className="h-10 w-10 text-xs" />
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-base font-semibold">{name}</h2>
-            {plan && <Link to="/minha-empresa?secao=planos"><Badge tone={plan.tone}>{plan.label}</Badge></Link>}
-          </div>
-          <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">{detail || 'Complete os dados para que apareçam nos seus documentos.'}</p>
+          <p className="truncate text-sm font-semibold">{name}</p>
+          {plan && <Link to="/minha-empresa?secao=planos" className="mt-1 inline-block"><Badge tone={plan.tone}>{plan.label}</Badge></Link>}
         </div>
       </div>
-      <div className="w-full sm:w-72">
+      <div className="mt-4">
         <div className="flex items-center justify-between text-xs">
-          <span className="font-medium">Cadastro {pct}% completo</span>
+          <span className="font-medium">Cadastro {pct}%</span>
           {progress.next ? (
-            <button type="button" onClick={() => onGo(progress.next!.section)} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
-              Falta: {progress.next.label}
-            </button>
+            <button type="button" onClick={() => onGo(progress.next!.section)} className="font-medium text-brand-600 hover:underline dark:text-brand-400">Falta: {progress.next.label}</button>
           ) : (
-            <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> Tudo pronto</span>
+            <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> Completo</span>
           )}
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Cadastro completo">
           <div className="h-full rounded-full bg-brand-500 transition-[width] duration-500" style={{ width: `${pct}%` }} />
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -201,10 +195,9 @@ export default function Company() {
         </p>
       )}
 
-      <CompanyHeader profile={profile} onGo={(id) => go(id as CompanySectionId)} />
-
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[220px_1fr]">
         <nav ref={nav} aria-label="Seções" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:sticky lg:top-20 lg:mx-0 lg:flex-col lg:gap-5 lg:overflow-visible lg:px-0">
+          <SideIdentity profile={profile} onGo={(id) => go(id as CompanySectionId)} />
           {navGroups.map((g) => {
             const items = g.ids.map((id) => sectionItems.find((x) => x.id === id)).filter((x): x is (typeof sectionItems)[number] => !!x)
             if (!items.length) return null
