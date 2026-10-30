@@ -1,5 +1,6 @@
-# O sistema mora em /app: qualquer tela dele abre o app/index.html (o React Router decide o resto).
-/app/*  /app/index.html  200
+# O sistema mora em /app: qualquer tela dele abre o app (o React Router decide o resto).
+# O destino é /app/ (e não /app/index.html): com index.html o Cloudflare Pages devolvia a landing da raiz ao recarregar uma tela.
+/app/*  /app/  200
 
 # Endereços de antes da landing page (links de assinatura e convite já enviados, favoritos, app instalado).
 /assinar/*  /app/assinar/:splat  301
