@@ -13,6 +13,7 @@ import { useWorkspaceStore } from '@/store/workspace'
 import Login from '@/pages/Login'
 import { PlanGate } from '@/components/PlanGate'
 import ResetPassword from '@/pages/ResetPassword'
+import MfaChallenge from '@/pages/MfaChallenge'
 const QuickAccess = lazy(() => import('@/pages/QuickAccess'))
 const Engagement = lazy(() => import('@/pages/Engagement'))
 const Engagements = lazy(() => import('@/pages/Engagements'))
@@ -40,7 +41,7 @@ const PublicContract = lazy(() => import('@/pages/PublicContract'))
 
 export default function App() {
   const theme = useUI((s) => s.theme)
-  const { session, ready, recovering, doneRecovering } = useAuth()
+  const { session, ready, recovering, mfaPending, doneRecovering } = useAuth()
   useSessionGuard(session)
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export default function App() {
     lastUserId.current = userId
   }, [userId, queryClient])
 
-  const needsLogin = isSupabaseConfigured && (!session || recovering)
+  const needsLogin = isSupabaseConfigured && (!session || recovering || mfaPending)
   // o link de assinatura é aberto pelo cliente, que não tem (nem precisa de) login
   const isPublicPage = useLocation().pathname.startsWith('/assinar/')
 
@@ -80,6 +81,9 @@ export default function App() {
         <div className="flex min-h-screen items-center justify-center">
           <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
         </div>
+      ) : mfaPending ? (
+        // vale também no link de "esqueci a senha": com a verificação ativa, o código vem antes da nova senha
+        <MfaChallenge />
       ) : recovering ? (
         <ResetPassword onDone={doneRecovering} />
       ) : needsLogin ? (

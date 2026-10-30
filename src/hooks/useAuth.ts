@@ -8,6 +8,8 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(!supabase)
   const [recovering, setRecovering] = useState(false)
+  // nível da sessão: quem ativou a verificação em duas etapas só segue depois de digitar o código (aal2)
+  const [mfa, setMfa] = useState<{ uid: string; pending: boolean } | null>(null)
 
   useEffect(() => {
     if (!supabase) return
@@ -23,10 +25,27 @@ export function useAuth() {
     return () => data.subscription.unsubscribe()
   }, [])
 
+  const uid = session?.user.id
+  useEffect(() => {
+    if (!supabase || !uid) return
+    let live = true
+    supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data }) => {
+      if (live) setMfa({ uid, pending: data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2' })
+    })
+    return () => {
+      live = false
+    }
+    // o token muda ao confirmar o código (aal2) e ao renovar: reavalia sem piscar a tela
+  }, [uid, session?.access_token])
+
+  // enquanto o nível não é conhecido, o app não abre (evita um instante de telas sem dados)
+  const mfaKnown = !session || mfa?.uid === uid
+
   return {
     session,
-    ready,
+    ready: ready && mfaKnown,
     recovering,
+    mfaPending: Boolean(session && mfa?.uid === uid && mfa?.pending),
     doneRecovering: () => setRecovering(false),
     signOut: () => {
       clearSessionMarks()
