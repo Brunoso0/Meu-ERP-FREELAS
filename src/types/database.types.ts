@@ -361,6 +361,8 @@ export type PlanId = 'free' | 'essential' | 'pro'
 export type SubscriptionStatus = 'none' | 'trialing' | 'active' | 'past_due' | 'canceled' | 'courtesy'
 export type TeamSize = 'solo' | '2-5' | '6-15' | '16+'
 
+export type AcquisitionSource = 'instagram' | 'indicacao' | 'google' | 'workana' | 'youtube' | 'whatsapp' | 'outro'
+
 export interface Workspace {
   id: string
   name: string
@@ -388,6 +390,14 @@ export interface Workspace {
   team_size: TeamSize | null
   segment: string | null
   onboarded_at: string | null
+  address_zip: string | null
+  address_street: string | null
+  address_number: string | null
+  address_complement: string | null
+  address_district: string | null
+  address_city: string | null
+  address_state: string | null
+  acquisition_source: AcquisitionSource | null
   plan_id: PlanId
   subscription_status: SubscriptionStatus
   trial_ends_at: string | null

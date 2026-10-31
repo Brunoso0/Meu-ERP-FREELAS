@@ -155,6 +155,14 @@ export interface BusinessProfile {
   company_name?: string
   document?: string
   segment?: string
+  phone?: string
+  address_zip?: string
+  address_street?: string
+  address_number?: string
+  address_district?: string
+  address_city?: string
+  address_state?: string
+  acquisition_source?: string
 }
 
 /** Grava a entrevista (ou a edição do perfil do negócio) no workspace. */
@@ -167,6 +175,9 @@ export async function saveBusinessProfile(workspaceId: string, profile: Business
     segment: profile.segment?.trim() || null,
   }
   if (profile.document !== undefined) patch.document = profile.document.trim() || null
+  for (const key of ['phone', 'address_zip', 'address_street', 'address_number', 'address_district', 'address_city', 'address_state', 'acquisition_source'] as const) {
+    if (profile[key] !== undefined) patch[key] = profile[key]?.trim() || null
+  }
   if (name) {
     patch.company_name = name
     patch.name = name

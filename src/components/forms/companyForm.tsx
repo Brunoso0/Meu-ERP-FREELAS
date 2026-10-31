@@ -11,7 +11,7 @@ import { PrivacySettings } from '@/components/auth/PrivacySettings'
 import { ReminderSettings } from '@/components/reminders/ReminderSettings'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { billingProviders, billingTypes } from '@/lib/billing'
-import { maskCpfCnpj, maskPhone } from '@/lib/utils'
+import { maskCep, maskCpfCnpj, maskPhone } from '@/lib/utils'
 
 const text = z.string()
 const email = z.string().email('E-mail inválido').or(z.literal(''))
@@ -25,6 +25,13 @@ export const companySchema = z.object({
   document,
   email,
   phone,
+  address_zip: text.refine((v) => v === '' || v.replace(/\D/g, '').length === 8, 'CEP incompleto'),
+  address_street: text.max(150, 'Até 150 caracteres'),
+  address_number: text.max(20, 'Até 20 caracteres'),
+  address_complement: text.max(80, 'Até 80 caracteres'),
+  address_district: text.max(80, 'Até 80 caracteres'),
+  address_city: text.max(80, 'Até 80 caracteres'),
+  address_state: text.refine((v) => v === '' || /^[A-Z]{2}$/.test(v), 'Use a sigla do estado'),
   pix_key: text.max(140, 'Chave muito longa'),
   pix_qr_image: text.refine((v) => v === '' || v.startsWith('data:image/'), 'Imagem inválida'),
   signature_image: text.refine((v) => v === '' || (v.startsWith('data:image/png;base64,') && v.length <= 200000), 'Assinatura inválida'),
@@ -81,6 +88,13 @@ export const companySections: CompanySection[] = [
       { name: 'document', label: 'CPF / CNPJ', mask: maskCpfCnpj, placeholder: '00.000.000/0000-00', full: true, group: 'Identidade' },
       { name: 'phone', label: 'WhatsApp', mask: maskPhone, placeholder: '(00) 00000-0000', group: 'Contato', groupHint: 'Como o seu cliente fala com você.' },
       { name: 'email', label: 'E-mail de contato', type: 'email', group: 'Contato' },
+      { name: 'address_zip', label: 'CEP', mask: maskCep, placeholder: '00000-000', group: 'Endereço', groupHint: 'Aparece nas propostas, contratos e cobranças.' },
+      { name: 'address_street', label: 'Rua', group: 'Endereço' },
+      { name: 'address_number', label: 'Número', group: 'Endereço' },
+      { name: 'address_complement', label: 'Complemento', group: 'Endereço' },
+      { name: 'address_district', label: 'Bairro', group: 'Endereço' },
+      { name: 'address_city', label: 'Cidade', group: 'Endereço' },
+      { name: 'address_state', label: 'UF', mask: (v: string) => v.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2), placeholder: 'BA', group: 'Endereço' },
       { name: 'signature_image', label: 'Sua assinatura', type: 'signature', hint: 'Sai no campo do emitente das propostas e dos contratos, inclusive nos links enviados para o cliente assinar.', group: 'Assinatura', groupHint: 'Usada nas propostas e nos contratos.' },
     ],
   },
