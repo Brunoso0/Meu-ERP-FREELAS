@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { KeyRound, Loader2, ShieldCheck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { activeFactor, recoverWithCode, verifyCode } from '@/lib/mfa'
+import { activeFactor, recoverWithCode, TRUST_DAYS, trustThisDevice, verifyCode } from '@/lib/mfa'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 
 /** Segundo passo do login: o código de 6 dígitos do app autenticador (ou um código de recuperação). */
 export default function MfaChallenge() {
-  const { signOut } = useAuth()
+  const { session, signOut } = useAuth()
   const queryClient = useQueryClient()
   const [factorId, setFactorId] = useState<string | null>(null)
   const [recovery, setRecovery] = useState(false)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
+  const [remember, setRemember] = useState(true)
 
   useEffect(() => {
     activeFactor()
@@ -31,6 +32,8 @@ export default function MfaChallenge() {
         toast.success('Verificação em duas etapas desativada', { description: 'Ative de novo em Minha empresa > Segurança e gere novos códigos.' })
       } else if (factorId) {
         await verifyCode(factorId, code)
+        // a sessão já vale como confirmada: se a pessoa quiser, este aparelho passa a ser reconhecido
+        if (remember && session) await trustThisDevice(session.user.id).catch(() => toast.info('Não foi possível lembrar este aparelho', { description: 'O código será pedido no próximo login.' }))
       }
       // o que foi consultado antes do código voltou vazio (a sessão ainda não valia): refaz tudo
       await queryClient.resetQueries()
@@ -69,6 +72,15 @@ export default function MfaChallenge() {
             className={input}
           />
         </div>
+        {!recovery && (
+          <label className="flex items-start gap-2 text-sm text-slate-300">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 accent-indigo-500" />
+            <span>
+              Confiar neste aparelho por {TRUST_DAYS} dias
+              <span className="block text-xs text-slate-500">Não use em computador de uso público ou compartilhado.</span>
+            </span>
+          </label>
+        )}
         <button type="submit" disabled={busy || !ready || (!recovery && !factorId)} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-60">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : recovery ? 'Usar código e entrar' : 'Confirmar'}
         </button>
