@@ -1,15 +1,16 @@
 /*
  * Dados de quem responde pelo serviço nos Termos e na Política de Privacidade.
- * Preencha antes de divulgar: enquanto estiverem vazios, os textos mostram o canal de contato do app.
+ * ATENÇÃO: dados FICTÍCIOS até a empresa e o domínio existirem. Troque antes de divulgar de verdade;
+ * se ficarem null, os textos mostram o canal de contato do app.
  */
 export const LEGAL = {
   product: 'Krono',
   /** Razão social ou nome de quem opera o serviço (controlador). */
-  legalName: null as string | null,
+  legalName: 'Krono Tecnologia Ltda. (dados fictícios)' as string | null,
   /** CNPJ (ou CPF) de quem opera o serviço. */
-  document: null as string | null,
+  document: 'CNPJ 00.000.000/0001-00' as string | null,
   /** E-mail para pedidos de privacidade e suporte. */
-  contactEmail: null as string | null,
+  contactEmail: 'contato@krono.example' as string | null,
   /** Data da última revisão dos textos. */
   updatedAt: '30 de outubro de 2026',
 }
