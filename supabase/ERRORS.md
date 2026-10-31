@@ -36,3 +36,19 @@ telas visitadas, chamadas de rede (método, endereço sem parâmetros e com ids 
 e toques em botões identificados só por id ou rótulo de acessibilidade. Nunca vão texto digitado, conteúdo de
 telas, corpo de requisições, nome ou e-mail. Erros com mais de 90 dias são apagados sozinhos. Para limpar à mão:
 `delete from public.client_errors;`.
+
+## Painel do Krono (super admin)
+
+Os erros também aparecem na tela **Painel do Krono** (menu lateral, só para administradores), aba Erros.
+Quem é administrador fica na tabela `platform_admins`, que o app não lê nem grava. Para incluir ou remover
+alguém, rode no SQL Editor do Supabase:
+
+```sql
+insert into public.platform_admins (user_id, note)
+select id, 'dono' from auth.users where email = 'EMAIL-DA-PESSOA';
+
+-- para remover
+delete from public.platform_admins where user_id = (select id from auth.users where email = 'EMAIL-DA-PESSOA');
+```
+
+O painel exige a verificação em duas etapas ativa e o código confirmado na sessão.
