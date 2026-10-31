@@ -1,0 +1,88 @@
+# Backup diário do banco de PRODUÇÃO, criptografado.
+#
+# Gera o dump (estrutura, dados do app e usuários do Auth), junta num arquivo, criptografa com a
+# frase-senha BACKUP_PASSPHRASE e guarda como artefato por 30 dias. O repositório é público: o
+# arquivo SÓ sai do runner criptografado, e nada do conteúdo vai para o log.
+#
+# Como o backup roda sozinho, ele NÃO usa o ambiente "production" (que pede aprovação a cada
+# execução). Crie um ambiente à parte chamado "backup" em Settings → Environments, restrito à
+# branch main (Deployment branches), com:
+#   variável SUPABASE_PROJECT_REF   id do projeto de produção
+#   segredo  SUPABASE_DB_PASSWORD   senha do banco de produção
+#   segredo  BACKUP_PASSPHRASE      frase-senha longa (guarde também no gerenciador de senhas:
+#                                   sem ela o backup não abre)
+# e o repositório precisa do segredo SUPABASE_ACCESS_TOKEN (o mesmo da publicação).
+#
+# Para restaurar, veja supabase/BACKUP.md.
+name: Backup
+
+on:
+  schedule:
+    - cron: '17 6 * * *' # 03:17 em Salvador
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup do banco de produção
+    runs-on: ubuntu-latest
+    environment: backup
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+
+      - name: Conferir configuração do ambiente "backup"
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "::error::Falta o segredo SUPABASE_ACCESS_TOKEN no repositório"; exit 1; }
+          test -n "$SUPABASE_DB_PASSWORD" || { echo "::error::Falta o segredo SUPABASE_DB_PASSWORD no ambiente backup"; exit 1; }
+          test -n "$BACKUP_PASSPHRASE" || { echo "::error::Falta o segredo BACKUP_PASSPHRASE no ambiente backup"; exit 1; }
+          test -n "$PROJECT_REF" || { echo "::error::Falta a variável SUPABASE_PROJECT_REF no ambiente backup"; exit 1; }
+          test "${#BACKUP_PASSPHRASE}" -ge 20 || { echo "::error::BACKUP_PASSPHRASE precisa ter ao menos 20 caracteres"; exit 1; }
+
+      - run: supabase link --project-ref "$PROJECT_REF"
+
+      - name: Gerar o dump
+        run: |
+          mkdir -p dump
+          supabase db dump --linked -f dump/schema.sql
+          supabase db dump --linked --data-only --use-copy -f dump/data.sql
+          supabase db dump --linked --data-only --use-copy --schema auth -f dump/auth-data.sql
+          supabase db dump --linked --role-only -f dump/roles.sql
+
+      - name: Conferir que o dump não está vazio
+        run: |
+          grep -q "CREATE TABLE" dump/schema.sql || { echo "::error::schema.sql sem tabelas"; exit 1; }
+          test "$(wc -c < dump/data.sql)" -gt 1000 || { echo "::error::data.sql pequeno demais"; exit 1; }
+          grep -q "auth.users\|\"auth\".\"users\"" dump/auth-data.sql || { echo "::error::auth-data.sql sem usuários"; exit 1; }
+
+      - name: Criptografar
+        run: |
+          name="krono-backup-$(date -u +%Y-%m-%d)"
+          tar -czf "$name.tar.gz" dump
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 -o "$name.tar.gz.gpg" "$name.tar.gz"
+          rm -rf dump "$name.tar.gz"
+          echo "BACKUP_FILE=$name.tar.gz.gpg" >> "$GITHUB_ENV"
+          ls -l "$name.tar.gz.gpg"
+
+      - name: Guardar por 30 dias (criptografado)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30
+          if-no-files-found: error
