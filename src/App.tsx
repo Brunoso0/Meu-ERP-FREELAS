@@ -34,6 +34,7 @@ const ProposalGenerator = lazy(() => import('@/pages/tools/ProposalGenerator'))
 const ContractGenerator = lazy(() => import('@/pages/tools/ContractGenerator'))
 const LeadFinder = lazy(() => import('@/pages/tools/LeadFinder'))
 const InvoiceGenerator = lazy(() => import('@/pages/tools/InvoiceGenerator'))
+const Admin = lazy(() => import('@/pages/Admin'))
 const Team = lazy(() => import('@/pages/Team'))
 const AcceptInvite = lazy(() => import('@/pages/AcceptInvite'))
 const PublicProposal = lazy(() => import('@/pages/PublicProposal'))
@@ -114,6 +115,7 @@ export default function App() {
             <Route path="metas" element={<Goals />} />
             <Route path="minha-empresa" element={<Company />} />
             <Route path="equipe" element={<Team />} />
+            <Route path="admin" element={<Admin />} />
             <Route path="convite/:token" element={<AcceptInvite />} />
             <Route path="ferramentas/calculadora" element={<BudgetCalculator />} />
             <Route path="ferramentas/orcamento" element={<QuoteGenerator />} />

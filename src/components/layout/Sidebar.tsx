@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, Download, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { ChevronDown, Download, ShieldCheck, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { Avatar } from '@/components/ui/primitives'
 import { Tip } from '@/components/ui/overlays'
 import { useTable } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
 import { useNarrowScreen } from '@/hooks/useMediaQuery'
+import { useAdminStatus } from '@/lib/admin'
 import { useInstallApp } from '@/lib/pwa'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
@@ -96,6 +97,7 @@ export function Sidebar() {
   const profile = useTable('profiles').data?.[0]
   const { signOut } = useAuth()
   const install = useInstallApp()
+  const adminStatus = useAdminStatus().data
   const name = profile?.full_name || profile?.email || 'Usuário'
 
   return (
@@ -150,6 +152,7 @@ export function Sidebar() {
         </nav>
 
         <div className="space-y-1 border-t p-2">
+          {adminStatus && adminStatus !== 'none' && <NavRow item={{ to: '/admin', label: 'Painel do Krono', icon: ShieldCheck }} collapsed={collapsed} />}
           {install && (
             <Tip label="Instalar app" disabled={!collapsed}>
               <button
