@@ -118,7 +118,7 @@ export async function deleteWorkspace(workspaceId: string, confirmName: string):
   await rpc('delete_workspace', { p_workspace: workspaceId, p_confirm_name: confirmName })
 }
 
-async function removeFolder(prefix: string): Promise<void> {
+export async function removeFolder(prefix: string): Promise<void> {
   if (!supabase) throw demoOnly()
   const bucket = supabase.storage.from('proofs')
   const { data, error } = await bucket.list(prefix, { limit: 1000 })

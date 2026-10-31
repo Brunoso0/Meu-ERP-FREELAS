@@ -37,6 +37,8 @@ const InvoiceGenerator = lazy(() => import('@/pages/tools/InvoiceGenerator'))
 const Team = lazy(() => import('@/pages/Team'))
 const AcceptInvite = lazy(() => import('@/pages/AcceptInvite'))
 const PublicProposal = lazy(() => import('@/pages/PublicProposal'))
+const Terms = lazy(() => import('@/pages/Legal').then((m) => ({ default: m.Terms })))
+const Privacy = lazy(() => import('@/pages/Legal').then((m) => ({ default: m.Privacy })))
 const PublicContract = lazy(() => import('@/pages/PublicContract'))
 
 export default function App() {
@@ -64,7 +66,8 @@ export default function App() {
 
   const needsLogin = isSupabaseConfigured && (!session || recovering || mfaPending)
   // o link de assinatura é aberto pelo cliente, que não tem (nem precisa de) login
-  const isPublicPage = useLocation().pathname.startsWith('/assinar/')
+  const pathname = useLocation().pathname
+  const isPublicPage = pathname.startsWith('/assinar/') || pathname === '/termos' || pathname === '/privacidade'
 
   return (
     <>
@@ -75,6 +78,8 @@ export default function App() {
           <Routes>
             <Route path="assinar/contrato/:token" element={<PublicContract />} />
             <Route path="assinar/:token" element={<PublicProposal />} />
+            <Route path="termos" element={<Terms />} />
+            <Route path="privacidade" element={<Privacy />} />
           </Routes>
         </Suspense>
       ) : !ready ? (

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { ArrowRight, Eye, EyeOff, Fingerprint, Loader2, Lock, Mail, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { TERMS_VERSION } from '@/lib/legal'
 import { APP_BASE, appUrl } from '@/lib/app-base'
 import { cn } from '@/lib/utils'
 import { biometricAvailable, biometricDevice, enableBiometric, isBiometricCancel, markActive, signInWithBiometric, takeExpiredNotice } from '@/lib/session'
@@ -42,6 +43,7 @@ export default function Login() {
   // a landing page abre direto no cadastro (/app/?cadastro)
   const [mode, setMode] = useState<'login' | 'signup'>(() => (new URLSearchParams(window.location.search).has('cadastro') ? 'signup' : 'login'))
   const [sentTo, setSentTo] = useState<string | null>(null)
+  const [accepted, setAccepted] = useState(false)
   const signup = mode === 'signup'
   const invited = window.location.pathname.startsWith(`${APP_BASE}/convite/`)
 
@@ -73,11 +75,12 @@ export default function Login() {
     if (signup) {
       const name = values.name?.trim()
       if (!name) return void toast.error('Informe o seu nome')
+      if (!accepted) return void toast.error('Aceite os termos de uso e a política de privacidade para criar a conta')
       const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         // o e-mail de confirmação traz a pessoa de volta para cá (inclusive para o link de convite)
-        options: { data: { full_name: name }, emailRedirectTo: window.location.origin + window.location.pathname },
+        options: { data: { full_name: name, terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString() }, emailRedirectTo: window.location.origin + window.location.pathname },
       })
       if (error) return void toast.error('Não foi possível criar a conta', { description: error.message })
       // e-mail já cadastrado: o Supabase não revela (devolve uma conta sem identidades)
@@ -206,6 +209,8 @@ export default function Login() {
             </button>
           </div>
 
+          {signup && <p className="mb-4 text-center text-[11px] text-slate-500">Ao entrar com Google ou GitHub você aceita os <a href={`${APP_BASE}/termos`} target="_blank" rel="noreferrer" className="underline">termos</a> e a <a href={`${APP_BASE}/privacidade`} target="_blank" rel="noreferrer" className="underline">política de privacidade</a>.</p>}
+
           <div className="mb-6 flex items-center py-1">
             <div className="flex-grow border-t border-slate-800" />
             <span className="mx-4 flex-shrink text-[11px] font-semibold uppercase tracking-wider text-slate-500">ou com e-mail</span>
@@ -273,6 +278,17 @@ export default function Login() {
               </div>
               {errors.password && <p className="mt-1.5 text-xs text-red-400">{errors.password.message}</p>}
             </div>
+
+            {signup && (
+              <label className="flex items-start gap-2.5 text-xs leading-relaxed text-slate-400">
+                <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-600 bg-slate-900 accent-indigo-500" />
+                <span>
+                  Li e aceito os{' '}
+                  <a href={`${APP_BASE}/termos`} target="_blank" rel="noreferrer" className="font-semibold text-indigo-400 hover:text-indigo-300">termos de uso</a> e a{' '}
+                  <a href={`${APP_BASE}/privacidade`} target="_blank" rel="noreferrer" className="font-semibold text-indigo-400 hover:text-indigo-300">política de privacidade</a>.
+                </span>
+              </label>
+            )}
 
             <button
               type="submit"
