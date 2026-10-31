@@ -152,7 +152,7 @@ export function Sidebar() {
         </nav>
 
         <div className="space-y-1 border-t p-2">
-          {adminStatus && adminStatus !== 'none' && <NavRow item={{ to: '/admin', label: 'Painel do Krono', icon: ShieldCheck }} collapsed={collapsed} />}
+          {adminStatus && adminStatus !== 'none' && <NavRow item={{ to: '/admin', label: 'Modo administrador', icon: ShieldCheck }} collapsed={collapsed} />}
           {install && (
             <Tip label="Instalar app" disabled={!collapsed}>
               <button
