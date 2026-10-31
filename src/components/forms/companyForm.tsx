@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { Bell, Building2, Plug, ReceiptText, ShieldCheck, type LucideIcon } from 'lucide-react'
 import type { FieldDef } from './EntityForm'
+import { GatewayCatalog } from '@/components/billing/GatewayCatalog'
 import { GatewayConnection } from '@/components/billing/GatewayConnection'
 import { NfseServicesEditor } from '@/components/billing/NfseServicesEditor'
 import { BiometricSettings } from '@/components/auth/BiometricSettings'
@@ -94,6 +95,7 @@ export const companySections: CompanySection[] = [
       { name: 'pix_qr_image', group: 'Como você recebe', label: 'QR Code Pix', type: 'image', hint: 'Imagem do QR Code gerado no app do seu banco. Aparece nos orçamentos.', showWhen: (v) => !asaas(v) },
       { name: 'billing_asaas_hint', group: 'Como você recebe', label: '', type: 'custom', showWhen: asaas, render: () => note(billingProviders.asaas.hint) },
       { name: 'billing_gateway', group: 'Como você recebe', label: 'Conexão', type: 'custom', showWhen: asaas, render: ({ setValue }) => <GatewayConnection onProviderChange={(provider) => setValue('billing_provider', provider)} /> },
+      { name: 'billing_catalog', group: 'Gateways de pagamento', groupHint: 'Mais formas de cobrar estão a caminho. Por enquanto, só o Asaas está disponível.', label: '', type: 'custom', render: () => <GatewayCatalog /> },
       { name: 'billing_types', group: 'Regras da cobrança', groupHint: 'Multa, juros, desconto e avisos ao cliente. Valem para as cobranças geradas pelo Asaas.', label: 'Formas de pagamento aceitas', type: 'select', options: billingTypes, full: true, showWhen: asaas },
       { name: 'billing_fine_pct', group: 'Regras da cobrança', label: 'Multa por atraso (%)', type: 'number', hint: 'Cobrada uma vez, logo após o vencimento. Para pessoa física (consumidor), a lei limita a 2%.', showWhen: asaas },
       { name: 'billing_interest_pct', group: 'Regras da cobrança', label: 'Juros ao mês (%)', type: 'number', hint: 'Proporcionais aos dias de atraso. Comum: 1% ao mês.', showWhen: asaas },

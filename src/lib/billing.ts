@@ -30,6 +30,17 @@ export const billingProviders: Record<BillingProvider, { label: string; hint: st
   asaas: { label: 'Asaas: cobrança com vencimento, multa e juros', hint: 'Cada recebimento vira uma cobrança no Asaas (Pix, boleto ou cartão), com multa e juros após o vencimento e baixa automática quando o cliente paga.' },
 }
 
+/**
+ * Gateways que o Krono vai oferecer. Só o Asaas funciona hoje; os outros aparecem na tela de
+ * Integrações como "em breve" (ainda não há conexão, e `billing_provider` só aceita simple e asaas).
+ */
+export const gatewayCatalog = [
+  { id: 'asaas', name: 'Asaas', hint: 'Pix, boleto e cartão com multa, juros e baixa automática.', available: true },
+  { id: 'mercadopago', name: 'Mercado Pago', hint: 'Pix, cartão e boleto pela sua conta do Mercado Pago.', available: false },
+  { id: 'abacatepay', name: 'AbacatePay', hint: 'Cobranças por Pix com integração simples.', available: false },
+  { id: 'infinitepay', name: 'InfinitePay', hint: 'Pix e cartão pela sua conta da InfinitePay.', available: false },
+] as const
+
 export const billingTypes = [
   { value: 'UNDEFINED', label: 'O cliente escolhe (Pix, boleto ou cartão)' },
   { value: 'PIX', label: 'Só Pix' },
