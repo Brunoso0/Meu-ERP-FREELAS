@@ -7,6 +7,7 @@ import { NfseServicesEditor } from '@/components/billing/NfseServicesEditor'
 import { BiometricSettings } from '@/components/auth/BiometricSettings'
 import { EmailSettings, PasswordSettings } from '@/components/auth/AccountSettings'
 import { TwoFactorSettings } from '@/components/auth/TwoFactorSettings'
+import { PrivacySettings } from '@/components/auth/PrivacySettings'
 import { ReminderSettings } from '@/components/reminders/ReminderSettings'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { billingProviders, billingTypes } from '@/lib/billing'
@@ -132,13 +133,14 @@ export const companySections: CompanySection[] = [
         {
           id: 'seguranca' as const,
           label: 'Segurança',
-          description: 'E-mail e senha de login, verificação em duas etapas e biometria.',
+          description: 'E-mail e senha de login, verificação em duas etapas, biometria e seus dados.',
           icon: ShieldCheck,
           fields: [
             { name: 'login_email', group: 'E-mail de login', groupHint: 'O e-mail que você usa para entrar no app.', label: 'E-mail de login', type: 'custom', render: () => <EmailSettings /> },
             { name: 'login_password', group: 'Senha', groupHint: 'Troque a senha quando quiser.', label: 'Senha', type: 'custom', render: () => <PasswordSettings /> },
             { name: 'two_factor', group: 'Verificação em duas etapas', groupHint: 'Um código do seu celular, além da senha, para entrar.', label: 'Verificação em duas etapas', type: 'custom', render: () => <TwoFactorSettings /> },
             { name: 'biometric_device', group: 'Biometria', groupHint: 'Entre no app com a digital ou o rosto neste aparelho.', label: 'Biometria', type: 'custom', render: () => <BiometricSettings /> },
+            { name: 'privacy_data', group: 'Seus dados', groupHint: 'Baixe uma cópia ou apague a sua conta (LGPD).', label: 'Seus dados', type: 'custom', render: () => <PrivacySettings /> },
           ] as FieldDef[],
         },
       ]
