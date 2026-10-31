@@ -33,6 +33,24 @@ select is((select length(app_version) from public.client_errors where message li
 select lives_ok($$ select public.report_client_error('   ') $$, 'mensagem vazia aceita');
 select is((select count(*) from public.client_errors where message = 'erro sem mensagem'), 1::bigint, 'com texto padrão');
 
+
+-- versão 2: contexto, rastro e pessoas afetadas
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated","aal":"aal2"}';
+select lives_ok($$ select public.report_client_error('Erro com contexto', 'pilha', '/app/clientes', 'Chrome', 'v1', 'react', null, '{"viewport":"390x844"}', '[{"t":1,"type":"nav","to":"/app/clientes"}]') $$, 'aceita contexto e rastro');
+select lives_ok($$ select public.report_client_error('Erro com contexto', 'pilha', '/app/clientes', 'Chrome', 'v1', 'react') $$, 'mesmo erro de novo');
+reset role;
+select is((select count from public.client_errors where message = 'Erro com contexto'), 2, 'conta repetições');
+select is((select kind from public.client_errors where message = 'Erro com contexto'), 'react', 'guarda o tipo');
+select is((select context->>'viewport' from public.client_errors where message = 'Erro com contexto'), '390x844', 'guarda o contexto e não o apaga na repetição sem contexto');
+select is((select cardinality(user_ids) from public.client_errors where message = 'Erro com contexto'), 1, 'mesma pessoa conta uma vez');
+select lives_ok($$ select public.report_client_error('Erro com contexto', 'pilha', '/app', 'Chrome', 'v1', 'react') $$, 'anônimo repete o erro');
+select is((select cardinality(user_ids) from public.client_errors where message = 'Erro com contexto'), 1, 'anônimo não entra na contagem de pessoas');
+set local role anon;
+select lives_ok($$ select public.report_client_error('Enorme', null, '/', null, null, null, null, (select jsonb_build_object('x', repeat('a', 5000))), null) $$, 'contexto gigante não quebra');
+reset role;
+select is((select context from public.client_errors where message = 'Enorme'), '{"truncado": true}'::jsonb, 'contexto gigante é descartado');
+
 select pass('erros ok');
 select * from finish();
 rollback;

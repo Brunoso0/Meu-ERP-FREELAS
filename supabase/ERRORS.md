@@ -13,10 +13,26 @@ from public.client_errors order by last_seen desc limit 50;
 -- os que mais acontecem
 select count, message, path, last_seen from public.client_errors order by count desc limit 20;
 
--- a pilha de um erro
-select stack from public.client_errors where id = 123;
+-- a ficha completa de um erro: tipo, tela, versão, aparelho e o rastro do que veio antes
+select kind, message, path, app_version, count, cardinality(user_ids) as pessoas, workspace_id,
+       context, breadcrumbs, stack
+from public.client_errors where id = 123;
+
+-- erros que afetam mais gente
+select cardinality(user_ids) as pessoas, count, kind, message, path from public.client_errors
+order by pessoas desc, count desc limit 20;
+
+-- só os de uma versão publicada (o código é o início do commit)
+select last_seen, kind, message, path from public.client_errors where app_version = 'abc1234' order by last_seen desc;
 ```
 
-O que se guarda: mensagem e pilha (cortadas), caminho sem parâmetros, navegador, versão e o id de quem
-estava logado (sem nome nem e-mail). Erros com mais de 90 dias são apagados sozinhos. Para limpar à mão:
+Tipos (`kind`): `tela` (a tela quebrou ao desenhar), `janela` (erro solto), `promessa` (promessa rejeitada),
+`rede` (o servidor respondeu 5xx), `consulta` e `acao` (falhas ao carregar ou gravar dados).
+
+O que se guarda: mensagem e pilha (cortadas), tipo, caminho sem parâmetros, versão publicada, workspace,
+navegador, tamanho da tela, idioma, fuso, se estava offline ou como app instalado, a pilha de componentes
+(erros de tela), quantas pessoas diferentes foram afetadas (só os ids) e um rastro das últimas ~20 ações:
+telas visitadas, chamadas de rede (método, endereço sem parâmetros e com ids trocados por `:id`, status e tempo)
+e toques em botões identificados só por id ou rótulo de acessibilidade. Nunca vão texto digitado, conteúdo de
+telas, corpo de requisições, nome ou e-mail. Erros com mais de 90 dias são apagados sozinhos. Para limpar à mão:
 `delete from public.client_errors;`.

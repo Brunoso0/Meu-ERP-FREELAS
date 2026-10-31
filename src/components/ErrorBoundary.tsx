@@ -10,7 +10,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    reportError(error, `tela quebrou${info.componentStack ? ` em${info.componentStack.split('\n')[1]?.trim().replace(/^at /, ' ') ?? ''}` : ''}`)
+    const stack = (info.componentStack ?? '').split('\n').map((l) => l.trim().replace(/^at /, '').replace(/ \(.*\)$/, '')).filter(Boolean)
+    reportError(error, { kind: 'tela', where: `tela quebrou em ${stack[0] ?? '?'}`, extra: { componentes: stack.slice(0, 8).join(' < ') } })
   }
 
   render() {
