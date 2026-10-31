@@ -202,7 +202,11 @@ async function cardLink(ws: WorkspaceRow) {
 
 async function cancel(ws: WorkspaceRow) {
   if (!ws.asaas_subscription_id) throw new Problem('Este workspace não tem assinatura.')
-  await asaas('DELETE', `/subscriptions/${ws.asaas_subscription_id}`)
+  // assinatura que o Asaas já removeu (cancelada lá, sem avisar o app): o Asaas recusa o pedido e o workspace
+  // ficaria preso ao id antigo. Só falha de verdade (fora do ar, chave inválida) interrompe.
+  await asaas('DELETE', `/subscriptions/${ws.asaas_subscription_id}`).catch((e) => {
+    if (!(e instanceof Problem) || e.status !== 400) throw e
+  })
   // o plano vale até o fim do período já pago; sem pagamento, volta ao Grátis na hora
   await admin
     .from('workspaces')
