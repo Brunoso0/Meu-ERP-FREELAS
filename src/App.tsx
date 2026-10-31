@@ -34,7 +34,14 @@ const ProposalGenerator = lazy(() => import('@/pages/tools/ProposalGenerator'))
 const ContractGenerator = lazy(() => import('@/pages/tools/ContractGenerator'))
 const LeadFinder = lazy(() => import('@/pages/tools/LeadFinder'))
 const InvoiceGenerator = lazy(() => import('@/pages/tools/InvoiceGenerator'))
-const Admin = lazy(() => import('@/pages/Admin'))
+const AdminLayout = lazy(() => import('@/components/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })))
+const AdminOverview = lazy(() => import('@/pages/admin/Overview'))
+const AdminMetrics = lazy(() => import('@/pages/admin/Metrics'))
+const AdminFinance = lazy(() => import('@/pages/admin/Finance'))
+const AdminSubscribers = lazy(() => import('@/pages/admin/Subscribers'))
+const AdminPlans = lazy(() => import('@/pages/admin/Plans'))
+const AdminErrors = lazy(() => import('@/pages/admin/Errors'))
+const AdminAudit = lazy(() => import('@/pages/admin/Audit'))
 const Team = lazy(() => import('@/pages/Team'))
 const AcceptInvite = lazy(() => import('@/pages/AcceptInvite'))
 const PublicProposal = lazy(() => import('@/pages/PublicProposal'))
@@ -97,6 +104,15 @@ export default function App() {
       ) : (
         <WorkspaceGate>
         <Routes>
+          <Route path="admin" element={<Suspense fallback={null}><AdminLayout /></Suspense>}>
+            <Route index element={<AdminOverview />} />
+            <Route path="metricas" element={<AdminMetrics />} />
+            <Route path="financeiro" element={<AdminFinance />} />
+            <Route path="assinantes" element={<AdminSubscribers />} />
+            <Route path="planos" element={<AdminPlans />} />
+            <Route path="erros" element={<AdminErrors />} />
+            <Route path="registro" element={<AdminAudit />} />
+          </Route>
           <Route element={<AppLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="acesso-rapido" element={<QuickAccess />} />
@@ -115,7 +131,6 @@ export default function App() {
             <Route path="metas" element={<Goals />} />
             <Route path="minha-empresa" element={<Company />} />
             <Route path="equipe" element={<Team />} />
-            <Route path="admin" element={<Admin />} />
             <Route path="convite/:token" element={<AcceptInvite />} />
             <Route path="ferramentas/calculadora" element={<BudgetCalculator />} />
             <Route path="ferramentas/orcamento" element={<QuoteGenerator />} />

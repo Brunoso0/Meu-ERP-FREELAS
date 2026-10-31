@@ -91,8 +91,52 @@ export interface AdminAuditRow {
 }
 
 export const adminOverview = () => rpc<AdminOverview>('admin_overview')
-export const adminWorkspaces = (search: string, offset = 0) => rpc<{ total: number; rows: AdminWorkspace[] }>('admin_workspaces', { p_search: search || null, p_limit: 50, p_offset: offset })
+export const adminWorkspaces = (search: string, status = '', offset = 0) => rpc<{ total: number; rows: AdminWorkspace[] }>('admin_workspaces', { p_search: search || null, p_status: status || null, p_limit: 50, p_offset: offset })
 export const adminErrors = () => rpc<AdminError[]>('admin_errors', { p_limit: 100 })
 export const adminAudit = () => rpc<AdminAuditRow[]>('admin_audit_list', { p_limit: 100 })
 export const adminGrantCourtesy = (workspace: string, plan: string, note: string) => rpc<void>('admin_grant_courtesy', { p_workspace: workspace, p_plan: plan, p_note: note || null })
 export const adminExtendTrial = (workspace: string, days: number, note: string) => rpc<void>('admin_extend_trial', { p_workspace: workspace, p_days: days, p_note: note || null })
+
+export interface AdminMetrics {
+  users: number
+  signups_week: { week: string; n: number }[]
+  active_7d: number
+  active_30d: number
+  funnel: { signups: number; with_client: number; with_proposal: number; paying: number }
+  canceled_30d: number
+  by_business_type: Record<string, number>
+  by_team_size: Record<string, number>
+  by_source: Record<string, number>
+  by_state: Record<string, number>
+  errors_by_day: { day: string; n: number }[]
+}
+
+export interface AdminFinance {
+  mrr_cents: number
+  active_count: number
+  by_plan: { plan_id: string; n: number; mrr_cents: number }[]
+  by_method: Record<string, number>
+  revenue_by_month: { month: string; cents: number }[]
+  received_30d_cents: number
+  recent_payments: { created_at: string; value: number; event: string; workspace: string | null }[]
+  past_due: { id: string; name: string; since: string | null; monthly_cents: number }[]
+  renewals_30d: { n: number; cents: number }
+}
+
+export interface AdminPlan {
+  id: string
+  name: string
+  price_cents: number
+  extra_member_cents: number
+  limits: Record<string, number | boolean>
+  workspaces: number
+  paying: number
+  trialing: number
+  courtesy: number
+}
+
+export const adminMetrics = () => rpc<AdminMetrics>('admin_metrics')
+export const adminFinance = () => rpc<AdminFinance>('admin_finance')
+export const adminPlans = () => rpc<AdminPlan[]>('admin_plans')
+export const adminUpdatePlan = (id: string, priceCents: number, extraMemberCents: number, limits: Record<string, number | boolean>, note: string) =>
+  rpc<void>('admin_update_plan', { p_id: id, p_price_cents: priceCents, p_extra_member_cents: extraMemberCents, p_limits: limits, p_note: note || null })
