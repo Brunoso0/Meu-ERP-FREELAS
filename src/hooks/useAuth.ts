@@ -2,6 +2,27 @@ import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { clearSessionMarks } from '@/lib/session'
+import { sessionIdOf, trustSession } from '@/lib/mfa'
+
+/** Logins que um aparelho confiável já liberou, e os pedidos em andamento (várias telas usam este hook). */
+const trustedLogins = new Set<string>()
+const trustChecks = new Map<string, Promise<boolean>>()
+
+function trustLogin(uid: string, sid: string | null): Promise<boolean> {
+  if (sid && trustedLogins.has(sid)) return Promise.resolve(true)
+  const key = sid ?? uid
+  let check = trustChecks.get(key)
+  if (!check) {
+    check = trustSession(uid)
+      .then((ok) => {
+        if (ok && sid) trustedLogins.add(sid)
+        return ok
+      })
+      .finally(() => trustChecks.delete(key))
+    trustChecks.set(key, check)
+  }
+  return check
+}
 
 /** Em modo demo não há login: `ready` já nasce true e `session` fica nula. */
 export function useAuth() {
@@ -35,8 +56,14 @@ export function useAuth() {
       return
     }
     let live = true
-    supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data }) => {
-      if (live) setMfa({ uid, pending: data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2' })
+    const accessToken = session?.access_token ?? ''
+    supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(async ({ data }) => {
+      let pending = data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2'
+      if (pending) {
+        // aparelho em que o código já foi confirmado antes (30 dias): a função libera este login
+        if (await trustLogin(uid, sessionIdOf(accessToken))) pending = false
+      }
+      if (live) setMfa({ uid, pending })
     })
     return () => {
       live = false

@@ -52,6 +52,36 @@ select is((select name from public.clients), 'Cliente B', 'e só vê o que é de
 -- o app não lê nem escreve os códigos de recuperação
 select throws_ok($$ select * from public.mfa_recovery_codes $$, '42501', null, 'códigos de recuperação fechados para o app');
 
+-- Aparelho confiável (migração 031): a sessão marcada como confiável abre os dados sem o código
+reset role;
+insert into public.mfa_trusted_devices (id, user_id, token_hash, expires_at) values
+  ('d1d1d1d1-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', 'hash-valido', now() + interval '30 days'),
+  ('d2d2d2d2-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-00000000000a', 'hash-vencido', now() - interval '1 day');
+insert into public.mfa_trusted_sessions (session_id, user_id, device_id, expires_at) values
+  ('51515151-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', 'd1d1d1d1-0000-0000-0000-000000000001', now() + interval '30 days'),
+  ('52525252-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-00000000000a', 'd2d2d2d2-0000-0000-0000-000000000002', now() - interval '1 day');
+set local role authenticated;
+
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated","aal":"aal1","session_id":"51515151-0000-0000-0000-000000000001"}';
+select is((select count(*) from public.clients), 1::bigint, 'sessão de aparelho confiável abre os dados em aal1');
+
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated","aal":"aal1","session_id":"52525252-0000-0000-0000-000000000002"}';
+select is((select count(*) from public.clients), 0::bigint, 'confiança vencida não vale');
+
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated","aal":"aal1","session_id":"99999999-0000-0000-0000-000000000009"}';
+select is((select count(*) from public.clients), 0::bigint, 'outra sessão da mesma conta continua pedindo o código');
+
+-- a sessão confiável de Ana não vale para outra pessoa que tenha a verificação ativa
+reset role;
+insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, secret, created_at, updated_at) values
+  ('33333333-0000-0000-0000-000000000003', 'bbbbbbbb-0000-0000-0000-00000000000b', 'celular2', 'totp', 'verified', 'JBSWY3DPEHPK3PXP', now(), now());
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"bbbbbbbb-0000-0000-0000-00000000000b","role":"authenticated","aal":"aal1","session_id":"51515151-0000-0000-0000-000000000001"}';
+select is((select count(*) from public.clients), 0::bigint, 'sessão confiável de outra conta não vale');
+
+select throws_ok($$ select * from public.mfa_trusted_devices $$, '42501', null, 'aparelhos confiáveis fechados para o app');
+select throws_ok($$ select * from public.mfa_trusted_sessions $$, '42501', null, 'sessões confiáveis fechadas para o app');
+
 reset role;
 select pass('mfa ok');
 select * from finish();

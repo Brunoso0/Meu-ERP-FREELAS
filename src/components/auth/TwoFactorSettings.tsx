@@ -3,12 +3,16 @@ import { toast } from 'sonner'
 import { Copy, Download, KeyRound, ShieldCheck, ShieldOff, Smartphone } from 'lucide-react'
 import { Badge, Button, Input } from '@/components/ui/primitives'
 import { confirm } from '@/components/ui/confirm'
-import { activeFactor, cancelEnrollment, disableTwoFactor, generateRecoveryCodes, recoveryCodesLeft, startEnrollment, verifyCode, type Enrollment } from '@/lib/mfa'
+import { activeFactor, cancelEnrollment, currentDeviceId, disableTwoFactor, forgetDevice, generateRecoveryCodes, recoveryCodesLeft, startEnrollment, TRUST_DAYS, trustedDevices, trustThisDevice, verifyCode, type Enrollment, type TrustedDevice } from '@/lib/mfa'
+import { useAuth } from '@/hooks/useAuth'
 
 type Step = 'loading' | 'off' | 'enrolling' | 'on'
 
 /** Verificação em duas etapas: liga com o app autenticador, mostra os códigos de recuperação uma única vez. */
 export function TwoFactorSettings() {
+  const { session } = useAuth()
+  const uid = session?.user.id
+  const [devices, setDevices] = useState<TrustedDevice[]>([])
   const [step, setStep] = useState<Step>('loading')
   const [factorId, setFactorId] = useState<string | null>(null)
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null)
@@ -23,6 +27,7 @@ export function TwoFactorSettings() {
       setFactorId(factor?.id ?? null)
       setStep(factor ? 'on' : 'off')
       setLeft(factor ? await recoveryCodesLeft().catch(() => null) : null)
+      setDevices(factor ? await trustedDevices().catch(() => []) : [])
     } catch {
       setStep('off')
     }
@@ -60,6 +65,9 @@ export function TwoFactorSettings() {
       if (!enrollment) return
       await verifyCode(enrollment.factorId, code)
       setCodes(await generateRecoveryCodes())
+      // quem acabou de provar que tem o celular não precisa digitar o código de novo neste aparelho
+      if (uid) await trustThisDevice(uid).catch(() => undefined)
+      setDevices(await trustedDevices().catch(() => []))
       setEnrollment(null)
       setFactorId(enrollment.factorId)
       setLeft(8)
@@ -80,12 +88,24 @@ export function TwoFactorSettings() {
     if (!(await confirm({ title: 'Desativar a verificação em duas etapas?', description: 'O acesso volta a pedir só e-mail e senha. Os códigos de recuperação deixam de ter uso.', confirmLabel: 'Desativar' }))) return
     run(async () => {
       await disableTwoFactor(factorId)
+      if (uid) await forgetDevice(uid).catch(() => undefined)
+      setDevices([])
       setFactorId(null)
       setCodes(null)
       setLeft(null)
       setStep('off')
       toast.success('Verificação em duas etapas desativada')
     }, 'Não foi possível desativar')
+  }
+
+  const forget = async (id?: string) => {
+    if (!uid) return
+    const all = !id
+    if (!(await confirm({ title: all ? 'Esquecer todos os aparelhos?' : 'Esquecer este aparelho?', description: 'No próximo login nele, o código do aplicativo volta a ser pedido.', confirmLabel: 'Esquecer', tone: 'default' }))) return
+    run(async () => {
+      await forgetDevice(uid, id)
+      setDevices(await trustedDevices().catch(() => []))
+    }, 'Não foi possível esquecer o aparelho')
   }
 
   const copy = async () => {
@@ -183,6 +203,36 @@ export function TwoFactorSettings() {
           </>
         )}
       </div>
+
+      {step === 'on' && (
+        <div className="rounded-lg border p-3">
+          <p className="text-sm font-medium">Aparelhos confiáveis</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Nestes aparelhos o código do aplicativo só é pedido a cada {TRUST_DAYS} dias. Num aparelho novo, ele é pedido no primeiro login.</p>
+          {devices.length === 0 ? (
+            <p className="mt-2 text-xs text-slate-500">Nenhum aparelho confiável agora.</p>
+          ) : (
+            <ul className="mt-2 divide-y text-sm">
+              {devices.map((d) => (
+                <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 font-medium">
+                      {d.label || 'Aparelho'} {uid && currentDeviceId(uid) === d.id && <Badge tone="green">Este aparelho</Badge>}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Vale até {new Date(d.expires_at).toLocaleDateString('pt-BR')}
+                      {d.last_used_at ? ` · usado em ${new Date(d.last_used_at).toLocaleDateString('pt-BR')}` : ''}
+                    </p>
+                  </div>
+                  <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => forget(d.id)}>Esquecer</Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {devices.length > 1 && (
+            <Button type="button" size="sm" variant="secondary" className="mt-2" disabled={busy} onClick={() => forget()}>Esquecer todos</Button>
+          )}
+        </div>
+      )}
 
       {step === 'on' && codes && (
         <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-500/40 dark:bg-amber-950/30">
