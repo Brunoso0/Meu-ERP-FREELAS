@@ -5,7 +5,8 @@ import { ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, Input, Skeleton } from '@/components/ui/primitives'
 import { ADMIN_STATUS_KEY } from '@/lib/admin'
-import { activeFactor, verifyCode } from '@/lib/mfa'
+import { supabase } from '@/lib/supabase'
+import { activeFactor, TRUST_DAYS, trustThisDevice, verifyCode } from '@/lib/mfa'
 
 export const message = (e: unknown) => (e instanceof Error ? e.message : 'Erro inesperado.')
 export const planLabel: Record<string, string> = { free: 'Grátis', essential: 'Essencial', pro: 'Profissional' }
@@ -52,6 +53,7 @@ export function StepUp() {
   const qc = useQueryClient()
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
+  const [remember, setRemember] = useState(true)
   const factor = useQuery({ queryKey: ['admin-factor'], queryFn: activeFactor, retry: false })
 
   const confirmCode = async () => {
@@ -59,6 +61,8 @@ export function StepUp() {
     setBusy(true)
     try {
       await verifyCode(factor.data.id, code)
+      const uid = (await supabase?.auth.getSession())?.data.session?.user.id
+      if (remember && uid) await trustThisDevice(uid).catch(() => toast.info('Não foi possível lembrar este aparelho', { description: 'O código será pedido no próximo login.' }))
       await qc.invalidateQueries({ queryKey: ADMIN_STATUS_KEY })
     } catch (e) {
       toast.error('Código não confere', { description: message(e) })
@@ -73,6 +77,7 @@ export function StepUp() {
         <div className="space-y-3">
           <p className="text-sm text-slate-500">O modo administrador mostra dados de todos os clientes. Digite o código de 6 dígitos do aplicativo autenticador para entrar.</p>
           <Input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={(e) => e.key === 'Enter' && code.length === 6 && void confirmCode()} inputMode="numeric" placeholder="000000" autoFocus />
+          <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Não pedir de novo neste aparelho por {TRUST_DAYS} dias</label>
           <Button type="button" onClick={confirmCode} loading={busy} disabled={code.length !== 6}>Entrar no modo administrador</Button>
         </div>
       ) : (
