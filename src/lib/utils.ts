@@ -69,3 +69,27 @@ export const safeHttpUrl = (url: string | null | undefined) => (url && /^https?:
 
 export const sum = (values: Array<number | null | undefined>) =>
   values.reduce<number>((acc, v) => acc + Number(v ?? 0), 0)
+
+export function maskCep(value: string) {
+  const d = value.replace(/\D/g, '').slice(0, 8)
+  return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d
+}
+
+/** CPF ou CNPJ com os dígitos verificadores conferidos (não aceita 111.111.111-11). */
+export function isValidCpfCnpj(value: string) {
+  const d = value.replace(/\D/g, '')
+  if (!/^\d{11}$|^\d{14}$/.test(d) || /^(\d)\1+$/.test(d)) return false
+  const digit = (len: number, weights: number[]) => {
+    const sum = weights.reduce((acc, w, i) => acc + Number(d[i]) * w, 0)
+    const rest = (sum * 10) % 11
+    return rest === 10 ? 0 : rest
+  }
+  if (d.length === 11) {
+    const w1 = [10, 9, 8, 7, 6, 5, 4, 3, 2]
+    const w2 = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]
+    return digit(9, w1) === Number(d[9]) && digit(10, w2) === Number(d[10])
+  }
+  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+  const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+  return digit(12, w1) === Number(d[12]) && digit(13, w2) === Number(d[13])
+}

@@ -27,6 +27,23 @@ const input = 'w-full rounded-2xl bg-transparent py-3.5 pl-11 text-sm text-white
 const socialButton =
   'group flex items-center justify-center gap-2 rounded-2xl border border-slate-700/60 bg-slate-900/90 px-4 py-3 text-sm font-medium shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-indigo-500/50 hover:bg-slate-800 active:scale-[0.98]'
 
+/** Força da senha em três níveis (comprimento e variedade), só como orientação: a regra mínima continua sendo a do formulário. */
+function PasswordStrength({ value }: { value: string }) {
+  if (!value) return null
+  const variety = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((re) => re.test(value)).length
+  const level = value.length >= 12 && variety >= 3 ? 3 : value.length >= 8 && variety >= 2 ? 2 : 1
+  const label = ['', 'Fraca', 'Boa', 'Forte'][level]
+  const color = ['', 'bg-red-500', 'bg-amber-400', 'bg-emerald-500'][level]
+  return (
+    <div className="mt-2 flex items-center gap-2" aria-live="polite">
+      <div className="flex flex-1 gap-1">
+        {[1, 2, 3].map((i) => <span key={i} className={cn('h-1 flex-1 rounded-full', i <= level ? color : 'bg-slate-700')} />)}
+      </div>
+      <span className="text-[11px] text-slate-400">{label}{level === 1 && ' · use 8+ caracteres, letras e números'}</span>
+    </div>
+  )
+}
+
 /** Entrar ou criar conta. Quem chega por um link de convite (/convite/…) volta a ele depois de entrar. */
 export default function Login() {
   const {
@@ -34,6 +51,7 @@ export default function Login() {
     handleSubmit,
     trigger,
     getValues,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { email: biometricDevice()?.email ?? '' } })
   const device = biometricDevice()
@@ -44,6 +62,7 @@ export default function Login() {
   const [mode, setMode] = useState<'login' | 'signup'>(() => (new URLSearchParams(window.location.search).has('cadastro') ? 'signup' : 'login'))
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [accepted, setAccepted] = useState(false)
+  const [confirm, setConfirm] = useState('')
   const signup = mode === 'signup'
   const invited = window.location.pathname.startsWith(`${APP_BASE}/convite/`)
 
@@ -75,6 +94,7 @@ export default function Login() {
     if (signup) {
       const name = values.name?.trim()
       if (!name) return void toast.error('Informe o seu nome')
+      if (values.password !== confirm) return void toast.error('As senhas não são iguais', { description: 'Digite a mesma senha nos dois campos.' })
       if (!accepted) return void toast.error('Aceite os termos de uso e a política de privacidade para criar a conta')
       const { data, error } = await supabase.auth.signUp({
         email: values.email,
@@ -277,7 +297,21 @@ export default function Login() {
                 </button>
               </div>
               {errors.password && <p className="mt-1.5 text-xs text-red-400">{errors.password.message}</p>}
+              {signup && <PasswordStrength value={watch('password') ?? ''} />}
             </div>
+
+            {signup && (
+              <div>
+                <label htmlFor="login-confirm" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                  Repita a senha
+                </label>
+                <div className={cn(field, confirm && confirm !== watch('password') && 'border-red-500/60')}>
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <input id="login-confirm" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={cn(input, 'pr-4')} />
+                </div>
+                {confirm && confirm !== watch('password') && <p className="mt-1.5 text-xs text-red-400">As senhas não são iguais</p>}
+              </div>
+            )}
 
             {signup && (
               <label className="flex items-start gap-2.5 text-xs leading-relaxed text-slate-400">
