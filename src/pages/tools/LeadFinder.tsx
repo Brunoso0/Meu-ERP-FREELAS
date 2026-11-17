@@ -12,13 +12,13 @@ import {
   leadTargets,
   mapsSearchUrl,
   nicheSuggestions,
-  searchLeads,
   whatsappUrl,
   type Lead,
   type LeadResult,
   type LeadScope,
   type LeadTarget,
 } from '@/lib/leads'
+import { runLeadSearch, useLeadSearch } from '@/lib/leadStore'
 import { cn } from '@/lib/utils'
 
 const STORAGE_KEY = 'meu-erp-freelas:lead-finder:v1'
@@ -56,9 +56,7 @@ export default function LeadFinder() {
   const profile = useTable('profiles').data?.[0]
   const insert = useInsert('clients')
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs)
-  const [result, setResult] = useState<LeadResult | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { result, loading, error, searchedAt } = useLeadSearch()
   const [placeError, setPlaceError] = useState<string | undefined>()
   const [saving, setSaving] = useState<string | null>(null)
 
@@ -82,17 +80,7 @@ export default function LeadFinder() {
       return
     }
     setPlaceError(undefined)
-    setError(null)
-    setLoading(true)
-    try {
-      const found = await searchLeads({ scope: prefs.scope, place: place.trim(), niche: prefs.niche.trim(), target: prefs.target, count: prefs.count })
-      setResult(found)
-    } catch (err) {
-      setResult(null)
-      setError(err instanceof Error ? err.message : 'Não foi possível buscar.')
-    } finally {
-      setLoading(false)
-    }
+    await runLeadSearch({ scope: prefs.scope, place: place.trim(), niche: prefs.niche.trim(), target: prefs.target, count: prefs.count })
   }
 
   const save = async (lead: Lead) => {
@@ -280,6 +268,7 @@ export default function LeadFinder() {
             {result && (
               <div className="flex flex-wrap items-start gap-2 border-b px-5 py-3.5">
                 <Badge tone={result.engine === 'maps' ? 'green' : 'amber'}>{result.leads.length} {result.leads.length === 1 ? 'empresa' : 'empresas'}</Badge>
+                {searchedAt && <span className="tabular text-xs text-slate-500 dark:text-slate-400">Busca de {new Date(searchedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
                 <p className="min-w-0 flex-1 basis-64 text-xs text-slate-500 dark:text-slate-400">
                   {engineNote[result.engine]}
                   {!!result.dropped && (
