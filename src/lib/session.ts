@@ -1,5 +1,6 @@
 import { browserSupportsWebAuthn, platformAuthenticatorIsAvailable, startAuthentication, startRegistration } from '@simplewebauthn/browser'
 import { supabase } from './supabase'
+import { clearLeadSearch } from './leadStore'
 
 /*
  * Regras da sessão. O Supabase renova o acesso sozinho para sempre (o token de
@@ -32,7 +33,11 @@ function write(key: string, value: string | null) {
 }
 
 export const markActive = () => write(LAST_ACTIVE, String(Date.now()))
-export const clearSessionMarks = () => write(LAST_ACTIVE, null)
+export const clearSessionMarks = () => {
+  write(LAST_ACTIVE, null)
+  // a última busca de leads é dado da pessoa que saiu: não fica para a próxima no mesmo navegador
+  clearLeadSearch()
+}
 
 /**
  * Passou do limite sem uso? Sessão sem marca também conta como vencida: todo
