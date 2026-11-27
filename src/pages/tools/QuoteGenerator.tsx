@@ -242,6 +242,17 @@ export default function QuoteGenerator() {
     if (gateway && connection.data && progress.next && !progress.next.gateway_charge_id) {
       if (await chargeQuote(q)) progress = quoteProgress(await listRows('financial_transactions'), q.id)
     }
+    // cobrança criada antes de a conta ter chave Pix: busca o QR agora, para o PDF já sair com ele
+    if (gateway && progress.next?.gateway_charge_id && !progress.next.gateway_pix_image && progress.next.status !== 'paid') {
+      try {
+        const { pixWarning } = await refreshPix(progress.next.id)
+        await refreshLinked()
+        progress = quoteProgress(await listRows('financial_transactions'), q.id)
+        if (pixWarning) toast.warning('O PDF vai sem o QR Code Pix', { description: pixWarning, duration: 15000 })
+      } catch {
+        // sem o QR o PDF sai só com o link de pagamento
+      }
+    }
     setPrinting(buildQuoteDoc(q, clientOf(q.client_id), profile, progress.received, progress.next, balance ? progress.parts[0]?.payment_date : null))
   }
 
